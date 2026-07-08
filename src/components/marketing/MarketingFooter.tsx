@@ -43,7 +43,7 @@ export function MarketingFooter() {
 
       <div className="mx-auto mt-2 flex max-w-6xl flex-col items-center justify-between gap-3 border-t border-white/10 px-4 pt-6 text-xs text-white/35 sm:flex-row sm:px-6">
         <span>© {new Date().getFullYear()} Retrn. Built for the people you haven't met yet.</span>
-        <span>Your data stays on your device.</span>
+        <span>Private to your account, synced everywhere.</span>
       </div>
     </footer>
   )

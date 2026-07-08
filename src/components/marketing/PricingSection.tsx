@@ -55,9 +55,9 @@ export function PricingSection() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="mx-auto mt-6 max-w-md text-base leading-relaxed text-white/55"
         >
-          Retrn runs entirely in your browser — there's no server to pay for,
-          so there's nothing to charge you for. Everything is included, for
-          as long as you need it.
+          Built by a student, for students — no seat licenses, no sales
+          team, nothing to upsell you on. Everything is included, for as
+          long as you need it.
         </motion.p>
 
         <motion.div

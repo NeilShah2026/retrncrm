@@ -30,7 +30,7 @@ export function LandingPage() {
         className="relative overflow-hidden"
         style={{
           background:
-            'linear-gradient(180deg, #08080c 0%, #0a0810 55%, #1c1420 75%, #4a3536 88%, #caa480 100%)',
+            'linear-gradient(180deg, #08080c 0%, #0a0810 55%, #1c1420 75%, #4a3536 88%, #f6ecdd 100%)',
         }}
       >
         <div
@@ -130,8 +130,9 @@ export function LandingPage() {
 
       {/* ============ LIGHT feature section ============ */}
       <div className="relative bg-[#f6ecdd]">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28" id="features">
+        <div className="mx-auto max-w-6xl px-4 pb-10 pt-20 sm:px-6 sm:pb-14 sm:pt-28" id="features">
           <FeatureSection
+            index={1}
             eyebrow="Capture"
             title="Add anyone in seconds, from anywhere"
             description="A name and how you met is enough to save. Paste a LinkedIn profile to auto-fill the rest, tag where you met them — career fair, guest lecture, hackathon, coffee chat — and Retrn takes care of the rest. Works just as fast from your phone as your laptop."
@@ -151,7 +152,7 @@ export function LandingPage() {
             'linear-gradient(180deg, #f6ecdd 0%, #f1d9bd 8%, #e8bfab 18%, #d99fac 30%, #b979a8 42%, #8c5fa0 54%, #5f4788 66%, #362d5e 78%, #17132a 90%, #0a0810 100%)',
         }}
       >
-        <div className="mx-auto max-w-3xl px-4 pt-24 text-center sm:px-6 sm:pt-32">
+        <div className="mx-auto max-w-3xl px-4 pt-12 text-center sm:px-6 sm:pt-16">
           <motion.p
             {...fadeUp}
             className="text-xs font-semibold uppercase tracking-wider text-zinc-700"
@@ -176,6 +177,7 @@ export function LandingPage() {
 
         <div className="mx-auto max-w-6xl space-y-8 px-4 pb-20 pt-4 sm:space-y-10 sm:px-6 sm:pb-28">
           <FeatureSection
+            index={2}
             eyebrow="Pipeline"
             title="Turn your network into your next offer"
             description="Track every internship and job you're chasing on a simple board, and see exactly who in your network can put in a good word — recruiters, referrers, and warm intros, all linked to the opportunity."
@@ -187,6 +189,7 @@ export function LandingPage() {
             reverse
           />
           <FeatureSection
+            index={3}
             eyebrow="Follow through"
             title="Never show up to a conversation cold"
             description="Get a quick brief before every coffee chat — talking points, your last conversation, shared history. Reusable outreach templates make the follow-up just as easy."
