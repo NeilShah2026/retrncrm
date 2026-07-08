@@ -80,12 +80,20 @@ export function WelcomeTour({
   const current = STEPS[step]
   const isNameStep = current.kind === 'name'
 
+  // Read the latest user via a ref rather than a dependency: `updateName`
+  // below triggers a Supabase auth-state change, which gives us a new
+  // `user` object while the dialog is still open. If `user` were a
+  // dependency, that alone would re-run this effect and snap `step` back
+  // to 0 right after advancing — "Continue" would look like it does nothing.
+  const userRef = React.useRef(user)
+  userRef.current = user
+
   React.useEffect(() => {
     if (open) {
       setStep(0)
-      setName((user?.user_metadata?.full_name as string | undefined) ?? '')
+      setName((userRef.current?.user_metadata?.full_name as string | undefined) ?? '')
     }
-  }, [open, user])
+  }, [open])
 
   function next() {
     if (isNameStep && name.trim()) void updateName(name.trim())

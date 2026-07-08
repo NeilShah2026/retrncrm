@@ -18,6 +18,7 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<AuthResult>
   signOut: () => Promise<void>
   updateName: (name: string) => Promise<AuthResult>
+  markOnboarded: () => Promise<AuthResult>
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
@@ -91,6 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null }
   }, [])
 
+  const markOnboarded = React.useCallback(async (): Promise<AuthResult> => {
+    const { error } = await supabase.auth.updateUser({ data: { onboarded: true } })
+    return { error: error?.message ?? null }
+  }, [])
+
   const value = React.useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signOut,
       updateName,
+      markOnboarded,
     }),
     [
       session,
@@ -112,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signOut,
       updateName,
+      markOnboarded,
     ],
   )
 

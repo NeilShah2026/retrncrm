@@ -2,6 +2,7 @@ import * as React from 'react'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
+import { useAuth } from '@/auth/AuthProvider'
 import type { Contact } from '@/types'
 
 interface UIContextValue {
@@ -12,8 +13,6 @@ interface UIContextValue {
 }
 
 const UIContext = React.createContext<UIContextValue | null>(null)
-
-const ONBOARDED_KEY = 'retrn-onboarded'
 
 /** Returns true if focus is in a field where typing shortcuts should be ignored. */
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -28,6 +27,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
+  const { user, markOnboarded } = useAuth()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -46,14 +46,15 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
   const openWelcomeTour = React.useCallback(() => setTourOpen(true), [])
 
-  // Show the welcome tour automatically the very first time someone reaches
-  // the app in this browser.
+  // Show the welcome tour automatically the first time someone reaches the
+  // app on this account — tracked on the account itself (not localStorage)
+  // so it doesn't reappear every time they sign in on a new device.
   React.useEffect(() => {
-    if (!localStorage.getItem(ONBOARDED_KEY)) setTourOpen(true)
-  }, [])
+    if (user && !user.user_metadata?.onboarded) setTourOpen(true)
+  }, [user])
 
   function finishTour() {
-    localStorage.setItem(ONBOARDED_KEY, '1')
+    void markOnboarded()
   }
 
   // Global keyboard shortcuts: Cmd/Ctrl+K → search, "N" → new contact.
