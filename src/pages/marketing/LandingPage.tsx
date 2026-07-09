@@ -6,6 +6,7 @@ import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 import { FeatureSection } from '@/components/marketing/FeatureSection'
 import { OrbitalGraphic } from '@/components/marketing/OrbitalGraphic'
 import { PricingSection } from '@/components/marketing/PricingSection'
+import { SectionDivider } from '@/components/marketing/SectionDivider'
 import { DashboardMockup } from '@/components/marketing/mockups/DashboardMockup'
 import { ContactsMockup } from '@/components/marketing/mockups/ContactsMockup'
 import { PipelineMockup } from '@/components/marketing/mockups/PipelineMockup'
@@ -208,7 +209,10 @@ export function LandingPage() {
       </section>
 
       {/* ================= PRICING ================= */}
+      <SectionDivider />
       <PricingSection />
+
+      <SectionDivider />
 
       {/* ================= FINAL CTA ================= */}
       <section className="relative overflow-hidden py-24 text-center sm:py-32">
@@ -239,6 +243,8 @@ export function LandingPage() {
           </motion.div>
         </div>
       </section>
+
+      <SectionDivider />
 
       <MarketingFooter />
     </div>
