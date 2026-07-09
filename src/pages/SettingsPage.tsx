@@ -32,6 +32,7 @@ import {
   useTemplates,
 } from '@/hooks/useData'
 import { contactRepo, opportunityRepo, tagRepo, templateRepo } from '@/services'
+import { ShareableProfileCard } from '@/components/profile/ShareableProfileCard'
 import { useAuth } from '@/auth/AuthProvider'
 import { useUI } from '@/context/ui-context'
 import { buildStarterContent } from '@/lib/starterContent'
@@ -45,7 +46,7 @@ import { toast } from 'sonner'
 
 export function SettingsPage() {
   const { openWelcomeTour } = useUI()
-  const { user, signOut, updateName } = useAuth()
+  const { user, signOut } = useAuth()
   const contacts = useContacts() ?? []
   const tags = useTags() ?? []
   const opportunities = useOpportunities() ?? []
@@ -58,16 +59,6 @@ export function SettingsPage() {
   const [confirmClear, setConfirmClear] = React.useState(false)
   const [confirmReset, setConfirmReset] = React.useState(false)
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
-
-  const savedName = (user?.user_metadata?.full_name as string | undefined) ?? ''
-  const [nameDraft, setNameDraft] = React.useState(savedName)
-  React.useEffect(() => setNameDraft(savedName), [savedName])
-
-  async function saveName() {
-    const { error } = await updateName(nameDraft.trim())
-    if (error) toast.error(error)
-    else toast.success('Name updated')
-  }
 
   function handleExportJson() {
     exportJson(contacts, tags, opportunities, templates)
@@ -186,6 +177,11 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Shareable profile */}
+      <div className="mb-6">
+        <ShareableProfileCard />
+      </div>
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Account */}
         <Card>
@@ -197,25 +193,6 @@ export function SettingsPage() {
             <p className="mb-4 truncate text-sm text-muted-foreground">
               Signed in as <span className="text-foreground">{user?.email}</span>
             </p>
-            <label htmlFor="my-name" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Your name
-            </label>
-            <div className="mb-4 flex gap-2">
-              <input
-                id="my-name"
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                placeholder="What should we call you?"
-                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-indigo-400"
-              />
-              <Button
-                variant="outline"
-                disabled={!nameDraft.trim() || nameDraft === savedName}
-                onClick={() => void saveName()}
-              >
-                Save
-              </Button>
-            </div>
             <Button
               variant="outline"
               onClick={() => setConfirmSignOut(true)}

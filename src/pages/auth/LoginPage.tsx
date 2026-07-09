@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Mail, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { ROUTES } from '@/lib/routes'
@@ -18,6 +18,16 @@ export function LoginPage() {
     signInWithGoogle,
   } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+
+  // Where to go after auth. Defaults to the dashboard, but the /add flow
+  // passes ?next=/add#… so a shared-profile scan resumes after sign-in.
+  // Guard against open redirects: only same-origin app paths.
+  const rawNext = params.get('next')
+  const next =
+    rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+      ? rawNext
+      : ROUTES.dashboard
 
   const [mode, setMode] = React.useState<Mode>('signin')
   const [method, setMethod] = React.useState<Method>('password')
@@ -30,7 +40,7 @@ export function LoginPage() {
   const [confirmEmailSent, setConfirmEmailSent] = React.useState(false)
 
   // Already signed in — no reason to see the login screen.
-  if (!loading && user) return <Navigate to={ROUTES.dashboard} replace />
+  if (!loading && user) return <Navigate to={next} replace />
 
   async function handleGoogle() {
     setError(null)
@@ -68,7 +78,7 @@ export function LoginPage() {
       } else {
         const { error } = await signInWithPassword(email, password)
         if (error) setError(error)
-        else navigate(ROUTES.dashboard)
+        else navigate(next)
       }
     } finally {
       setSubmitting(false)

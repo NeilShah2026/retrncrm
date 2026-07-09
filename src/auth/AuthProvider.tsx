@@ -2,6 +2,7 @@ import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
+import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
 
 interface AuthResult {
   error: string | null
@@ -19,6 +20,7 @@ interface AuthContextValue {
   signOut: () => Promise<void>
   updateName: (name: string) => Promise<AuthResult>
   updateCollege: (college: string) => Promise<AuthResult>
+  updateProfile: (profile: ShareProfile) => Promise<AuthResult>
   markOnboarded: () => Promise<AuthResult>
 }
 
@@ -98,6 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null }
   }, [])
 
+  const updateProfile = React.useCallback(
+    async (profile: ShareProfile): Promise<AuthResult> => {
+      const { error } = await supabase.auth.updateUser({
+        data: profileToMetadata(profile),
+      })
+      return { error: error?.message ?? null }
+    },
+    [],
+  )
+
   const markOnboarded = React.useCallback(async (): Promise<AuthResult> => {
     const { error } = await supabase.auth.updateUser({ data: { onboarded: true } })
     return { error: error?.message ?? null }
@@ -115,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       updateName,
       updateCollege,
+      updateProfile,
       markOnboarded,
     }),
     [
@@ -127,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       updateName,
       updateCollege,
+      updateProfile,
       markOnboarded,
     ],
   )

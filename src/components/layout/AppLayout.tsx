@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -9,6 +10,7 @@ import {
   KanbanSquare,
   Mail,
   GraduationCap,
+  QrCode,
   MoreHorizontal,
   LogOut,
   ChevronsUpDown,
@@ -23,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from './ThemeToggle'
+import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { cn } from '@/lib/utils'
@@ -108,6 +111,7 @@ export function AppLayout() {
   const { openNewContact, openSearch } = useUI()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [shareOpen, setShareOpen] = React.useState(false)
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
@@ -156,6 +160,13 @@ export function AppLayout() {
         </nav>
 
         <div className="space-y-2 border-t px-3 py-3">
+          <button
+            onClick={() => setShareOpen(true)}
+            className="flex w-full items-center gap-2 rounded-md border border-indigo-500/20 bg-indigo-500/[0.06] px-3 py-2 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-500/10 dark:text-indigo-300"
+          >
+            <QrCode className="h-4 w-4" />
+            Share profile
+          </button>
           <AccountMenu />
           <div className="flex items-center justify-between px-2">
             <span className="text-[11px] text-muted-foreground">Synced to the cloud</span>
@@ -223,6 +234,10 @@ export function AppLayout() {
                 {displayName(user)}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShareOpen(true)}>
+                <QrCode className="h-4 w-4" />
+                Share profile
+              </DropdownMenuItem>
               {SECONDARY_NAV.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
@@ -241,6 +256,8 @@ export function AppLayout() {
           </DropdownMenu>
         </nav>
       </div>
+
+      <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
     </div>
   )
 }
