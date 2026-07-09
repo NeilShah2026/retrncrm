@@ -8,6 +8,7 @@ import {
   Plus,
   KanbanSquare,
   Mail,
+  GraduationCap,
   MoreHorizontal,
   LogOut,
   ChevronsUpDown,
@@ -31,6 +32,7 @@ import { displayName, initialFor } from '@/lib/displayName'
 const PRIMARY_NAV = [
   { to: ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
+  { to: ROUTES.college, label: 'College', icon: GraduationCap, end: false },
   { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare, end: false },
 ]
 

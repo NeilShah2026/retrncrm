@@ -12,6 +12,7 @@ export const ROUTES = {
   contact: (id: string) => `/app/contacts/${id}`,
   contactsSearch: (q: string) => `/app/contacts?q=${encodeURIComponent(q)}`,
   contactsOverdue: '/app/contacts?overdue=1',
+  college: '/app/college',
   pipeline: '/app/pipeline',
   templates: '/app/templates',
   tags: '/app/tags',

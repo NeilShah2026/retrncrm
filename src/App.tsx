@@ -12,6 +12,7 @@ import { ContactDetailPage } from '@/pages/ContactDetailPage'
 import { TagsPage } from '@/pages/TagsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { PipelinePage } from '@/pages/PipelinePage'
+import { CollegePage } from '@/pages/CollegePage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -44,6 +45,7 @@ function AppEntry() {
             <Route index element={<DashboardPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="contacts/:id" element={<ContactDetailPage />} />
+            <Route path="college" element={<CollegePage />} />
             <Route path="pipeline" element={<PipelinePage />} />
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="tags" element={<TagsPage />} />
