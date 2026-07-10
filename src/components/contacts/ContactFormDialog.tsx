@@ -308,7 +308,7 @@ export function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit contact' : 'New contact'}</DialogTitle>
           <DialogDescription>

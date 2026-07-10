@@ -110,7 +110,7 @@ export function CollegePage() {
       header={
         <PageHeader title={college} description={`${atCollege.length} in your campus network`}>
           {changing ? (
-            <div className="w-64">
+            <div className="w-full sm:w-64">
               <CollegePicker
                 value={college}
                 onSelect={(c) => {

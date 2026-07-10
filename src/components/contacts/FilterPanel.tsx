@@ -81,7 +81,7 @@ export function FilterPanel({ contacts, tags, filters, onChange }: Props) {
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="max-h-[70vh] w-80 overflow-y-auto scrollbar-thin p-3"
+        className="max-h-[70vh] w-[calc(100vw-2rem)] overflow-y-auto scrollbar-thin p-3 sm:w-80"
       >
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold">Filters</span>

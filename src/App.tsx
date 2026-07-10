@@ -68,8 +68,7 @@ export default function App() {
             <Routes>
               <Route path={ROUTES.home} element={<LandingPage />} />
               <Route path={ROUTES.login} element={<LoginPage />} />
-              <Route path={ROUTES.add} element={<AddContactPage />} />
-              <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
+              <Route path={ROUTES.add} element={<AddContactPage />} />              <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
               <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
             </Routes>
           </BrowserRouter>

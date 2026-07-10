@@ -13,6 +13,7 @@ import { FilterPanel } from '@/components/contacts/FilterPanel'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useContacts, useTagMap, useTags } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useUI } from '@/context/ui-context'
 import { contactRepo } from '@/services'
 import {
@@ -49,6 +50,9 @@ export function ContactsPage() {
   const [view, setView] = React.useState<ViewMode>(
     () => (localStorage.getItem(VIEW_KEY) as ViewMode) ?? 'table',
   )
+  const isMobile = useIsMobile()
+  // Wide data tables don't belong on a phone — always show cards there.
+  const effectiveView: ViewMode = isMobile ? 'grid' : view
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [deleting, setDeleting] = React.useState<Contact | null>(null)
 
@@ -151,7 +155,7 @@ export function ContactsPage() {
                 filters={filters}
                 onChange={setFilters}
               />
-              <div className="flex overflow-hidden rounded-md border">
+              <div className="hidden overflow-hidden rounded-md border md:flex">
                 <button
                   onClick={() => setView('table')}
                   className={cn(
@@ -185,7 +189,7 @@ export function ContactsPage() {
       {/* This is the ONLY scrollable region on this page — the header and
           toolbar above never move. */}
       {loading ? (
-        <ContactsSkeleton view={view} />
+        <ContactsSkeleton view={effectiveView} />
       ) : totalCount === 0 ? (
         <EmptyState
           icon={Users}
@@ -210,7 +214,7 @@ export function ContactsPage() {
             </Button>
           }
         />
-      ) : view === 'table' ? (
+      ) : effectiveView === 'table' ? (
         <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
           <div className="h-full overflow-auto scrollbar-thin">
             <ContactsTable

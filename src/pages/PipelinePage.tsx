@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -93,17 +94,22 @@ export function PipelinePage() {
     setFormOpen(true)
   }
 
-  async function moveTo(stage: OpportunityStage) {
-    if (!dragId) return
-    const opp = opportunities?.find((o) => o.id === dragId)
-    setDragId(null)
-    setDragOverStage(null)
-    if (!opp || opp.stage === stage) return
+  async function moveOpportunity(opp: Opportunity, stage: OpportunityStage) {
+    if (opp.stage === stage) return
     await opportunityRepo.update(opp.id, {
       stage,
       order: byStage[stage].length,
     })
     toast.success(`Moved ${opp.company} → ${OPPORTUNITY_STAGES[stage].label}`)
+  }
+
+  async function moveTo(stage: OpportunityStage) {
+    if (!dragId) return
+    const opp = opportunities?.find((o) => o.id === dragId)
+    setDragId(null)
+    setDragOverStage(null)
+    if (!opp) return
+    await moveOpportunity(opp, stage)
   }
 
   async function confirmDelete() {
@@ -152,7 +158,7 @@ export function PipelinePage() {
       ) : (
         // The only scroll region on this page: horizontal for the columns,
         // and each column scrolls its own card list vertically below.
-        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2 scrollbar-thin">
+        <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto pb-2 scrollbar-thin sm:snap-none">
           {OPPORTUNITY_STAGE_KEYS.map((stage) => {
             const cards = byStage[stage]
             const s = OPPORTUNITY_STAGES[stage]
@@ -166,7 +172,7 @@ export function PipelinePage() {
                 onDragLeave={() => setDragOverStage((c) => (c === stage ? null : c))}
                 onDrop={() => void moveTo(stage)}
                 className={cn(
-                  'flex w-[280px] shrink-0 flex-col rounded-xl border bg-muted/30 transition-colors',
+                  'flex w-[82vw] max-w-[300px] shrink-0 snap-start flex-col rounded-xl border bg-muted/30 transition-colors sm:w-[280px]',
                   dragOverStage === stage && 'ring-2 ring-ring bg-accent/40',
                 )}
               >
@@ -202,6 +208,7 @@ export function PipelinePage() {
                       }}
                       onEdit={() => openEdit(o)}
                       onDelete={() => setDeleting(o)}
+                      onMove={(s) => void moveOpportunity(o, s)}
                     />
                   ))}
                   {cards.length === 0 && (
@@ -246,6 +253,7 @@ function OpportunityCard({
   onDragEnd,
   onEdit,
   onDelete,
+  onMove,
 }: {
   opportunity: Opportunity
   contactMap: Map<string, Contact>
@@ -254,6 +262,7 @@ function OpportunityCard({
   onDragEnd: () => void
   onEdit: () => void
   onDelete: () => void
+  onMove: (stage: OpportunityStage) => void
 }) {
   const deadline = deadlineChip(o.deadline)
   const contacts = o.contactIds
@@ -283,7 +292,7 @@ function OpportunityCard({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="opacity-0 transition-opacity group-hover:opacity-100"
+                className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -297,6 +306,16 @@ function OpportunityCard({
                   </a>
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                Move to
+              </DropdownMenuLabel>
+              {OPPORTUNITY_STAGE_KEYS.filter((s) => s !== o.stage).map((s) => (
+                <DropdownMenuItem key={s} onClick={() => onMove(s)}>
+                  <span className={cn('h-2 w-2 rounded-full', OPPORTUNITY_STAGES[s].dot)} />
+                  {OPPORTUNITY_STAGES[s].label}
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={onDelete}

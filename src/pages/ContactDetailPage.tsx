@@ -262,7 +262,7 @@ export function ContactDetailPage() {
                             </p>
                           )}
                         </div>
-                        <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon-sm">
