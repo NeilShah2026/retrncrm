@@ -44,7 +44,7 @@ export function OrbitalGraphic({ light }: Props) {
   return (
     <div
       aria-hidden
-      className="relative mx-auto h-[560px] w-[560px] max-w-full"
+      className="relative h-[560px] w-[560px] shrink-0"
       style={{ perspective: 800 }}
     >
       {/* Concentric rings */}

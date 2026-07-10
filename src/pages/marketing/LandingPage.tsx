@@ -70,7 +70,7 @@ export function LandingPage() {
           transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
         />
 
-        <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 pb-24 pt-16 text-center sm:px-6 sm:pt-24">
+        <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 pb-16 pt-14 text-center sm:px-6 sm:pb-24 sm:pt-24">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -126,7 +126,7 @@ export function LandingPage() {
             initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 1, delay: 0.4, ease: EASE }}
-            className="mx-auto mt-16 w-full max-w-xl"
+            className="mx-auto mt-12 w-full max-w-xl sm:mt-16"
           >
             <DashboardMockup />
           </motion.div>
@@ -134,7 +134,7 @@ export function LandingPage() {
       </section>
 
       {/* ================= "EVERYWHERE" BEAT ================= */}
-      <section className="relative overflow-hidden py-16 sm:py-24">
+      <section className="relative overflow-hidden py-12 sm:py-20">
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <motion.p
             {...fadeUp}
@@ -157,15 +157,19 @@ export function LandingPage() {
           </motion.p>
         </div>
 
-        <div className="relative mt-4 px-4 sm:px-6">
-          <OrbitalGraphic />
+        {/* The orbital is a fixed 560px system; scale + clip it so it doesn't
+            leave a huge empty square on small screens. */}
+        <div className="relative mt-2 flex h-[360px] justify-center overflow-hidden sm:mt-6 sm:h-[560px]">
+          <div className="origin-top scale-[0.6] sm:scale-100">
+            <OrbitalGraphic />
+          </div>
         </div>
       </section>
 
       {/* ================= FEATURES ================= */}
       <section
         id="features"
-        className="relative mx-auto max-w-6xl space-y-28 px-4 pb-28 pt-4 sm:space-y-36 sm:px-6 sm:pb-36"
+        className="relative mx-auto max-w-6xl space-y-20 px-4 pb-20 pt-2 sm:space-y-36 sm:px-6 sm:pb-36 sm:pt-4"
       >
         {/* soft moving accent glows behind the feature stack */}
         <motion.div
@@ -215,7 +219,7 @@ export function LandingPage() {
       <SectionDivider />
 
       {/* ================= FINAL CTA ================= */}
-      <section className="relative overflow-hidden py-24 text-center sm:py-32">
+      <section className="relative overflow-hidden py-20 text-center sm:py-32">
         <motion.div
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-600/22 blur-[130px]"

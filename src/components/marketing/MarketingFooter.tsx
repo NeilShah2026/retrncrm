@@ -6,7 +6,8 @@ const LINKS = [
   { label: 'Product', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'Sign in', href: ROUTES.login },
-  { label: 'Get started', href: ROUTES.login },
+  { label: 'Privacy', href: ROUTES.privacy },
+  { label: 'Terms', href: ROUTES.terms },
 ]
 
 export function MarketingFooter() {

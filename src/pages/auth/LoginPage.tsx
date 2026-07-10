@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, Mail, ShieldCheck, Users } from 'lucide-react'
+import { ArrowRight, Mail, PartyPopper, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,12 @@ export function LoginPage() {
       ? rawNext
       : ROUTES.dashboard
 
-  const [mode, setMode] = React.useState<Mode>('signin')
+  // Arriving from a paid plan (Student/Standard) → open in sign-up mode and
+  // surface the founding offer, since it's free for anyone who joins in time.
+  const plan = params.get('plan')
+  const fromPaidPlan = plan === 'student' || plan === 'standard'
+
+  const [mode, setMode] = React.useState<Mode>(fromPaidPlan ? 'signup' : 'signin')
   const [method, setMethod] = React.useState<Method>('password')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -108,6 +113,19 @@ export function LoginPage() {
           </div>
           <span className="text-sm font-semibold tracking-tight text-white">Retrn</span>
         </Link>
+
+        {fromPaidPlan && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-amber-300/25 bg-gradient-to-r from-amber-400/10 via-rose-400/10 to-indigo-500/10 px-4 py-3 text-sm text-white/85">
+            <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <span>
+              <span className="font-semibold text-white">No card needed.</span>{' '}
+              Sign up before{' '}
+              <span className="font-semibold text-white">August 31, 2026</span> and
+              Retrn is <span className="font-semibold text-white">free for life</span> —
+              including everything in {plan === 'student' ? 'Student' : 'Standard'}.
+            </span>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur-xl">
           {magicLinkSent ? (
@@ -212,6 +230,18 @@ export function LoginPage() {
                   {!submitting && <ArrowRight className="h-3.5 w-3.5" />}
                 </button>
               </form>
+
+              <p className="mt-4 text-center text-[11px] leading-relaxed text-white/35">
+                By continuing, you agree to Retrn's{' '}
+                <Link to={ROUTES.terms} className="text-white/55 hover:text-white/80">
+                  Terms
+                </Link>{' '}
+                and{' '}
+                <Link to={ROUTES.privacy} className="text-white/55 hover:text-white/80">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
 
               <button
                 type="button"
