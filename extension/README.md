@@ -31,9 +31,9 @@ Toolbar icon → popup
   the Supabase session from an open Retrn tab; if none is open, it opens one and
   asks you to sign in, then reconnect. A **password** fallback is also available.
   - Works across multiple origins listed in `RETRN_APP_URLS` in `src/config.ts`
-    (production `https://retrncrm.vercel.app` and local `http://localhost:5173`
-    are included). Each origin must also appear in `host_permissions` in
-    `public/manifest.json`. Add new domains to **both** places.
+    (production `https://retrncrm.com` / `https://www.retrncrm.com` and local
+    `http://localhost:5173` are included). Each origin must also appear in
+    `host_permissions` in `public/manifest.json`. Add new domains to **both**.
 - **Config:** `src/config.ts` holds the Supabase URL and the **public anon key**
   — the same publishable key the web app ships, safe to include.
 

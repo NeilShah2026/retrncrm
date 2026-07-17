@@ -50,8 +50,8 @@ export function LegalLayout({
             being finalized ahead of public launch; sections marked{' '}
             <PlaceholderInline>TO BE FINALIZED</PlaceholderInline> will be
             completed before paid plans go live. Questions? Email{' '}
-            <a href="mailto:hello@retrn.app" className="text-amber-200 underline">
-              hello@retrn.app
+            <a href="mailto:hello@retrncrm.com" className="text-amber-200 underline">
+              hello@retrncrm.com
             </a>
             .
           </p>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Puzzle, ShieldCheck } from 'lucide-react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 import { FeatureSection } from '@/components/marketing/FeatureSection'
@@ -210,6 +210,47 @@ export function LandingPage() {
           accent="rose"
           visual={<ComposeMockup />}
         />
+      </section>
+
+      {/* ================= EXTENSION TEASER ================= */}
+      <section className="relative px-4 pb-20 sm:px-6 sm:pb-28">
+        <motion.div
+          initial={{ opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.7, ease: EASE }}
+          className="relative mx-auto flex max-w-3xl flex-col items-center overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-[#100d1c] to-[#0a0812] px-6 py-10 text-center sm:px-10 sm:py-12"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[100px]"
+          />
+          <div className="relative">
+            <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200">
+              Coming soon
+            </span>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white">
+              <Puzzle className="h-6 w-6" />
+            </div>
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-white sm:text-3xl">
+              A browser extension for your inbox
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-white/55">
+              Log emails from Gmail and Outlook — and add people from LinkedIn —
+              straight to the right Retrn contact, without leaving the tab.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {['Gmail', 'Outlook', 'LinkedIn'].map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/60"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       {/* ================= PRICING ================= */}

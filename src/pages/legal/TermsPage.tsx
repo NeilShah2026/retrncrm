@@ -109,8 +109,8 @@ export function TermsPage() {
         <P>
           We offer a <Strong>14-day money-back guarantee</Strong> on paid plans. If
           you are not satisfied, email{' '}
-          <a href="mailto:billing@retrn.app" className="text-white underline">
-            billing@retrn.app
+          <a href="mailto:billing@retrncrm.com" className="text-white underline">
+            billing@retrncrm.com
           </a>{' '}
           within 14 days of your initial purchase or renewal and we will refund that
           payment. This applies equally to monthly and annual plans. Refunds are
@@ -232,8 +232,8 @@ export function TermsPage() {
       <Section n={17} title="Contact">
         <P>
           Questions about these Terms? Email{' '}
-          <a href="mailto:hello@retrn.app" className="text-white underline">
-            hello@retrn.app
+          <a href="mailto:hello@retrncrm.com" className="text-white underline">
+            hello@retrncrm.com
           </a>
           .
         </P>

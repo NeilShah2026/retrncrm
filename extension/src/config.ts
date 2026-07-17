@@ -19,6 +19,7 @@ export const SUPABASE_ANON_KEY =
  * public/manifest.json, or the extension can't read that tab.
  */
 export const RETRN_APP_URLS = [
-  'https://retrncrm.vercel.app',
+  'https://retrncrm.com',
+  'https://www.retrncrm.com',
   'http://localhost:5173',
 ]

@@ -91,7 +91,7 @@ const TIERS: Tier[] = [
       'Onboarding support for your org',
     ],
     cta: 'Contact us',
-    href: 'mailto:hello@retrn.app',
+    href: 'mailto:hello@retrncrm.com',
     external: true,
   },
 ]
