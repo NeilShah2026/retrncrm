@@ -261,6 +261,16 @@ export function ContactDetailPage() {
                               {it.summary}
                             </p>
                           )}
+                          {it.link && (
+                            <a
+                              href={it.link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                            >
+                              Open source ↗
+                            </a>
+                          )}
                         </div>
                         <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                           <DropdownMenu>

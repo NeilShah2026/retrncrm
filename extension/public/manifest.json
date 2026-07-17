@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Retrn — Log emails & contacts to your network",
+  "version": "0.2.0",
+  "description": "Log emails from Gmail/Outlook and add people from LinkedIn to their Retrn contact, in one click.",
+  "action": {
+    "default_title": "Log this email to Retrn",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://plkpfojzqsgfqpfeeasf.supabase.co/*",
+    "https://retrncrm.vercel.app/*",
+    "http://localhost:5173/*",
+    "https://mail.google.com/*",
+    "https://outlook.office.com/*",
+    "https://outlook.office365.com/*",
+    "https://outlook.live.com/*",
+    "https://www.linkedin.com/*"
+  ]
+}

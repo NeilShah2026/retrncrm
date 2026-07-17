@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users,
@@ -6,10 +5,8 @@ import {
   AlarmClock,
   Tag as TagIcon,
   ArrowRight,
-  MessageSquarePlus,
+  MessageSquare,
   Sparkles,
-  CalendarClock,
-  Coffee,
   KanbanSquare,
   CalendarDays,
 } from 'lucide-react'
@@ -20,19 +17,17 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
-import { ReconnectBadge } from '@/components/common/ReconnectBadge'
-import { LogInteractionDialog } from '@/components/contacts/LogInteractionDialog'
-import { CoffeeChatPrepDialog } from '@/components/contacts/CoffeeChatPrepDialog'
 import { useContacts, useOpportunities, useTags } from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { fullName, formatRelative, formatDate } from '@/lib/format'
 import { daysSince } from '@/lib/format'
 import {
+  INTERACTION_TYPES,
   OPPORTUNITY_STAGES,
   OPPORTUNITY_STAGE_KEYS,
 } from '@/lib/constants'
-import type { Contact, Opportunity } from '@/types'
+import type { Contact, Interaction, Opportunity } from '@/types'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 
@@ -41,14 +36,9 @@ export function DashboardPage() {
   const tags = useTags()
   const opportunities = useOpportunities()
   const { openNewContact } = useUI()
-  const [logTarget, setLogTarget] = React.useState<Contact | null>(null)
-  const [prepTarget, setPrepTarget] = React.useState<Contact | null>(null)
 
-  const stats = React.useMemo(() => computeStats(contacts), [contacts])
-  const pipeline = React.useMemo(
-    () => computePipelineStats(opportunities),
-    [opportunities],
-  )
+  const stats = computeStats(contacts)
+  const pipeline = computePipelineStats(opportunities)
 
   if (contacts === undefined) return <DashboardSkeleton />
 
@@ -59,7 +49,7 @@ export function DashboardPage() {
       header={
         <PageHeader
           title="Dashboard"
-          description="Your network at a glance — who to reconnect with, and who's new."
+          description="Your network at a glance — recent activity, new people, and your pipeline."
         >
           <Button onClick={openNewContact} className="gap-2">
             <UserPlus className="h-4 w-4" />
@@ -95,7 +85,7 @@ export function DashboardPage() {
             <StatTile
               icon={AlarmClock}
               label="Overdue"
-              value={stats.overdue.length}
+              value={stats.overdueCount}
               accent="text-red-500"
               to={ROUTES.contactsOverdue}
             />
@@ -109,75 +99,51 @@ export function DashboardPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Reconnect suggestions */}
+            {/* Recent interactions */}
             <Card className="lg:col-span-2">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <AlarmClock className="h-4 w-4 text-red-500" />
-                    <h2 className="font-semibold">Reconnect suggestions</h2>
+                    <MessageSquare className="h-4 w-4 text-indigo-500" />
+                    <h2 className="font-semibold">Recent interactions</h2>
                   </div>
                   <Link
-                    to={ROUTES.contactsOverdue}
+                    to={ROUTES.contacts}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     View all
                   </Link>
                 </div>
-                {stats.overdue.length === 0 ? (
+                {stats.recentInteractions.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
-                    🎉 You're all caught up — no one is overdue right now.
+                    No interactions logged yet. Log one from a contact — or from
+                    your inbox with the Retrn extension.
                   </p>
                 ) : (
                   <ul className="divide-y">
-                    {stats.overdue.slice(0, 6).map((c) => (
-                      <li
-                        key={c.id}
-                        className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:gap-3"
-                      >
+                    {stats.recentInteractions.map(({ contact: c, interaction: it }) => (
+                      <li key={it.id}>
                         <Link
                           to={ROUTES.contact(c.id)}
-                          className="flex min-w-0 flex-1 items-center gap-3"
+                          className="flex items-center gap-3 py-2.5"
                         >
                           <ContactAvatar
                             contact={c}
                             className="h-9 w-9 shrink-0 text-xs"
                           />
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">
                               {fullName(c)}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {c.company || 'No company'} ·{' '}
-                              {c.lastContactDate
-                                ? `last ${formatRelative(c.lastContactDate)}`
-                                : 'never contacted'}
+                              {INTERACTION_TYPES[it.type]?.emoji ?? '•'}{' '}
+                              {it.summary || INTERACTION_TYPES[it.type]?.label || 'Note'}
                             </p>
                           </div>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {formatRelative(it.date)}
+                          </span>
                         </Link>
-                        <div className="flex shrink-0 items-center justify-between gap-2 pl-12 sm:justify-end sm:gap-1.5 sm:pl-0">
-                          <ReconnectBadge contact={c} />
-                          <div className="flex items-center gap-0.5">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setPrepTarget(c)}
-                              aria-label={`Prep to reconnect with ${fullName(c)}`}
-                              title="Prep for reconnect"
-                            >
-                              <Coffee className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setLogTarget(c)}
-                              aria-label={`Log interaction with ${fullName(c)}`}
-                              title="Log interaction"
-                            >
-                              <MessageSquarePlus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
                       </li>
                     ))}
                   </ul>
@@ -216,61 +182,6 @@ export function DashboardPage() {
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-
-            {/* Upcoming follow-ups */}
-            <Card className="lg:col-span-3">
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-indigo-500" />
-                  <h2 className="font-semibold">Upcoming follow-ups</h2>
-                  <span className="text-xs text-muted-foreground">
-                    · due within 2 weeks
-                  </span>
-                </div>
-                {stats.upcoming.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    Nothing due soon. Set a cadence goal on a contact to see
-                    follow-ups here.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {stats.upcoming.map(({ contact: c, due }) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-2 rounded-lg border p-3 transition-colors hover:bg-accent/50"
-                      >
-                        <Link
-                          to={ROUTES.contact(c.id)}
-                          className="flex min-w-0 flex-1 items-center gap-3"
-                        >
-                          <ContactAvatar
-                            contact={c}
-                            className="h-9 w-9 text-xs"
-                          />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {fullName(c)}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              Due in {due} {due === 1 ? 'day' : 'days'}
-                            </p>
-                          </div>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setPrepTarget(c)}
-                          aria-label={`Prep to reconnect with ${fullName(c)}`}
-                          title="Prep for reconnect"
-                        >
-                          <Coffee className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -354,22 +265,6 @@ export function DashboardPage() {
           </div>
         </>
       )}
-
-      <CoffeeChatPrepDialog
-        open={Boolean(prepTarget)}
-        onOpenChange={(o) => !o && setPrepTarget(null)}
-        contactId={prepTarget?.id}
-        onLogInteraction={() => {
-          const c = prepTarget
-          setPrepTarget(null)
-          if (c) setLogTarget(c)
-        }}
-      />
-      <LogInteractionDialog
-        open={Boolean(logTarget)}
-        onOpenChange={(o) => !o && setLogTarget(null)}
-        contactId={logTarget?.id ?? ''}
-      />
     </PageShell>
   )
 }
@@ -378,13 +273,13 @@ interface Stats {
   total: number
   recentCount: number
   recent: Contact[]
-  overdue: Contact[]
-  upcoming: { contact: Contact; due: number }[]
+  overdueCount: number
+  recentInteractions: { contact: Contact; interaction: Interaction }[]
 }
 
 function computeStats(contacts: Contact[] | undefined): Stats {
   if (!contacts) {
-    return { total: 0, recentCount: 0, recent: [], overdue: [], upcoming: [] }
+    return { total: 0, recentCount: 0, recent: [], overdueCount: 0, recentInteractions: [] }
   }
 
   const recentSorted = [...contacts].sort((a, b) =>
@@ -395,30 +290,23 @@ function computeStats(contacts: Contact[] | undefined): Stats {
     return d !== null && d <= 30
   }).length
 
-  const overdue = contacts
-    .map((c) => ({ c, s: getReconnectStatus(c) }))
-    .filter((x) => x.s.overdue)
-    .sort((a, b) => (b.s.overdueBy ?? 0) - (a.s.overdueBy ?? 0))
-    .map((x) => x.c)
+  const overdueCount = contacts.filter((c) => getReconnectStatus(c).overdue).length
 
-  const upcoming = contacts
-    .map((c) => ({ contact: c, s: getReconnectStatus(c) }))
-    .filter(
-      (x) =>
-        !x.s.overdue &&
-        x.s.goalDays !== null &&
-        x.s.overdueBy !== null &&
-        -x.s.overdueBy <= 14,
-    )
-    .map((x) => ({ contact: x.contact, due: -(x.s.overdueBy as number) }))
-    .sort((a, b) => a.due - b.due)
+  // Flatten every interaction across contacts, newest first.
+  const recentInteractions = contacts
+    .flatMap((contact) => contact.interactions.map((interaction) => ({ contact, interaction })))
+    .sort((a, b) => {
+      const d = b.interaction.date.localeCompare(a.interaction.date)
+      return d !== 0 ? d : b.interaction.createdAt.localeCompare(a.interaction.createdAt)
+    })
+    .slice(0, 7)
 
   return {
     total: contacts.length,
     recentCount,
     recent: recentSorted.slice(0, 5),
-    overdue,
-    upcoming,
+    overdueCount,
+    recentInteractions,
   }
 }
 

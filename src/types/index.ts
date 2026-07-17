@@ -21,6 +21,8 @@ export interface Interaction {
   type: InteractionType
   summary: string
   createdAt: string
+  /** Optional deep link back to the source (e.g. an email thread or LinkedIn). */
+  link?: string
 }
 
 export interface OtherLink {
