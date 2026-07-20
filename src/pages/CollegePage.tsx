@@ -67,11 +67,18 @@ export function CollegePage() {
     setAddOpen(true)
   }
 
-  // People whose school matches the chosen college.
+  // People in your campus network: an explicit school match, OR — when no
+  // school is saved on the contact — anyone marked with a campus role
+  // (professor / alumni / classmate / peer), assumed to be your college.
   const atCollege = React.useMemo(() => {
     if (!college || !contacts) return []
     const target = normSchool(college)
-    return contacts.filter((c) => normSchool(c.school) === target)
+    const CAMPUS_ROLES = new Set(['professor', 'alumni', 'classmate', 'peer'])
+    return contacts.filter((c) => {
+      const s = normSchool(c.school)
+      if (s) return s === target
+      return c.connectionType ? CAMPUS_ROLES.has(c.connectionType) : false
+    })
   }, [contacts, college])
 
   // ---- No college chosen yet ----

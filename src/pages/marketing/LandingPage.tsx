@@ -12,6 +12,7 @@ import { ContactsMockup } from '@/components/marketing/mockups/ContactsMockup'
 import { PipelineMockup } from '@/components/marketing/mockups/PipelineMockup'
 import { ComposeMockup } from '@/components/marketing/mockups/ComposeMockup'
 import { ROUTES } from '@/lib/routes'
+import { CHROME_STORE_URL } from '@/lib/constants'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -226,8 +227,9 @@ export function LandingPage() {
             className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[100px]"
           />
           <div className="relative">
-            <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200">
-              Coming soon
+            <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Now on the Chrome Web Store
             </span>
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white">
               <Puzzle className="h-6 w-6" />
@@ -239,15 +241,26 @@ export function LandingPage() {
               Log emails from Gmail and Outlook — and add people from LinkedIn —
               straight to the right Retrn contact, without leaving the tab.
             </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              {['Gmail', 'Outlook', 'LinkedIn'].map((label) => (
-                <span
-                  key={label}
-                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/60"
-                >
-                  {label}
-                </span>
-              ))}
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <a
+                href={CHROME_STORE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-all hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)]"
+              >
+                Add to Chrome
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </a>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {['Gmail', 'Outlook', 'LinkedIn'].map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/60"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </motion.div>

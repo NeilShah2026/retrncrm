@@ -72,7 +72,8 @@ export default function App() {
               <Route path={ROUTES.login} element={<LoginPage />} />
               <Route path={ROUTES.add} element={<AddContactPage />} />
               <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />
-              <Route path={ROUTES.terms} element={<TermsPage />} />              <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
+              <Route path={ROUTES.terms} element={<TermsPage />} />
+              <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
               <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
             </Routes>
           </BrowserRouter>

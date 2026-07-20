@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from './ThemeToggle'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
+import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { cn } from '@/lib/utils'
@@ -258,6 +259,7 @@ export function AppLayout() {
       </div>
 
       <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
+      <ExtensionBanner />
     </div>
   )
 }

@@ -250,3 +250,7 @@ export const TEMPLATE_CATEGORIES: Record<
 export const TEMPLATE_CATEGORY_KEYS = Object.keys(
   TEMPLATE_CATEGORIES,
 ) as TemplateCategory[]
+
+/** Public Chrome Web Store listing for the Retrn browser extension. */
+export const CHROME_STORE_URL =
+  'https://chromewebstore.google.com/detail/retrn-%E2%80%94-log-emails-contac/hjdanpmlocgaihgmlldhjjbmlnjepnkk'

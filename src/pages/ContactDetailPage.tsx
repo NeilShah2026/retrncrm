@@ -10,6 +10,7 @@ import {
   Link2,
   Mail,
   MapPin,
+  Merge,
   MessageSquarePlus,
   MoreHorizontal,
   Pencil,
@@ -41,6 +42,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { PageShell } from '@/components/layout/PageShell'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
+import { MergeContactDialog } from '@/components/contacts/MergeContactDialog'
 import { LogInteractionDialog } from '@/components/contacts/LogInteractionDialog'
 import { CoffeeChatPrepDialog } from '@/components/contacts/CoffeeChatPrepDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
@@ -72,6 +74,7 @@ export function ContactDetailPage() {
   const navigate = useNavigate()
 
   const [editing, setEditing] = React.useState(false)
+  const [merging, setMerging] = React.useState(false)
   const [logging, setLogging] = React.useState(false)
   const [editingInteraction, setEditingInteraction] =
     React.useState<Interaction | null>(null)
@@ -137,6 +140,7 @@ export function ContactDetailPage() {
           onLog={() => setLogging(true)}
           onCompose={() => setComposing(true)}
           onEdit={() => setEditing(true)}
+          onMerge={() => setMerging(true)}
           onDelete={() => setDeleting(true)}
         />
       }
@@ -456,6 +460,7 @@ export function ContactDetailPage() {
         onOpenChange={setEditing}
         contact={contact}
       />
+      <MergeContactDialog open={merging} onOpenChange={setMerging} primary={contact} />
       <LogInteractionDialog
         open={logging}
         onOpenChange={(o) => {
@@ -516,6 +521,7 @@ function PageHeaderBar({
   onLog,
   onCompose,
   onEdit,
+  onMerge,
   onDelete,
 }: {
   contact?: Contact
@@ -523,6 +529,7 @@ function PageHeaderBar({
   onLog?: () => void
   onCompose?: () => void
   onEdit?: () => void
+  onMerge?: () => void
   onDelete?: () => void
 }) {
   const navigate = useNavigate()
@@ -597,6 +604,9 @@ function PageHeaderBar({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="h-4 w-4" /> Edit contact
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onMerge}>
+                <Merge className="h-4 w-4" /> Merge duplicate…
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
