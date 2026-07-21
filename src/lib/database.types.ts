@@ -122,6 +122,42 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['templates']['Row']>
         Relationships: []
       }
+      events: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          location: string | null
+          starts_at: string
+          ends_at: string
+          all_day: boolean
+          contact_ids: string[]
+          logged: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['events']['Row']> & {
+          user_id: string
+          title: string
+          starts_at: string
+          ends_at: string
+        }
+        Update: Partial<Database['public']['Tables']['events']['Row']>
+        Relationships: []
+      }
+      calendar_tokens: {
+        Row: {
+          token: string
+          user_id: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['calendar_tokens']['Row']> & {
+          user_id: string
+        }
+        Update: Partial<Database['public']['Tables']['calendar_tokens']['Row']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

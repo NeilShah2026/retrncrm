@@ -10,6 +10,7 @@ import {
   KanbanSquare,
   Mail,
   GraduationCap,
+  CalendarDays,
   QrCode,
   MoreHorizontal,
   LogOut,
@@ -29,6 +30,7 @@ import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
+import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { displayName, initialFor } from '@/lib/displayName'
@@ -41,6 +43,7 @@ const PRIMARY_NAV = [
 ]
 
 const SECONDARY_NAV = [
+  { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
   { to: ROUTES.templates, label: 'Templates', icon: Mail, end: false },
   { to: ROUTES.tags, label: 'Tags', icon: TagIcon, end: false },
   { to: ROUTES.settings, label: 'Settings', icon: Settings, end: false },
@@ -113,6 +116,9 @@ export function AppLayout() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [shareOpen, setShareOpen] = React.useState(false)
+
+  // Past meetings roll into the linked contacts' timelines automatically.
+  useAutoLogMeetings()
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">

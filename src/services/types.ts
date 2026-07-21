@@ -1,4 +1,5 @@
 import type {
+  CalendarEvent,
   Contact,
   Interaction,
   Opportunity,
@@ -90,5 +91,17 @@ export interface TemplateRepository {
   update(id: string, patch: TemplatePatch): Promise<OutreachTemplate>
   remove(id: string): Promise<void>
   replaceAll(items: OutreachTemplate[]): Promise<void>
+  clear(): Promise<void>
+}
+
+export type EventDraft = Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>
+export type EventPatch = Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
+
+export interface EventRepository {
+  getAll(): Promise<CalendarEvent[]>
+  create(draft: EventDraft): Promise<CalendarEvent>
+  update(id: string, patch: EventPatch): Promise<CalendarEvent>
+  remove(id: string): Promise<void>
+  replaceAll(items: CalendarEvent[]): Promise<void>
   clear(): Promise<void>
 }

@@ -6,10 +6,17 @@ import {
   rowToOpportunity,
   rowToTag,
   rowToTemplate,
+  rowToEvent,
 } from '@/services/supabaseMappers'
-import type { Contact, Opportunity, OutreachTemplate, Tag } from '@/types'
+import type {
+  CalendarEvent,
+  Contact,
+  Opportunity,
+  OutreachTemplate,
+  Tag,
+} from '@/types'
 
-type TableName = 'contacts' | 'tags' | 'opportunities' | 'templates'
+type TableName = 'contacts' | 'tags' | 'opportunities' | 'templates' | 'events'
 
 /**
  * Reactive read for one table, scoped to the signed-in user. Fetches once on
@@ -118,5 +125,16 @@ export function useTemplates(): OutreachTemplate[] | undefined {
   return useRealtimeTable(
     'templates',
     rowToTemplate as (row: never) => OutreachTemplate,
+  )
+}
+
+export function useEvents(): CalendarEvent[] | undefined {
+  const events = useRealtimeTable('events', rowToEvent as (row: never) => CalendarEvent)
+  return React.useMemo(
+    () =>
+      events
+        ? [...events].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+        : events,
+    [events],
   )
 }

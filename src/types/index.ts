@@ -185,6 +185,30 @@ export interface Opportunity {
 }
 
 // ---------------------------------------------------------------------------
+// Calendar
+// ---------------------------------------------------------------------------
+
+/** A scheduled meeting/event, optionally with people from your network. */
+export interface CalendarEvent {
+  id: string
+  title: string
+  description?: string
+  /** Physical place or a meeting link (Zoom, Meet…). */
+  location?: string
+  /** ISO datetime */
+  startsAt: string
+  /** ISO datetime */
+  endsAt: string
+  allDay: boolean
+  /** Contacts this meeting is with. */
+  contactIds: string[]
+  /** True once the past meeting has been logged to those contacts' timelines. */
+  logged: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// ---------------------------------------------------------------------------
 // Outreach templates
 // ---------------------------------------------------------------------------
 

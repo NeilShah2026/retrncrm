@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  CalendarPlus,
   Clock,
   Coffee,
   GraduationCap,
@@ -34,6 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { format, parseISO } from 'date-fns'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { TagBadge } from '@/components/common/TagBadge'
 import { StrengthMeter } from '@/components/common/StrengthMeter'
@@ -43,10 +45,11 @@ import { PageShell } from '@/components/layout/PageShell'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { MergeContactDialog } from '@/components/contacts/MergeContactDialog'
+import { EventFormDialog } from '@/components/calendar/EventFormDialog'
 import { LogInteractionDialog } from '@/components/contacts/LogInteractionDialog'
 import { CoffeeChatPrepDialog } from '@/components/contacts/CoffeeChatPrepDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
-import { useContact, useContactMap, useTagMap } from '@/hooks/useData'
+import { useContact, useContactMap, useEvents, useTagMap } from '@/hooks/useData'
 import { contactRepo } from '@/services'
 import {
   CONNECTION_TYPES,
@@ -71,10 +74,12 @@ export function ContactDetailPage() {
   const contact = useContact(id)
   const tagMap = useTagMap()
   const contactMap = useContactMap()
+  const events = useEvents()
   const navigate = useNavigate()
 
   const [editing, setEditing] = React.useState(false)
   const [merging, setMerging] = React.useState(false)
+  const [scheduling, setScheduling] = React.useState(false)
   const [logging, setLogging] = React.useState(false)
   const [editingInteraction, setEditingInteraction] =
     React.useState<Interaction | null>(null)
@@ -117,6 +122,11 @@ export function ContactDetailPage() {
   const introducer = contact.introducedById
     ? contactMap.get(contact.introducedById)
     : undefined
+  // Meetings scheduled with this person that haven't happened yet.
+  const nowIso = new Date().toISOString()
+  const upcomingMeetings = (events ?? []).filter(
+    (e) => e.contactIds.includes(contact.id) && e.endsAt >= nowIso,
+  )
 
   async function handleDelete() {
     const name = fullName(current)
@@ -218,6 +228,65 @@ export function ContactDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Upcoming meetings */}
+          <Card>
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <SectionLabel className="mb-0">
+                  Meetings
+                  {upcomingMeetings.length > 0 && (
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      {upcomingMeetings.length}
+                    </span>
+                  )}
+                </SectionLabel>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setScheduling(true)}
+                  className="gap-1.5"
+                >
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                  Schedule
+                </Button>
+              </div>
+              {upcomingMeetings.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nothing scheduled with {contact.firstName} yet.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {upcomingMeetings.map((e) => (
+                    <li key={e.id}>
+                      <Link
+                        to={ROUTES.calendar}
+                        className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+                          <span className="text-[9px] font-medium uppercase leading-none">
+                            {format(parseISO(e.startsAt), 'MMM')}
+                          </span>
+                          <span className="text-sm font-semibold leading-tight">
+                            {format(parseISO(e.startsAt), 'd')}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{e.title}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {e.allDay
+                              ? 'All day'
+                              : format(parseISO(e.startsAt), 'EEE, h:mm a')}
+                            {e.location ? ` · ${e.location}` : ''}
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Interaction timeline */}
           <Card>
@@ -461,6 +530,11 @@ export function ContactDetailPage() {
         contact={contact}
       />
       <MergeContactDialog open={merging} onOpenChange={setMerging} primary={contact} />
+      <EventFormDialog
+        open={scheduling}
+        onOpenChange={setScheduling}
+        defaultContactId={contact.id}
+      />
       <LogInteractionDialog
         open={logging}
         onOpenChange={(o) => {

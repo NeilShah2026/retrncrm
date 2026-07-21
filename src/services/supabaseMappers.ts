@@ -1,5 +1,6 @@
 import type { Database } from '@/lib/database.types'
 import type {
+  CalendarEvent,
   Contact,
   ConnectionType,
   ContactFrequency,
@@ -186,5 +187,47 @@ export function templateToRow(
     body: t.body!,
     created_at: t.createdAt,
     updated_at: t.updatedAt,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar events
+// ---------------------------------------------------------------------------
+
+type EventRow = Database['public']['Tables']['events']['Row']
+
+export function rowToEvent(row: EventRow): CalendarEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? undefined,
+    location: row.location ?? undefined,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    allDay: row.all_day,
+    contactIds: row.contact_ids ?? [],
+    logged: row.logged,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function eventToRow(
+  userId: string,
+  e: Partial<CalendarEvent> & { id: string },
+): Database['public']['Tables']['events']['Insert'] {
+  return {
+    id: e.id,
+    user_id: userId,
+    title: e.title!,
+    description: e.description ?? null,
+    location: e.location ?? null,
+    starts_at: e.startsAt!,
+    ends_at: e.endsAt!,
+    all_day: e.allDay ?? false,
+    contact_ids: e.contactIds ?? [],
+    logged: e.logged ?? false,
+    created_at: e.createdAt,
+    updated_at: e.updatedAt,
   }
 }
