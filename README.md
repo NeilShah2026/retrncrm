@@ -110,7 +110,10 @@ one of them falls back to its non-AI path if the model is unreachable or
 unconfigured, and **no AI call ever gates a save**.
 
 - **Smart capture** — a second read of a dictated sentence, filling what the
-  local parser missed and showing what it changed before you save.
+  local parser missed, correcting what it got wrong, and tidying the sentence
+  into a readable note. It runs once on its own, ~1.2s after the sentence stops
+  changing, so typing and phone-keyboard dictation get the same pass as the
+  in-browser mic. Every change is listed before you save.
 - **Ask your network** — natural-language questions over your own contacts
   ("who do I know in fintech in Boston?"), from `⌘K` or the sidebar. Falls back
   to the existing Fuse.js search.

@@ -47,6 +47,13 @@ const EXAMPLES = [
   'Talked to Priya on the flight to Chicago, she’s a founder, tag her startups.',
 ]
 
+/**
+ * How long the sentence has to stop changing before the second read fires.
+ * Long enough to not fire between two typed words; short enough that it's
+ * done by the time you've finished reading the chips.
+ */
+const IDLE_BEFORE_REFINE_MS = 1200
+
 /** Turn the parsed capture into the draft the repository expects. */
 function toDraft(parsed: ParsedCapture, tagIds: string[]): ContactDraft {
   return {
@@ -115,6 +122,7 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
       setEdited(false)
       setDuplicate(null)
       setAi(null)
+      autoRan.current = false
       speech.reset()
       if (speech.supported) speech.start()
     } else {
@@ -167,16 +175,33 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
     }
   }, [])
 
-  // Run it once when dictation stops: that's the moment the sentence is
-  // finished, and it saves a tap on the path we want to be effortless.
-  const wasListening = React.useRef(false)
+  /**
+   * Run it once, automatically, when the sentence settles.
+   *
+   * Waiting on the mic button wasn't enough: plenty of people type, and phone
+   * keyboards dictate straight into the textarea without the Web Speech API
+   * ever being involved. So the trigger is "the text stopped changing while
+   * nothing is actively listening" — which covers dictating, typing, and
+   * pasting alike, and still costs exactly one request per capture. Editing
+   * afterwards is a deliberate act, so that re-runs only via the button.
+   */
+  const autoRan = React.useRef(false)
   React.useEffect(() => {
-    const justStopped = wasListening.current && !speech.listening
-    wasListening.current = speech.listening
-    if (!open || aiOff || aiBusy || !justStopped) return
-    if (!source || ai?.source === source) return
-    void refine(source)
-  }, [speech.listening, open, aiOff, aiBusy, source, ai, refine])
+    // `saving` matters: saving stops dictation, and that must not kick off a
+    // request for a contact that's already on its way to the database.
+    if (!open || aiOff || aiBusy || saving || autoRan.current) return
+    // Still talking — a thinking pause mid-sentence isn't the end of it. The
+    // mic auto-starts on open though, so someone who types instead would wait
+    // forever: once they've taken over by hand, the idle timer is the signal.
+    if (speech.listening && !edited) return
+    // Too short to be a sentence worth a round trip.
+    if (source.length < 15 || ai?.source === source) return
+    const timer = setTimeout(() => {
+      autoRan.current = true
+      void refine(source)
+    }, IDLE_BEFORE_REFINE_MS)
+    return () => clearTimeout(timer)
+  }, [speech.listening, edited, open, aiOff, aiBusy, saving, source, ai, refine])
 
   /** Match spoken tag names to existing tags, creating the ones that are new. */
   async function resolveTags(names: string[]): Promise<string[]> {
@@ -386,8 +411,26 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
           )}
 
           {live && !canSave && (
-            <p className="text-xs text-muted-foreground">
-              Couldn’t catch a name yet — try “met <em>Sarah Chen</em> at…”.
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {aiBusy ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Reading that again…
+                </>
+              ) : (
+                <>
+                  Couldn’t catch a name yet — try “met <em>Sarah Chen</em> at…”.
+                  {!aiOff && ai?.source !== source && source.length >= 15 && (
+                    <button
+                      type="button"
+                      onClick={() => void refine(source)}
+                      className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                    >
+                      Let AI try
+                    </button>
+                  )}
+                </>
+              )}
             </p>
           )}
 

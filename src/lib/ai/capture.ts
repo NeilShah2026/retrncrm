@@ -54,7 +54,14 @@ const FIELD_LABELS: Partial<Record<keyof ParsedCapture, string>> = {
   linkedinUrl: 'LinkedIn',
   contactFrequencyGoal: 'Follow up',
   tagNames: 'Tags',
+  notes: 'Note',
 }
+
+/**
+ * Fields whose previous value isn't worth showing struck through — the raw
+ * transcript is already on screen in the textarea directly above.
+ */
+const DIFF_HIDES_PREVIOUS = new Set<keyof ParsedCapture>(['notes'])
 
 const TEXT_KEYS = [
   'firstName',
@@ -89,13 +96,15 @@ Keys:
   source: one of ${MEET_SOURCE_KEYS.join(', ')}
   contactFrequencyGoal: one of ${FREQUENCY_KEYS.join(', ')}
   tagNames: array of short topical labels the speaker asked for
+  notes: the sentence rewritten as a clean note about this person
 
 Rules:
 - The speaker is the user; the person described is the contact. "I" is never the contact.
 - Expand spoken shorthand in titles ("PM" -> "Product Manager").
 - Fix dictation artifacts in names and companies, but keep real spellings.
 - A school is only a school if the sentence says so; a workplace is the company.
-- Use contactFrequencyGoal only for an explicit cadence ("follow up in a month").`
+- Use contactFrequencyGoal only for an explicit cadence ("follow up in a month").
+- "notes" keeps every concrete detail from the sentence — including anything that didn't fit a field above — but drops dictation filler ("um", "like"), repeated words, and the self-referential opener ("met a guy named…"). Write it about them, punctuated, in at most two sentences. Add nothing that wasn't said. Omit the key entirely if the sentence is only the fields and has nothing left worth remembering.`
 
 interface RawCapture {
   firstName?: unknown
@@ -114,6 +123,7 @@ interface RawCapture {
   source?: unknown
   contactFrequencyGoal?: unknown
   tagNames?: unknown
+  notes?: unknown
 }
 
 function cleanText(value: unknown, max = 80): string | undefined {
@@ -168,8 +178,9 @@ export async function refineCapture(
     ],
   })
 
-  // Start from the local parse so notes, transcript and dateMet are untouched:
-  // the sentence itself is the note, and the date met is today by definition.
+  // Start from the local parse: the raw transcript and dateMet are ours to
+  // keep (the date met is today by definition), and every field below only
+  // overrides what the regex produced if the model actually returned it.
   const parsed: ParsedCapture = { ...local }
   const changes: CaptureChange[] = []
 
@@ -186,7 +197,7 @@ export async function refineCapture(
     changes.push({
       key,
       label: FIELD_LABELS[key] ?? key,
-      from: had ? humanize(key, before) : undefined,
+      from: had && !DIFF_HIDES_PREVIOUS.has(key) ? humanize(key, before) : undefined,
       to: humanize(key, next),
     })
   }
@@ -195,6 +206,11 @@ export async function refineCapture(
   apply('connectionType', pickEnum(raw.connectionType, CONNECTION_TYPE_KEYS))
   apply('source', pickEnum(raw.source, MEET_SOURCE_KEYS))
   apply('contactFrequencyGoal', pickEnum(raw.contactFrequencyGoal, FREQUENCY_KEYS))
+
+  // The note is the one thing here that's prose rather than a field, so it
+  // gets a prose-sized budget — and only replaces the transcript if the model
+  // actually returned something.
+  apply('notes', cleanText(raw.notes, 600))
 
   const tagNames = Array.isArray(raw.tagNames)
     ? raw.tagNames
