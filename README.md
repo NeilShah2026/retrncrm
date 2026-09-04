@@ -62,8 +62,13 @@ Restore starter content** brings the example contact and templates back.
 
 - **Marketing site** (`/`) — dark hero, real in-app screenshots, feature
   walkthrough, pricing, all in one page.
-- **Dashboard** — totals, recently added, reconnect suggestions (overdue by
-  cadence goal or 6+ months), upcoming follow-ups, recruiting-pipeline snapshot.
+- **Dashboard** — answers "what should I do now?" before it shows anything
+  else: an AI **briefing** of the few things worth doing today, the next
+  **upcoming meetings** with the people in them, a **needs-a-nudge** list of
+  whoever has waited longest (with one-tap *Caught up* and prep), totals,
+  recently added, and the recruiting-pipeline snapshot. There is no
+  "recent activity" feed — a log of what already happened is pleasant to
+  scroll and useless to act on.
 - **Contacts** — sortable table ↔ card grid toggle; filter by tag, company,
   industry, where-met, connection type, date-met range, relationship strength,
   and "overdue". The page header and toolbar are pinned — only the contact
@@ -83,6 +88,10 @@ Restore starter content** brings the example contact and templates back.
   auto-fill; duplicate detection warns on matching name + company.
 - **Recruiting pipeline** — Kanban board (Researching → Applied → Interviewing →
   Offer → Closed) linking opportunities to the contacts who can help.
+- **Calendar** — month grid and agenda of meetings with the people in your
+  network, with application deadlines overlaid. A past meeting logs itself to
+  the linked contacts' timelines, and the whole thing publishes as an iCal
+  feed you can subscribe to (**Subscribe**).
 - **Outreach templates** — reusable messages with `{{firstName}}` /
   `{{company}}` mail-merge, composed straight to email.
 - **Tags** — create, rename, color-code, delete (auto-detaches from contacts).
@@ -114,9 +123,20 @@ unconfigured, and **no AI call ever gates a save**.
   into a readable note. It runs once on its own, ~1.2s after the sentence stops
   changing, so typing and phone-keyboard dictation get the same pass as the
   in-browser mic. Every change is listed before you save.
+- **Daily briefing** — the dashboard's first card. The overdue list, the next
+  two weeks of meetings, and the applications in flight go up as one compact
+  snapshot; an ordered handful of specific actions comes back, each one citing
+  the fact that made it urgent and each pointing at a real record (the model
+  answers with references into the snapshot, never a name it typed). Acting on
+  it prunes the list rather than buying a new one, and the answer is cached
+  against a fingerprint of the facts behind it, so a day of tapping *Caught up*
+  costs about one request. With AI off the same list is written by plain rules.
 - **Ask your network** — natural-language questions over your own contacts
-  ("who do I know in fintech in Boston?"), from `⌘K` or the sidebar. Falls back
-  to the existing Fuse.js search.
+  ("who do I know in fintech in Boston?", "how many people do I know at
+  Fidelity?"), from `⌘K`, the sidebar, or the dashboard's ask box. It holds a
+  thread — the roster is sent once and follow-ups ride on it, so "which of them
+  have I not spoken to since spring?" costs a sentence — and offers the next
+  questions worth asking. Falls back to the existing Fuse.js search.
 - **Draft outreach** — a first-person draft in the compose dialog, using the
   contact's context and the template's tone. Never sends anything itself.
 - **Coffee-chat prep** — generated talking points you can save to the contact.
@@ -166,6 +186,7 @@ src/
     voiceParse.ts         Spoken sentence -> contact fields (local, no API)
     caughtUp.ts           One-tap last-contact reset
     ai/                   Client + per-feature prompts, all via /api/ai
+                          (briefing.ts also ships the rules-based fallback)
   hooks/useSpeechRecognition.ts   Web Speech API wrapper
 api/
   ai.ts                   Edge entry point for the model proxy

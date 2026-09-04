@@ -3,13 +3,12 @@ import {
   Users,
   UserPlus,
   AlarmClock,
-  Tag as TagIcon,
   ArrowRight,
-  MessageSquare,
   Sparkles,
   Mic,
   KanbanSquare,
   CalendarDays,
+  CalendarClock,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -18,27 +17,39 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
-import { useContacts, useOpportunities, useTags } from '@/hooks/useData'
+import { BriefingCard } from '@/components/dashboard/BriefingCard'
+import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
+import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
+import {
+  useContacts,
+  useContactMap,
+  useEvents,
+  useOpportunities,
+  useTagMap,
+} from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
 import { getReconnectStatus } from '@/lib/reconnect'
-import { fullName, formatRelative, formatDate } from '@/lib/format'
+import { fullName, formatDate } from '@/lib/format'
 import { daysSince } from '@/lib/format'
-import {
-  INTERACTION_TYPES,
-  OPPORTUNITY_STAGES,
-  OPPORTUNITY_STAGE_KEYS,
-} from '@/lib/constants'
-import type { Contact, Interaction, Opportunity } from '@/types'
+import { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_KEYS } from '@/lib/constants'
+import type { CalendarEvent, Contact, Opportunity } from '@/types'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 
+/**
+ * The page people land on. It answers three questions in order: what should I
+ * do now (the AI briefing), who am I seeing next (the calendar), and who have
+ * I let go quiet (the reconnect list) — then the slower context underneath.
+ */
 export function DashboardPage() {
   const contacts = useContacts()
-  const tags = useTags()
   const opportunities = useOpportunities()
+  const events = useEvents()
+  const contactMap = useContactMap()
+  const tagMap = useTagMap()
   const { openNewContact, openVoiceCapture } = useUI()
 
-  const stats = computeStats(contacts)
+  const stats = computeStats(contacts, events, opportunities)
   const pipeline = computePipelineStats(opportunities)
 
   if (contacts === undefined) return <DashboardSkeleton />
@@ -50,7 +61,7 @@ export function DashboardPage() {
       header={
         <PageHeader
           title="Dashboard"
-          description="Your network at a glance — recent activity, new people, and your pipeline."
+          description="What to do next, who you're seeing, and who's gone quiet."
         >
           {/* Voice leads: adding someone should cost a sentence, not a form. */}
           <Button onClick={openVoiceCapture} className="gap-2">
@@ -88,79 +99,47 @@ export function DashboardPage() {
               to={ROUTES.contacts}
             />
             <StatTile
-              icon={UserPlus}
-              label="Added (30 days)"
-              value={stats.recentCount}
-              accent="text-emerald-500"
+              icon={CalendarClock}
+              label="Meetings this week"
+              value={stats.meetingsThisWeek}
+              accent="text-sky-500"
+              to={ROUTES.calendar}
             />
             <StatTile
               icon={AlarmClock}
               label="Overdue"
               value={stats.overdueCount}
-              accent="text-red-500"
+              accent="text-amber-500"
               to={ROUTES.contactsOverdue}
             />
             <StatTile
-              icon={TagIcon}
-              label="Tags"
-              value={tags?.length ?? 0}
+              icon={KanbanSquare}
+              label="Open applications"
+              value={stats.openOpportunities}
               accent="text-violet-500"
-              to={ROUTES.tags}
+              to={ROUTES.pipeline}
             />
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Recent activity — captured automatically, never hand-logged */}
-            <Card className="lg:col-span-2">
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-indigo-500" />
-                    <h2 className="font-semibold">Recent activity</h2>
-                  </div>
-                  <Link
-                    to={ROUTES.contacts}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    View all
-                  </Link>
-                </div>
-                {stats.recentInteractions.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    Nothing yet. Meetings you schedule and emails caught by the
-                    Retrn extension show up here on their own.
-                  </p>
-                ) : (
-                  <ul className="divide-y">
-                    {stats.recentInteractions.map(({ contact: c, interaction: it }) => (
-                      <li key={it.id}>
-                        <Link
-                          to={ROUTES.contact(c.id)}
-                          className="flex items-center gap-3 py-2.5"
-                        >
-                          <ContactAvatar
-                            contact={c}
-                            className="h-9 w-9 shrink-0 text-xs"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {fullName(c)}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {INTERACTION_TYPES[it.type]?.emoji ?? '•'}{' '}
-                              {it.summary || INTERACTION_TYPES[it.type]?.label || 'Note'}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {formatRelative(it.date)}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+            {/* What to do now — model-ordered, with a rules-based fallback. */}
+            <div className="lg:col-span-2">
+              <BriefingCard
+                contacts={contacts}
+                opportunities={opportunities ?? []}
+                events={events ?? []}
+                tagMap={tagMap}
+                ready={opportunities !== undefined && events !== undefined}
+              />
+            </div>
+
+            {/* Who you're seeing next */}
+            <UpcomingMeetings events={events ?? []} contactMap={contactMap} />
+
+            {/* Who's gone quiet */}
+            <div className="lg:col-span-2">
+              <NeedsAttention contacts={contacts} />
+            </div>
 
             {/* Recently added */}
             <Card>
@@ -176,10 +155,7 @@ export function DashboardPage() {
                         to={ROUTES.contact(c.id)}
                         className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-accent/60"
                       >
-                        <ContactAvatar
-                          contact={c}
-                          className="h-8 w-8 text-xs"
-                        />
+                        <ContactAvatar contact={c} className="h-8 w-8 text-xs" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">
                             {fullName(c)}
@@ -282,42 +258,34 @@ export function DashboardPage() {
 
 interface Stats {
   total: number
-  recentCount: number
   recent: Contact[]
   overdueCount: number
-  recentInteractions: { contact: Contact; interaction: Interaction }[]
+  meetingsThisWeek: number
+  openOpportunities: number
 }
 
-function computeStats(contacts: Contact[] | undefined): Stats {
-  if (!contacts) {
-    return { total: 0, recentCount: 0, recent: [], overdueCount: 0, recentInteractions: [] }
-  }
-
-  const recentSorted = [...contacts].sort((a, b) =>
+function computeStats(
+  contacts: Contact[] | undefined,
+  events: CalendarEvent[] | undefined,
+  opportunities: Opportunity[] | undefined,
+): Stats {
+  const recentSorted = [...(contacts ?? [])].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   )
-  const recentCount = contacts.filter((c) => {
-    const d = daysSince(c.createdAt.slice(0, 10))
-    return d !== null && d <= 30
+
+  // "This week" is the next seven days, not the calendar week — what's ahead
+  // of you on a Friday shouldn't reset to zero on Monday.
+  const meetingsThisWeek = (events ?? []).filter((e) => {
+    const days = daysSince(e.startsAt)
+    return days !== null && days <= 0 && days >= -7
   }).length
 
-  const overdueCount = contacts.filter((c) => getReconnectStatus(c).overdue).length
-
-  // Flatten every interaction across contacts, newest first.
-  const recentInteractions = contacts
-    .flatMap((contact) => contact.interactions.map((interaction) => ({ contact, interaction })))
-    .sort((a, b) => {
-      const d = b.interaction.date.localeCompare(a.interaction.date)
-      return d !== 0 ? d : b.interaction.createdAt.localeCompare(a.interaction.createdAt)
-    })
-    .slice(0, 7)
-
   return {
-    total: contacts.length,
-    recentCount,
+    total: contacts?.length ?? 0,
     recent: recentSorted.slice(0, 5),
-    overdueCount,
-    recentInteractions,
+    overdueCount: (contacts ?? []).filter((c) => getReconnectStatus(c).overdue).length,
+    meetingsThisWeek,
+    openOpportunities: (opportunities ?? []).filter((o) => o.stage !== 'closed').length,
   }
 }
 

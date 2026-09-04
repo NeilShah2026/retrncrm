@@ -1,4 +1,4 @@
-import { askClaudeJson, truncate } from './client'
+import { askClaudeJson, truncate, type AiMessage } from './client'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { CONNECTION_TYPES, MEET_SOURCES } from '@/lib/constants'
 import { fullName } from '@/lib/format'
@@ -8,9 +8,15 @@ import type { Contact, Tag } from '@/types'
  * "Who do I know in fintech in Boston?" over your own contacts.
  *
  * Fuzzy search finds a string you can already name; this finds people by what
- * you remember about them. It's one request per question — a compact roster
- * goes up, a shortlist of ids with reasons comes back — and it falls back to
- * the Fuse index if anything goes wrong, so the search box never breaks.
+ * you remember about them — and, since the roster carries reconnect state and
+ * how you met, answers judgement questions too ("who should I ask for a
+ * referral?", "how many people do I know at Fidelity?").
+ *
+ * It's a conversation, not a single shot: the roster goes up once, in the
+ * first message, and follow-ups ride on the same thread, so "what about the
+ * ones in Boston?" costs a sentence rather than another roster. Everything
+ * falls back to the Fuse index if anything goes wrong, so the search box
+ * never breaks.
  *
  * The roster is deliberately lossy: contacts are referred to by position, not
  * id, and notes are clipped, which keeps a few hundred people inside a couple
@@ -24,9 +30,21 @@ export interface NetworkMatch {
 }
 
 export interface NetworkAnswer {
+  /** The answer in prose — the part that isn't a list of people. */
+  answer: string
   matches: NetworkMatch[]
-  /** A sentence of framing, when the model offers one. */
-  summary?: string
+  /** Questions worth asking next, offered as chips. */
+  followUps: string[]
+}
+
+/**
+ * One thread of questions against one roster. Immutable: `askNetwork` returns
+ * the next session rather than mutating this one, so React state stays honest.
+ */
+export interface NetworkSession {
+  /** Index-aligned with the numbering the model was given. */
+  roster: Contact[]
+  turns: AiMessage[]
 }
 
 /** Roster caps — a payload this size costs cents, not dollars. */
@@ -34,22 +52,34 @@ const MAX_CONTACTS = 400
 const MAX_NOTE_CHARS = 160
 const MAX_ROSTER_CHARS = 40_000
 const MAX_MATCHES = 12
+const MAX_FOLLOW_UPS = 3
+/** Turns kept after the roster message, so a long thread stays affordable. */
+const MAX_HISTORY_TURNS = 8
 
-const SYSTEM = `You help someone search their own personal CRM by meaning \
-rather than by keyword. You are given a numbered roster of the people they \
-know and one question about it.
+const SYSTEM = `You help someone search and reason about their own personal \
+CRM — the people they have met and written down. You are given a numbered \
+roster of those people, then questions about it, one at a time.
 
-Reply with a single JSON object and nothing else:
-{"summary": "one short sentence", "matches": [{"n": 3, "why": "one short line"}]}
+Reply to every question with a single JSON object and nothing else:
+{"answer": "one to three sentences", "matches": [{"n": 3, "why": "one short line"}], "followUps": ["…"]}
 
 Rules:
 - "n" must be a number from the roster. Never invent a person.
 - Order matches best-first and return at most ${MAX_MATCHES}.
 - "why" is one specific line grounded in that person's roster entry — the \
-company, school, tag, or note that makes them the right person to ask. Never \
+company, school, tag, note, or how long it has been since they spoke. Never \
 restate the question.
-- If nobody genuinely fits, return an empty matches array and say so in \
-"summary". A weak honest answer beats a confident wrong one.
+- "answer" answers the question directly. If it is a counting or comparing \
+question, give the number or the comparison. If it is a "who should I…" \
+question, say who and why in one line. Do not just list names that are \
+already in "matches".
+- If nobody genuinely fits, return an empty matches array and say so plainly. \
+A weak honest answer beats a confident wrong one.
+- "followUps" is up to ${MAX_FOLLOW_UPS} short questions this person could \
+usefully ask next about this same roster, phrased in their voice. Omit it \
+when nothing obvious follows.
+- Later questions refer to the same roster and may build on your previous \
+answers ("what about the ones in Boston?").
 - The roster is the only thing you know. Do not use outside knowledge about \
 any named company or person.`
 
@@ -135,29 +165,56 @@ function detail(c: Contact): number {
   )
 }
 
-interface RawAnswer {
-  summary?: unknown
-  matches?: unknown
+/**
+ * A fresh thread. Free: the roster is built by the first question, against the
+ * contacts as they are then rather than as they were when the dialog opened.
+ */
+export function startSession(): NetworkSession {
+  return { roster: [], turns: [] }
 }
 
+interface RawAnswer {
+  answer?: unknown
+  summary?: unknown
+  matches?: unknown
+  followUps?: unknown
+}
+
+/**
+ * Ask one question on a thread. Returns the answer plus the session to pass
+ * back for the follow-up — the roster is only ever sent in the first turn.
+ */
 export async function askNetwork(
+  session: NetworkSession,
   question: string,
   contacts: Contact[],
   tagMap: Map<string, Tag>,
   signal?: AbortSignal,
-): Promise<NetworkAnswer> {
-  const { text, included } = buildRoster(contacts, tagMap)
+): Promise<{ answer: NetworkAnswer; session: NetworkSession }> {
+  const asked = truncate(question, 400)
+
+  let roster = session.roster
+  let turns = session.turns
+  if (turns.length === 0) {
+    // Build the roster now so it reflects the contacts as they are today,
+    // not as they were when the dialog opened.
+    const built = buildRoster(contacts, tagMap)
+    roster = built.included
+    turns = [
+      {
+        role: 'user',
+        content: `Roster (${built.included.length} people):\n${built.text}\n\nQuestion: ${asked}`,
+      },
+    ]
+  } else {
+    turns = [...turns, { role: 'user', content: `Question: ${asked}` }]
+  }
 
   const raw = await askClaudeJson<RawAnswer>({
     system: SYSTEM,
-    maxTokens: 900,
+    maxTokens: 1000,
     signal,
-    messages: [
-      {
-        role: 'user',
-        content: `Roster (${included.length} people):\n${text}\n\nQuestion: ${truncate(question, 400)}`,
-      },
-    ],
+    messages: trimHistory(turns),
   })
 
   const matches: NetworkMatch[] = []
@@ -166,7 +223,7 @@ export async function askNetwork(
     if (typeof entry !== 'object' || entry === null) continue
     const { n, why } = entry as { n?: unknown; why?: unknown }
     const index = typeof n === 'number' ? Math.floor(n) : Number.NaN
-    const contact = included[index - 1]
+    const contact = roster[index - 1]
     // Guards against a hallucinated index or the same person listed twice.
     if (!contact || seen.has(contact.id)) continue
     seen.add(contact.id)
@@ -177,8 +234,47 @@ export async function askNetwork(
     if (matches.length >= MAX_MATCHES) break
   }
 
-  return {
+  // "summary" is what earlier versions of this prompt asked for; accept it so
+  // a model that reaches for the old key still says something.
+  const prose = [raw.answer, raw.summary].find(
+    (v): v is string => typeof v === 'string' && v.trim().length > 0,
+  )
+
+  const followUps = (Array.isArray(raw.followUps) ? raw.followUps : [])
+    .filter((f): f is string => typeof f === 'string' && f.trim().length > 0)
+    .slice(0, MAX_FOLLOW_UPS)
+    .map((f) => truncate(f, 90))
+
+  const answer: NetworkAnswer = {
+    answer: prose ? truncate(prose, 400) : '',
     matches,
-    summary: typeof raw.summary === 'string' ? truncate(raw.summary, 240) : undefined,
+    followUps,
   }
+
+  return {
+    answer,
+    // Record a compact, valid version of what came back rather than the raw
+    // reply: it keeps the thread small and can't feed malformed JSON back in.
+    session: {
+      roster,
+      turns: [...turns, { role: 'assistant', content: replay(answer, roster) }],
+    },
+  }
+}
+
+/** The assistant turn as the model would have written it, minus the noise. */
+function replay(answer: NetworkAnswer, roster: Contact[]): string {
+  return JSON.stringify({
+    answer: answer.answer,
+    matches: answer.matches.map((m) => ({
+      n: roster.indexOf(m.contact) + 1,
+      why: m.reason,
+    })),
+  })
+}
+
+/** Keep the roster message and the tail of the thread; drop the middle. */
+function trimHistory(turns: AiMessage[]): AiMessage[] {
+  if (turns.length <= MAX_HISTORY_TURNS + 1) return turns
+  return [turns[0], ...turns.slice(-MAX_HISTORY_TURNS)]
 }
