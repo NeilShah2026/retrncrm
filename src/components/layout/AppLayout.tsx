@@ -7,12 +7,14 @@ import {
   Settings,
   Search,
   Plus,
+  Mic,
   KanbanSquare,
   Mail,
   GraduationCap,
   CalendarDays,
   QrCode,
   MoreHorizontal,
+  Sparkles,
   LogOut,
   ChevronsUpDown,
 } from 'lucide-react'
@@ -112,7 +114,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  * and scroll only the region that actually needs it.
  */
 export function AppLayout() {
-  const { openNewContact, openSearch } = useUI()
+  const { openNewContact, openVoiceCapture, openSearch, openAskNetwork } = useUI()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [shareOpen, setShareOpen] = React.useState(false)
@@ -129,13 +131,23 @@ export function AppLayout() {
         </div>
 
         <div className="mt-5 space-y-2 px-3">
-          <Button
-            className="w-full justify-start gap-2"
-            onClick={openNewContact}
-          >
-            <Plus className="h-4 w-4" />
-            New contact
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1 justify-start gap-2"
+              onClick={openVoiceCapture}
+            >
+              <Mic className="h-4 w-4" />
+              Say who you met
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={openNewContact}
+              aria-label="New contact (form)"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
           <button
             onClick={openSearch}
             className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent"
@@ -145,6 +157,13 @@ export function AppLayout() {
             <kbd className="pointer-events-none rounded border bg-muted px-1.5 font-mono text-[10px]">
               ⌘K
             </kbd>
+          </button>
+          <button
+            onClick={() => openAskNetwork()}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="flex-1 text-left">Ask your network</span>
           </button>
         </div>
 
@@ -197,8 +216,16 @@ export function AppLayout() {
               <Search className="h-4 w-4" />
             </Button>
             <ThemeToggle />
-            <Button size="icon" onClick={openNewContact} aria-label="New contact">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={openNewContact}
+              aria-label="New contact"
+            >
               <Plus className="h-4 w-4" />
+            </Button>
+            <Button size="icon" onClick={openVoiceCapture} aria-label="Say who you met">
+              <Mic className="h-4 w-4" />
             </Button>
           </div>
         </header>
@@ -241,6 +268,10 @@ export function AppLayout() {
                 {displayName(user)}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => openAskNetwork()}>
+                <Sparkles className="h-4 w-4" />
+                Ask your network
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShareOpen(true)}>
                 <QrCode className="h-4 w-4" />
                 Share profile

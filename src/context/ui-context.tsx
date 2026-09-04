@@ -1,14 +1,20 @@
 import * as React from 'react'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
+import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { CommandPalette } from '@/components/search/CommandPalette'
+import { AskNetworkDialog } from '@/components/ai/AskNetworkDialog'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useAuth } from '@/auth/AuthProvider'
 import type { Contact } from '@/types'
 
 interface UIContextValue {
   openNewContact: () => void
+  /** The one-sentence capture sheet — the low-friction way to add someone. */
+  openVoiceCapture: () => void
   openEditContact: (contact: Contact) => void
   openSearch: () => void
+  /** Natural-language search over your contacts, optionally pre-filled. */
+  openAskNetwork: (question?: string) => void
   openWelcomeTour: () => void
 }
 
@@ -32,6 +38,9 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tourOpen, setTourOpen] = React.useState(false)
+  const [voiceOpen, setVoiceOpen] = React.useState(false)
+  const [askOpen, setAskOpen] = React.useState(false)
+  const [askQuestion, setAskQuestion] = React.useState<string | undefined>()
 
   const openNewContact = React.useCallback(() => {
     setEditing(null)
@@ -43,6 +52,11 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     setFormOpen(true)
   }, [])
 
+  const openVoiceCapture = React.useCallback(() => setVoiceOpen(true), [])
+  const openAskNetwork = React.useCallback((question?: string) => {
+    setAskQuestion(question)
+    setAskOpen(true)
+  }, [])
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
   const openWelcomeTour = React.useCallback(() => setTourOpen(true), [])
 
@@ -65,27 +79,57 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         setSearchOpen((v) => !v)
         return
       }
-      if (
-        e.key.toLowerCase() === 'n' &&
+      const bare =
         !e.metaKey &&
         !e.ctrlKey &&
         !e.altKey &&
         !isTypingTarget(e.target) &&
         !formOpen &&
         !searchOpen &&
-        !tourOpen
-      ) {
+        !tourOpen &&
+        !voiceOpen &&
+        !askOpen
+      if (!bare) return
+      if (e.key.toLowerCase() === 'n') {
         e.preventDefault()
         openNewContact()
+        return
+      }
+      // "V" for voice — the fastest path from "I just met someone" to saved.
+      if (e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        openVoiceCapture()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [formOpen, searchOpen, tourOpen, openNewContact])
+  }, [
+    formOpen,
+    searchOpen,
+    tourOpen,
+    voiceOpen,
+    askOpen,
+    openNewContact,
+    openVoiceCapture,
+  ])
 
   const value = React.useMemo(
-    () => ({ openNewContact, openEditContact, openSearch, openWelcomeTour }),
-    [openNewContact, openEditContact, openSearch, openWelcomeTour],
+    () => ({
+      openNewContact,
+      openVoiceCapture,
+      openEditContact,
+      openSearch,
+      openAskNetwork,
+      openWelcomeTour,
+    }),
+    [
+      openNewContact,
+      openVoiceCapture,
+      openEditContact,
+      openSearch,
+      openAskNetwork,
+      openWelcomeTour,
+    ],
   )
 
   return (
@@ -96,10 +140,18 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         onOpenChange={setFormOpen}
         contact={editing}
       />
+      <VoiceCaptureDialog open={voiceOpen} onOpenChange={setVoiceOpen} />
       <CommandPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}
         onNewContact={openNewContact}
+        onVoiceCapture={openVoiceCapture}
+        onAskNetwork={openAskNetwork}
+      />
+      <AskNetworkDialog
+        open={askOpen}
+        onOpenChange={setAskOpen}
+        initialQuestion={askQuestion}
       />
       <WelcomeTour
         open={tourOpen}

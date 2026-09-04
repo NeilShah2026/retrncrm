@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   CalendarPlus,
+  Check,
   Clock,
   Coffee,
   GraduationCap,
@@ -12,7 +13,6 @@ import {
   Mail,
   MapPin,
   Merge,
-  MessageSquarePlus,
   MoreHorizontal,
   Pencil,
   Phone,
@@ -46,7 +46,6 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { MergeContactDialog } from '@/components/contacts/MergeContactDialog'
 import { EventFormDialog } from '@/components/calendar/EventFormDialog'
-import { LogInteractionDialog } from '@/components/contacts/LogInteractionDialog'
 import { CoffeeChatPrepDialog } from '@/components/contacts/CoffeeChatPrepDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
 import { useContact, useContactMap, useEvents, useTagMap } from '@/hooks/useData'
@@ -59,6 +58,7 @@ import {
   STRENGTH_LABELS,
 } from '@/lib/constants'
 import { getReconnectStatus } from '@/lib/reconnect'
+import { markCaughtUp } from '@/lib/caughtUp'
 import {
   fullName,
   formatDate,
@@ -80,9 +80,6 @@ export function ContactDetailPage() {
   const [editing, setEditing] = React.useState(false)
   const [merging, setMerging] = React.useState(false)
   const [scheduling, setScheduling] = React.useState(false)
-  const [logging, setLogging] = React.useState(false)
-  const [editingInteraction, setEditingInteraction] =
-    React.useState<Interaction | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [deletingInteraction, setDeletingInteraction] =
     React.useState<Interaction | null>(null)
@@ -147,7 +144,7 @@ export function ContactDetailPage() {
         <PageHeaderBar
           contact={contact}
           onPrep={() => setPrepping(true)}
-          onLog={() => setLogging(true)}
+          onCaughtUp={() => void markCaughtUp(current)}
           onCompose={() => setComposing(true)}
           onEdit={() => setEditing(true)}
           onMerge={() => setMerging(true)}
@@ -288,29 +285,22 @@ export function ContactDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Interaction timeline */}
+          {/* Activity — filled in automatically, never hand-logged */}
           <Card>
             <CardContent className="p-5">
               <div className="mb-4 flex items-center justify-between">
                 <SectionLabel className="mb-0">
-                  Timeline
+                  Activity
                   <span className="ml-2 font-normal text-muted-foreground">
                     {sortedInteractions.length}
                   </span>
                 </SectionLabel>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setLogging(true)}
-                  className="gap-1.5"
-                >
-                  <MessageSquarePlus className="h-3.5 w-3.5" />
-                  Add
-                </Button>
               </div>
               {sortedInteractions.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  No interactions logged yet.
+                  Nothing yet. Meetings you schedule here and emails caught by
+                  the browser extension land in this feed on their own — there
+                  is nothing to fill in.
                 </p>
               ) : (
                 <ol className="relative space-y-4 border-l pl-6">
@@ -353,14 +343,6 @@ export function ContactDetailPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingInteraction(it)
-                                  setLogging(true)
-                                }}
-                              >
-                                Edit
-                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setDeletingInteraction(it)}
                                 className="text-destructive focus:text-destructive"
@@ -535,15 +517,6 @@ export function ContactDetailPage() {
         onOpenChange={setScheduling}
         defaultContactId={contact.id}
       />
-      <LogInteractionDialog
-        open={logging}
-        onOpenChange={(o) => {
-          setLogging(o)
-          if (!o) setEditingInteraction(null)
-        }}
-        contactId={contact.id}
-        interaction={editingInteraction}
-      />
       <CoffeeChatPrepDialog
         open={prepping}
         onOpenChange={setPrepping}
@@ -552,9 +525,9 @@ export function ContactDetailPage() {
           setPrepping(false)
           setComposing(true)
         }}
-        onLogInteraction={() => {
+        onMarkCaughtUp={() => {
           setPrepping(false)
-          setLogging(true)
+          void markCaughtUp(current)
         }}
       />
       <ComposeDialog
@@ -566,7 +539,7 @@ export function ContactDetailPage() {
         open={deleting}
         onOpenChange={setDeleting}
         title={`Delete ${fullName(contact)}?`}
-        description="This permanently removes the contact and their interaction history."
+        description="This permanently removes the contact and their activity history."
         confirmLabel="Delete"
         destructive
         onConfirm={handleDelete}
@@ -574,8 +547,8 @@ export function ContactDetailPage() {
       <ConfirmDialog
         open={Boolean(deletingInteraction)}
         onOpenChange={(o) => !o && setDeletingInteraction(null)}
-        title="Delete this interaction?"
-        description="The last-contact date will be recalculated from remaining interactions."
+        title="Delete this activity?"
+        description="The last-contact date will be recalculated from what remains."
         confirmLabel="Delete"
         destructive
         onConfirm={handleDeleteInteraction}
@@ -592,7 +565,7 @@ export function ContactDetailPage() {
 function PageHeaderBar({
   contact,
   onPrep,
-  onLog,
+  onCaughtUp,
   onCompose,
   onEdit,
   onMerge,
@@ -600,7 +573,7 @@ function PageHeaderBar({
 }: {
   contact?: Contact
   onPrep?: () => void
-  onLog?: () => void
+  onCaughtUp?: () => void
   onCompose?: () => void
   onEdit?: () => void
   onMerge?: () => void
@@ -654,17 +627,22 @@ function PageHeaderBar({
           >
             <Coffee className="h-4 w-4" />
           </Button>
-          <Button size="sm" onClick={onLog} className="hidden gap-1.5 sm:inline-flex">
-            <MessageSquarePlus className="h-4 w-4" />
-            Log interaction
+          {/* One tap, no form: says "we spoke today" and resets the nudge. */}
+          <Button
+            size="sm"
+            onClick={onCaughtUp}
+            className="hidden gap-1.5 sm:inline-flex"
+          >
+            <Check className="h-4 w-4" />
+            Caught up
           </Button>
           <Button
             size="icon-sm"
-            onClick={onLog}
-            aria-label="Log interaction"
+            onClick={onCaughtUp}
+            aria-label="Mark as caught up"
             className="sm:hidden"
           >
-            <MessageSquarePlus className="h-4 w-4" />
+            <Check className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

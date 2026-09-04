@@ -42,13 +42,13 @@ function buildExampleContact(exampleTagId: string): Contact {
     talkingPoints:
       'Talking points and prep notes show up here — try the "Prep" button above.',
     notes:
-      '**Tip:** Click **Edit** to change any field, or **Log interaction** to track your next conversation.\n\nDelete this card whenever you\'re ready — from here, or in bulk via *Settings → Clear all data*.',
+      '**Tip:** Next time you meet someone, hit **Say who you met** and just talk — one sentence becomes a contact.\n\nDelete this card whenever you\'re ready — from here, or in bulk via *Settings → Clear all data*.',
     interactions: [
       {
         id: createId(),
         date: today,
         type: 'coffee',
-        summary: 'Grabbed coffee and talked about internships — this is a sample timeline entry.',
+        summary: 'Grabbed coffee and talked about internships — a sample activity entry.',
         createdAt: now,
       },
     ],

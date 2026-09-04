@@ -7,6 +7,7 @@ import {
   ArrowRight,
   MessageSquare,
   Sparkles,
+  Mic,
   KanbanSquare,
   CalendarDays,
 } from 'lucide-react'
@@ -35,7 +36,7 @@ export function DashboardPage() {
   const contacts = useContacts()
   const tags = useTags()
   const opportunities = useOpportunities()
-  const { openNewContact } = useUI()
+  const { openNewContact, openVoiceCapture } = useUI()
 
   const stats = computeStats(contacts)
   const pipeline = computePipelineStats(opportunities)
@@ -51,7 +52,12 @@ export function DashboardPage() {
           title="Dashboard"
           description="Your network at a glance — recent activity, new people, and your pipeline."
         >
-          <Button onClick={openNewContact} className="gap-2">
+          {/* Voice leads: adding someone should cost a sentence, not a form. */}
+          <Button onClick={openVoiceCapture} className="gap-2">
+            <Mic className="h-4 w-4" />
+            Say who you met
+          </Button>
+          <Button variant="outline" onClick={openNewContact} className="gap-2">
             <UserPlus className="h-4 w-4" />
             New contact
           </Button>
@@ -62,8 +68,13 @@ export function DashboardPage() {
         <EmptyState
           icon={Sparkles}
           title="Welcome to Retrn"
-          description="Your personal CRM for everyone you meet beyond LinkedIn. Add your first contact to get started — a name and how you met is enough."
-          action={<Button onClick={openNewContact}>Add your first contact</Button>}
+          description="Your personal CRM for everyone you meet beyond LinkedIn. Tap the mic and say who you met — one sentence is enough."
+          action={
+            <Button onClick={openVoiceCapture} className="gap-2">
+              <Mic className="h-4 w-4" />
+              Say who you met
+            </Button>
+          }
         />
       ) : (
         <>
@@ -99,13 +110,13 @@ export function DashboardPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Recent interactions */}
+            {/* Recent activity — captured automatically, never hand-logged */}
             <Card className="lg:col-span-2">
               <CardContent className="p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-indigo-500" />
-                    <h2 className="font-semibold">Recent interactions</h2>
+                    <h2 className="font-semibold">Recent activity</h2>
                   </div>
                   <Link
                     to={ROUTES.contacts}
@@ -116,8 +127,8 @@ export function DashboardPage() {
                 </div>
                 {stats.recentInteractions.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
-                    No interactions logged yet. Log one from a contact — or from
-                    your inbox with the Retrn extension.
+                    Nothing yet. Meetings you schedule and emails caught by the
+                    Retrn extension show up here on their own.
                   </p>
                 ) : (
                   <ul className="divide-y">

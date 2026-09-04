@@ -1,9 +1,10 @@
 import * as React from 'react'
 import { toast } from 'sonner'
 import {
+  Check,
   Coffee,
+  Loader2,
   MapPin,
-  MessageSquarePlus,
   Save,
   Send,
   Sparkles,
@@ -21,18 +22,21 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { StrengthMeter } from '@/components/common/StrengthMeter'
-import { useContact } from '@/hooks/useData'
+import { useContact, useTagMap } from '@/hooks/useData'
 import { contactRepo } from '@/services'
 import { CONNECTION_TYPES, INTERACTION_TYPES } from '@/lib/constants'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { fullName, formatDate, renderMarkdown } from '@/lib/format'
+import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { generateTalkingPoints } from '@/lib/ai/prep'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   contactId: string | undefined
   onCompose?: () => void
-  onLogInteraction?: () => void
+  /** One tap to reset the reconnect clock — no form, no typing. */
+  onMarkCaughtUp?: () => void
 }
 
 /**
@@ -44,12 +48,15 @@ export function CoffeeChatPrepDialog({
   onOpenChange,
   contactId,
   onCompose,
-  onLogInteraction,
+  onMarkCaughtUp,
 }: Props) {
   const contact = useContact(contactId)
+  const tagMap = useTagMap()
   const [points, setPoints] = React.useState('')
   const [dirty, setDirty] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [suggesting, setSuggesting] = React.useState(false)
+  const [aiOff, setAiOff] = React.useState(() => !isAiAvailable())
 
   React.useEffect(() => {
     if (open && contact) {
@@ -70,6 +77,32 @@ export function CoffeeChatPrepDialog({
       toast.error('Could not save talking points.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Reads the same brief the user is looking at and turns it into things to
+   * actually say. Suggestions are appended, never written over what they
+   * wrote, and nothing reaches the contact until they hit Save.
+   */
+  async function suggestPoints() {
+    if (!contact) return
+    setSuggesting(true)
+    try {
+      const suggested = await generateTalkingPoints(contact, tagMap)
+      setPoints((prev) => (prev.trim() ? `${prev.trim()}
+${suggested}` : suggested))
+      setDirty(true)
+      toast.success('Suggestions added — edit them, then save.')
+    } catch (err) {
+      if (err instanceof AiUnavailableError) {
+        setAiOff(true)
+      } else {
+        console.error(err)
+        toast.error('Couldn’t come up with anything — your notes are untouched.')
+      }
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -141,18 +174,36 @@ export function CoffeeChatPrepDialog({
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Talking points
               </p>
-              {dirty && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void savePoints()}
-                  disabled={saving}
-                  className="h-6 gap-1 px-2 text-xs"
-                >
-                  <Save className="h-3 w-3" />
-                  Save
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {!aiOff && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void suggestPoints()}
+                    disabled={suggesting}
+                    className="h-6 gap-1 px-2 text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                  >
+                    {suggesting ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    {suggesting ? 'Thinking…' : 'Suggest'}
+                  </Button>
+                )}
+                {dirty && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void savePoints()}
+                    disabled={saving}
+                    className="h-6 gap-1 px-2 text-xs"
+                  >
+                    <Save className="h-3 w-3" />
+                    Save
+                  </Button>
+                )}
+              </div>
             </div>
             <Textarea
               value={points}
@@ -221,10 +272,10 @@ export function CoffeeChatPrepDialog({
               Send a message
             </Button>
           )}
-          {onLogInteraction && (
-            <Button size="sm" onClick={onLogInteraction} className="gap-1.5">
-              <MessageSquarePlus className="h-3.5 w-3.5" />
-              Log this interaction
+          {onMarkCaughtUp && (
+            <Button size="sm" onClick={onMarkCaughtUp} className="gap-1.5">
+              <Check className="h-3.5 w-3.5" />
+              Mark as caught up
             </Button>
           )}
         </div>

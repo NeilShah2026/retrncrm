@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
-import { Copy, Mail, MailWarning } from 'lucide-react'
+import { Copy, Loader2, Mail, MailWarning, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -21,11 +21,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
-import { useContacts, useTemplates } from '@/hooks/useData'
+import { useContacts, useTagMap, useTemplates } from '@/hooks/useData'
 import { useMyName } from '@/hooks/useMyName'
 import { TEMPLATE_CATEGORIES } from '@/lib/constants'
 import { buildMailto, contactMergeSource, mergeTemplate } from '@/lib/templates'
 import { fullName } from '@/lib/format'
+import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { draftOutreach } from '@/lib/ai/outreach'
 import type { Contact } from '@/types'
 
 interface Props {
@@ -47,6 +49,7 @@ export function ComposeDialog({
 }: Props) {
   const contacts = useContacts() ?? []
   const templates = useTemplates() ?? []
+  const tagMap = useTagMap()
   const [myName, setMyName] = useMyName()
 
   const [selectedContactId, setSelectedContactId] = React.useState(NONE)
@@ -54,6 +57,8 @@ export function ComposeDialog({
   const [subject, setSubject] = React.useState('')
   const [body, setBody] = React.useState('')
   const [edited, setEdited] = React.useState(false)
+  const [drafting, setDrafting] = React.useState(false)
+  const [aiOff, setAiOff] = React.useState(() => !isAiAvailable())
 
   React.useEffect(() => {
     if (!open) return
@@ -89,6 +94,42 @@ export function ComposeDialog({
     })
     setSubject(merged.subject)
     setBody(merged.body)
+  }
+
+  /**
+   * Rewrites the merged template for this specific person. It only ever fills
+   * the body you can already edit — "Reset to template" is the undo, and
+   * nothing is sent either way.
+   */
+  async function draft() {
+    if (!contact || !template) {
+      toast.error('Pick a template and a contact first.')
+      return
+    }
+    setDrafting(true)
+    try {
+      const text = await draftOutreach({
+        contact,
+        template,
+        tagMap,
+        myName,
+        currentBody: body,
+      })
+      setBody(text)
+      // Counts as a hand-edit so the merge effect doesn't overwrite it.
+      setEdited(true)
+      toast.success('Draft written — read it before you send it.')
+    } catch (err) {
+      if (err instanceof AiUnavailableError) {
+        setAiOff(true)
+        toast.info('AI isn’t set up here — the template is still ready to send.')
+      } else {
+        console.error(err)
+        toast.error('Couldn’t write that draft. The template is unchanged.')
+      }
+    } finally {
+      setDrafting(false)
+    }
   }
 
   async function copy(text: string, label: string) {
@@ -211,17 +252,34 @@ export function ComposeDialog({
           )}
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label htmlFor="compose-body">Message</Label>
-              {edited && (
-                <button
-                  type="button"
-                  onClick={reset}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Reset to template
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {edited && (
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Reset to template
+                  </button>
+                )}
+                {!aiOff && (
+                  <button
+                    type="button"
+                    onClick={() => void draft()}
+                    disabled={drafting || !contact || !template}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-500 disabled:opacity-50 dark:text-indigo-400"
+                  >
+                    {drafting ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    {drafting ? 'Writing…' : 'Draft with AI'}
+                  </button>
+                )}
+              </div>
             </div>
             <Textarea
               id="compose-body"

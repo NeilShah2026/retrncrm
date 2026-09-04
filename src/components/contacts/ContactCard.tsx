@@ -16,6 +16,7 @@ import { StrengthMeter } from '@/components/common/StrengthMeter'
 import { CONNECTION_TYPES } from '@/lib/constants'
 import { fullName, formatRelative } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
+import { markCaughtUp } from '@/lib/caughtUp'
 import type { Contact, Tag } from '@/types'
 
 interface Props {
@@ -74,6 +75,9 @@ export function ContactCard({ contact, tagMap, onEdit, onDelete }: Props) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onEdit(contact)}>
                     Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void markCaughtUp(contact)}>
+                    Caught up today
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

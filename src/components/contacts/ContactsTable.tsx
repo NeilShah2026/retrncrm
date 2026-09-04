@@ -15,6 +15,7 @@ import { CONNECTION_TYPES } from '@/lib/constants'
 import { fullName, formatDate, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { markCaughtUp } from '@/lib/caughtUp'
 import type { SortDir, SortKey } from '@/lib/filters'
 import type { Contact, Tag } from '@/types'
 
@@ -182,6 +183,9 @@ export function ContactsTable({
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEdit(c)}>
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => void markCaughtUp(c)}>
+                        Caught up today
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

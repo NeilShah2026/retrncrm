@@ -9,6 +9,8 @@ import {
   Building2,
   KanbanSquare,
   Mail,
+  Mic,
+  Sparkles,
 } from 'lucide-react'
 import {
   CommandDialog,
@@ -28,9 +30,18 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onNewContact: () => void
+  onVoiceCapture: () => void
+  /** Hands the typed query to the natural-language search over contacts. */
+  onAskNetwork: (question: string) => void
 }
 
-export function CommandPalette({ open, onOpenChange, onNewContact }: Props) {
+export function CommandPalette({
+  open,
+  onOpenChange,
+  onNewContact,
+  onVoiceCapture,
+  onAskNetwork,
+}: Props) {
   const navigate = useNavigate()
   const contacts = useContacts()
   const tagMap = useTagMap()
@@ -69,12 +80,25 @@ export function CommandPalette({ open, onOpenChange, onNewContact }: Props) {
           No results for “{query}”. Try a company, tag, or where you met.
         </CommandEmpty>
 
+        {query.trim().length > 2 && (
+          <CommandGroup heading="Ask">
+            <CommandItem
+              value="ask-network"
+              keywords={[query]}
+              onSelect={() => run(() => onAskNetwork(query))}
+            >
+              <Sparkles /> Ask your network: “{query}”
+            </CommandItem>
+          </CommandGroup>
+        )}
+
         {results.length > 0 && (
           <CommandGroup heading="People">
             {results.map((c) => (
               <CommandItem
                 key={c.id}
                 value={`person-${c.id}`}
+                keywords={[query, fullName(c), c.company ?? '', c.jobTitle ?? '']}
                 onSelect={() => run(() => navigate(ROUTES.contact(c.id)))}
               >
                 <ContactAvatar contact={c} className="h-7 w-7 text-xs" />
@@ -93,8 +117,17 @@ export function CommandPalette({ open, onOpenChange, onNewContact }: Props) {
 
         {!query.trim() && (
           <CommandGroup heading="Actions">
+            <CommandItem value="voice-capture" onSelect={() => run(onVoiceCapture)}>
+              <Mic /> Say who you met
+            </CommandItem>
             <CommandItem value="new-contact" onSelect={() => run(onNewContact)}>
-              <UserPlus /> New contact
+              <UserPlus /> New contact (form)
+            </CommandItem>
+            <CommandItem
+              value="ask-network-blank"
+              onSelect={() => run(() => onAskNetwork(''))}
+            >
+              <Sparkles /> Ask your network a question
             </CommandItem>
             <CommandItem
               value="go-dashboard"
@@ -139,6 +172,7 @@ export function CommandPalette({ open, onOpenChange, onNewContact }: Props) {
           <CommandGroup heading="Jump to">
             <CommandItem
               value="view-all-matches"
+              keywords={[query]}
               onSelect={() => run(() => navigate(ROUTES.contactsSearch(query)))}
             >
               <Building2 /> See all contacts matching “{query}”

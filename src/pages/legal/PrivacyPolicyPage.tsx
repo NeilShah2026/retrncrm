@@ -39,6 +39,14 @@ export function PrivacyPolicyPage() {
               photos or business-card images you upload.
             </>,
             <>
+              <Strong>Voice capture</Strong> — if you dictate a contact, your
+              browser (not Retrn) performs the speech-to-text. On Chrome and
+              Edge that means the audio is sent to the browser vendor&rsquo;s
+              speech service under their privacy policy; Retrn only ever
+              receives the finished text, and only saves it when you press
+              save. We never record or store audio.
+            </>,
+            <>
               <Strong>Billing information</Strong> — if you subscribe to a paid
               plan, payment is processed by our payment provider (see Sub-processors).
               We do not store your full card number.

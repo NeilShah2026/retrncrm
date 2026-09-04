@@ -63,6 +63,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
   /** Present → edit mode. */
   contact?: Contact | null
+  /** Pre-filled fields for a new contact (e.g. handed over from voice capture). */
+  prefill?: Partial<Contact>
   onSaved?: (contact: Contact) => void
 }
 
@@ -94,33 +96,39 @@ interface FormState {
   notes: string
 }
 
-function initialState(contact?: Contact | null): FormState {
+function initialState(
+  contact?: Contact | null,
+  prefill?: Partial<Contact>,
+): FormState {
+  // Editing an existing contact always wins; otherwise a prefill (voice
+  // capture, LinkedIn paste) seeds the blank form.
+  const contactValues = contact ?? prefill
   return {
-    firstName: contact?.firstName ?? '',
-    lastName: contact?.lastName ?? '',
-    photo: contact?.photo,
-    company: contact?.company ?? '',
-    jobTitle: contact?.jobTitle ?? '',
-    industry: contact?.industry ?? '',
-    email: contact?.email ?? '',
-    phone: contact?.phone ?? '',
-    linkedinUrl: contact?.linkedinUrl ?? '',
-    twitter: contact?.twitter ?? '',
-    otherLinks: contact?.otherLinks ?? [],
-    connectionType: contact?.connectionType ?? '',
-    source: contact?.source ?? '',
-    school: contact?.school ?? '',
-    gradYear: contact?.gradYear ?? '',
-    major: contact?.major ?? '',
-    introducedById: contact?.introducedById ?? '',
-    howWeMet: contact?.howWeMet ?? '',
-    whereWeMet: contact?.whereWeMet ?? '',
-    dateMet: contact?.dateMet ?? '',
-    tagIds: contact?.tagIds ?? [],
-    relationshipStrength: contact?.relationshipStrength ?? 3,
-    lastContactDate: contact?.lastContactDate ?? '',
-    contactFrequencyGoal: contact?.contactFrequencyGoal ?? 'none',
-    notes: contact?.notes ?? '',
+    firstName: contactValues?.firstName ?? '',
+    lastName: contactValues?.lastName ?? '',
+    photo: contactValues?.photo,
+    company: contactValues?.company ?? '',
+    jobTitle: contactValues?.jobTitle ?? '',
+    industry: contactValues?.industry ?? '',
+    email: contactValues?.email ?? '',
+    phone: contactValues?.phone ?? '',
+    linkedinUrl: contactValues?.linkedinUrl ?? '',
+    twitter: contactValues?.twitter ?? '',
+    otherLinks: contactValues?.otherLinks ?? [],
+    connectionType: contactValues?.connectionType ?? '',
+    source: contactValues?.source ?? '',
+    school: contactValues?.school ?? '',
+    gradYear: contactValues?.gradYear ?? '',
+    major: contactValues?.major ?? '',
+    introducedById: contactValues?.introducedById ?? '',
+    howWeMet: contactValues?.howWeMet ?? '',
+    whereWeMet: contactValues?.whereWeMet ?? '',
+    dateMet: contactValues?.dateMet ?? '',
+    tagIds: contactValues?.tagIds ?? [],
+    relationshipStrength: contactValues?.relationshipStrength ?? 3,
+    lastContactDate: contactValues?.lastContactDate ?? '',
+    contactFrequencyGoal: contactValues?.contactFrequencyGoal ?? 'none',
+    notes: contactValues?.notes ?? '',
   }
 }
 
@@ -132,11 +140,14 @@ export function ContactFormDialog({
   open,
   onOpenChange,
   contact,
+  prefill,
   onSaved,
 }: Props) {
   const editing = Boolean(contact)
   const allContacts = useContacts() ?? []
-  const [form, setForm] = React.useState<FormState>(() => initialState(contact))
+  const [form, setForm] = React.useState<FormState>(() =>
+    initialState(contact, prefill),
+  )
   const [expanded, setExpanded] = React.useState(false)
   const [duplicates, setDuplicates] = React.useState<Contact[]>([])
   const [saving, setSaving] = React.useState(false)
@@ -186,11 +197,13 @@ export function ContactFormDialog({
   // Reset the form whenever the dialog is (re)opened for a new target.
   React.useEffect(() => {
     if (open) {
-      setForm(initialState(contact))
-      setExpanded(Boolean(contact))
+      setForm(initialState(contact, prefill))
+      // A prefill has already filled fields that live below the fold — open
+      // the extra section so nothing arrives hidden.
+      setExpanded(Boolean(contact) || Boolean(prefill))
       setDuplicates([])
     }
-  }, [open, contact])
+  }, [open, contact, prefill])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
