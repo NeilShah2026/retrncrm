@@ -7,6 +7,7 @@ import {
   MEET_SOURCES,
   MEET_SOURCE_KEYS,
 } from '@/lib/constants'
+import { MAX_TAGS_PER_CONTACT } from '@/lib/tagging'
 import type { ParsedCapture } from '@/lib/voiceParse'
 import type { ConnectionType, ContactFrequency, MeetSource } from '@/types'
 
@@ -95,7 +96,7 @@ Keys:
   connectionType: one of ${CONNECTION_TYPE_KEYS.join(', ')}
   source: one of ${MEET_SOURCE_KEYS.join(', ')}
   contactFrequencyGoal: one of ${FREQUENCY_KEYS.join(', ')}
-  tagNames: array of short topical labels the speaker asked for
+  tagNames: tags for this person (see the tag rule below)
   notes: the sentence rewritten as a clean note about this person
 
 Rules:
@@ -104,6 +105,12 @@ Rules:
 - Fix dictation artifacts in names and companies, but keep real spellings.
 - A school is only a school if the sentence says so; a workplace is the company.
 - Use contactFrequencyGoal only for an explicit cadence ("follow up in a month").
+- Tags: always include a tag the speaker asked for out loud. Beyond those, \
+add a tag from the user's existing tag list (given below the sentence) when \
+the sentence plainly puts this person in it, and at most one new tag of your \
+own when nothing existing covers something clearly true of them. Four tags \
+maximum, 1-3 words each, Title Case, reusing an existing tag's exact \
+spelling. Never a tag that could only ever apply to this one person.
 - "notes" keeps every concrete detail from the sentence — including anything that didn't fit a field above — but drops dictation filler ("um", "like"), repeated words, and the self-referential opener ("met a guy named…"). Write it about them, punctuated, in at most two sentences. Add nothing that wasn't said. Omit the key entirely if the sentence is only the fields and has nothing left worth remembering.`
 
 interface RawCapture {
@@ -161,6 +168,12 @@ function humanize(key: keyof ParsedCapture, value: unknown): string {
 export async function refineCapture(
   transcript: string,
   local: ParsedCapture,
+  /**
+   * The user's existing tag names. Given to the model so a captured person
+   * joins the tags already in use instead of starting a parallel vocabulary —
+   * the tags it picks land in the same reviewed change list as everything else.
+   */
+  tagVocabulary: string[] = [],
 ): Promise<CaptureRefinement> {
   const raw = await askClaudeJson<RawCapture>({
     system: SYSTEM,
@@ -173,6 +186,9 @@ export async function refineCapture(
           '',
           'The regex parser produced:',
           JSON.stringify(stripLocal(local)),
+          ...(tagVocabulary.length
+            ? ['', `The user's existing tags: ${tagVocabulary.join(', ')}`]
+            : []),
         ].join('\n'),
       },
     ],
@@ -216,7 +232,7 @@ export async function refineCapture(
     ? raw.tagNames
         .map((t) => cleanText(t, 24))
         .filter((t): t is string => Boolean(t))
-        .slice(0, 5)
+        .slice(0, MAX_TAGS_PER_CONTACT)
     : undefined
   if (tagNames?.length) apply('tagNames', tagNames)
 

@@ -50,7 +50,14 @@ export function CalendarPage() {
   const opportunities = useOpportunities()
   const contactMap = useContactMap()
 
-  const [view, setView] = React.useState<View>('month')
+  // A seven-column month grid on a 375px screen leaves a few pixels of text
+  // per day, so the agenda is the readable default there. It's only the
+  // initial value — the toggle still wins if someone wants the grid.
+  const [view, setView] = React.useState<View>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+      ? 'agenda'
+      : 'month',
+  )
   const [showDeadlines, setShowDeadlines] = React.useState(true)
   const [cursor, setCursor] = React.useState(() => new Date())
   const [formOpen, setFormOpen] = React.useState(false)

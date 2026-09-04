@@ -61,6 +61,26 @@
     font-feature-settings: 'rlig' 1, 'calt' 1;
     text-rendering: optimizeLegibility;
   }
+
+  /* iOS zooms the whole page when a focused field is under 16px, and never
+     zooms back out. Every field on a phone gets 16px, whatever its class
+     says; the desktop keeps the smaller type. */
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+
+  /* A tap should never leave a grey flash behind on a custom control. */
+  @media (hover: none) {
+    button,
+    a,
+    [role='button'] {
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
 }
 
 /* Custom scrollbars */

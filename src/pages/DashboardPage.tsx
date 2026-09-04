@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
+import { AssistantLauncher } from '@/components/ai/AssistantLauncher'
 import { BriefingCard } from '@/components/dashboard/BriefingCard'
 import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
 import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
@@ -47,7 +48,7 @@ export function DashboardPage() {
   const events = useEvents()
   const contactMap = useContactMap()
   const tagMap = useTagMap()
-  const { openNewContact, openVoiceCapture } = useUI()
+  const { openNewContact, openVoiceCapture, openAssistant } = useUI()
 
   const stats = computeStats(contacts, events, opportunities)
   const pipeline = computePipelineStats(opportunities)
@@ -63,12 +64,18 @@ export function DashboardPage() {
           title="Dashboard"
           description="What to do next, who you're seeing, and who's gone quiet."
         >
-          {/* Voice leads: adding someone should cost a sentence, not a form. */}
-          <Button onClick={openVoiceCapture} className="gap-2">
+          {/* Voice leads: adding someone should cost a sentence, not a form.
+              Both are hidden on a phone, where the top bar's mic, the
+              assistant bar below and the bottom-bar button already carry it. */}
+          <Button onClick={openVoiceCapture} className="hidden gap-2 sm:inline-flex">
             <Mic className="h-4 w-4" />
             Say who you met
           </Button>
-          <Button variant="outline" onClick={openNewContact} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={openNewContact}
+            className="hidden gap-2 sm:inline-flex"
+          >
             <UserPlus className="h-4 w-4" />
             New contact
           </Button>
@@ -79,18 +86,28 @@ export function DashboardPage() {
         <EmptyState
           icon={Sparkles}
           title="Welcome to Retrn"
-          description="Your personal CRM for everyone you meet beyond LinkedIn. Tap the mic and say who you met — one sentence is enough."
+          description="Your personal CRM for everyone you meet beyond LinkedIn. Tap the mic and say who you met — or type it to the assistant. One sentence is enough."
           action={
-            <Button onClick={openVoiceCapture} className="gap-2">
-              <Mic className="h-4 w-4" />
-              Say who you met
-            </Button>
+            <div className="flex flex-col items-center gap-2 sm:flex-row">
+              <Button onClick={openVoiceCapture} className="gap-2">
+                <Mic className="h-4 w-4" />
+                Say who you met
+              </Button>
+              <Button variant="outline" onClick={() => openAssistant()} className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Tell the assistant
+              </Button>
+            </div>
           }
         />
       ) : (
         <>
+          {/* The phone's headline feature, above everything else. On a laptop
+              the same box lives inside the briefing card. */}
+          <AssistantLauncher className="mb-4 md:hidden" />
+
           {/* Stat tiles */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             <StatTile
               icon={Users}
               label="Total contacts"

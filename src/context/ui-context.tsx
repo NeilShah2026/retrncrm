@@ -2,7 +2,7 @@ import * as React from 'react'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { CommandPalette } from '@/components/search/CommandPalette'
-import { AskNetworkDialog } from '@/components/ai/AskNetworkDialog'
+import { AssistantDialog } from '@/components/ai/AssistantDialog'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useAuth } from '@/auth/AuthProvider'
 import type { Contact } from '@/types'
@@ -14,7 +14,7 @@ interface UIContextValue {
   openEditContact: (contact: Contact) => void
   openSearch: () => void
   /** Natural-language search over your contacts, optionally pre-filled. */
-  openAskNetwork: (question?: string) => void
+  openAssistant: (question?: string) => void
   openWelcomeTour: () => void
 }
 
@@ -53,7 +53,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const openVoiceCapture = React.useCallback(() => setVoiceOpen(true), [])
-  const openAskNetwork = React.useCallback((question?: string) => {
+  const openAssistant = React.useCallback((question?: string) => {
     setAskQuestion(question)
     setAskOpen(true)
   }, [])
@@ -119,7 +119,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       openVoiceCapture,
       openEditContact,
       openSearch,
-      openAskNetwork,
+      openAssistant,
       openWelcomeTour,
     }),
     [
@@ -127,7 +127,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       openVoiceCapture,
       openEditContact,
       openSearch,
-      openAskNetwork,
+      openAssistant,
       openWelcomeTour,
     ],
   )
@@ -146,9 +146,9 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         onOpenChange={setSearchOpen}
         onNewContact={openNewContact}
         onVoiceCapture={openVoiceCapture}
-        onAskNetwork={openAskNetwork}
+        onAssistant={openAssistant}
       />
-      <AskNetworkDialog
+      <AssistantDialog
         open={askOpen}
         onOpenChange={setAskOpen}
         initialQuestion={askQuestion}

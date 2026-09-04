@@ -1,16 +1,35 @@
+import { format } from 'date-fns'
 import { askClaudeJson, truncate, type AiMessage } from './client'
+import { parseActions, type AssistantAction } from './actions'
 import { getReconnectStatus } from '@/lib/reconnect'
-import { CONNECTION_TYPES, MEET_SOURCES } from '@/lib/constants'
+import {
+  CONNECTION_TYPES,
+  CONNECTION_TYPE_KEYS,
+  FREQUENCY_KEYS,
+  MEET_SOURCES,
+  MEET_SOURCE_KEYS,
+  OPPORTUNITY_STAGE_KEYS,
+  OPPORTUNITY_TYPE_KEYS,
+} from '@/lib/constants'
 import { fullName } from '@/lib/format'
 import type { Contact, Tag } from '@/types'
 
 /**
- * "Who do I know in fintech in Boston?" over your own contacts.
+ * The assistant: one box that both answers questions about your network and
+ * records what you tell it.
  *
+ * Asking — "who do I know in fintech in Boston?" — is what this started as.
  * Fuzzy search finds a string you can already name; this finds people by what
- * you remember about them — and, since the roster carries reconnect state and
- * how you met, answers judgement questions too ("who should I ask for a
+ * you remember about them, and since the roster carries reconnect state and
+ * how you met, it answers judgement questions too ("who should I ask for a
  * referral?", "how many people do I know at Fidelity?").
+ *
+ * Telling — "met Priya at the AI meetup, she's a PM at Klaviyo, coffee next
+ * Tuesday at 3" — comes back as a *plan* in `actions`: typed, validated,
+ * previewable, and not yet saved. The same thread does both because the same
+ * sentence often is both, and because a person shouldn't have to know which
+ * box they're in. `lib/ai/actions.ts` owns everything about what an action is
+ * and how it runs; this file only asks for them and hands them back parsed.
  *
  * It's a conversation, not a single shot: the roster goes up once, in the
  * first message, and follow-ups ride on the same thread, so "what about the
@@ -35,6 +54,12 @@ export interface NetworkAnswer {
   matches: NetworkMatch[]
   /** Questions worth asking next, offered as chips. */
   followUps: string[]
+  /**
+   * What the message asked to be recorded, validated and ready to preview.
+   * Nothing here has happened yet — the user approves the list first (see
+   * `lib/ai/actions.ts`).
+   */
+  actions: AssistantAction[]
 }
 
 /**
@@ -55,13 +80,16 @@ const MAX_MATCHES = 12
 const MAX_FOLLOW_UPS = 3
 /** Turns kept after the roster message, so a long thread stays affordable. */
 const MAX_HISTORY_TURNS = 8
+/** Told to the model; `parseActions` enforces the real cap. */
+const MAX_ACTIONS_HINT = 8
 
-const SYSTEM = `You help someone search and reason about their own personal \
-CRM — the people they have met and written down. You are given a numbered \
-roster of those people, then questions about it, one at a time.
+const SYSTEM = `You are the assistant inside someone's personal CRM — the \
+people they have met and written down. You are given a numbered roster of \
+those people, then messages about it, one at a time. A message is either a \
+question about the roster, or an instruction to record something.
 
-Reply to every question with a single JSON object and nothing else:
-{"answer": "one to three sentences", "matches": [{"n": 3, "why": "one short line"}], "followUps": ["…"]}
+Reply to every message with a single JSON object and nothing else:
+{"answer": "one to three sentences", "matches": [{"n": 3, "why": "one short line"}], "followUps": ["…"], "actions": []}
 
 Rules:
 - "n" must be a number from the roster. Never invent a person.
@@ -81,7 +109,52 @@ when nothing obvious follows.
 - Later questions refer to the same roster and may build on your previous \
 answers ("what about the ones in Boston?").
 - The roster is the only thing you know. Do not use outside knowledge about \
-any named company or person.`
+any named company or person.
+
+ACTIONS
+
+When the message asks you to *record* something — "met Priya at the AI meetup, \
+she's a PM at Klaviyo", "coffee with Sarah next Tuesday at 3", "I spoke to \
+Marcus today", "tag Dan as fintech", "add the Fidelity internship, due Nov 1" \
+— put it in "actions" and say what you are about to do in "answer". The user \
+approves the list before any of it is saved, so propose the whole request; \
+never ask for confirmation in "answer" and never claim something is already \
+done.
+
+Every action is one of these objects. Omit any optional field the message \
+doesn't give you — never invent a company, title, email, or time:
+{"type":"add_contact","firstName":"…","lastName":"…","company":"…","jobTitle":"…","school":"…","connectionType":"…","source":"…","whereWeMet":"…","howWeMet":"…","email":"…","phone":"…","notes":"…","tagNames":["…"]}
+{"type":"schedule_meeting","title":"…","startsAtLocal":"YYYY-MM-DDTHH:mm","durationMinutes":30,"allDay":false,"location":"…","people":["Full Name"]}
+{"type":"log_caught_up","person":"Full Name","date":"YYYY-MM-DD"}
+{"type":"add_note","person":"Full Name","text":"…"}
+{"type":"add_tags","person":"Full Name","tagNames":["…"]}
+{"type":"set_followup","person":"Full Name","frequency":"${FREQUENCY_KEYS.join('|')}"}
+{"type":"add_opportunity","company":"…","role":"…","opportunityType":"${OPPORTUNITY_TYPE_KEYS.join('|')}","stage":"${OPPORTUNITY_STAGE_KEYS.join('|')}","deadline":"YYYY-MM-DD","people":["Full Name"]}
+
+connectionType is one of ${CONNECTION_TYPE_KEYS.join(', ')}. \
+source is one of ${MEET_SOURCE_KEYS.join(', ')}.
+
+Action rules:
+- "person" and "people" are names. Use a roster name exactly as it is spelled \
+there when you mean someone already in it. If the message introduces someone \
+new *and* schedules with them, emit add_contact first and use that same name \
+in the later action.
+- Dates and times are absolute local wall-clock, resolved from today's date, \
+which is given with the roster. "next Tuesday at 3" becomes a real \
+YYYY-MM-DDTHH:mm. Never return a relative phrase. Assume a sensible hour when \
+one isn't given (coffee 9am, lunch 12pm, a call 10am) and say which you \
+assumed in "answer".
+- Propose at most ${MAX_ACTIONS_HINT} actions, and only what was actually \
+asked for. Recording a person you were only asked about is wrong.
+- A question is not an instruction. "who should I follow up with?" is answered \
+with matches and no actions.
+- There is no action for deleting or editing anything. If the message asks for \
+one, say so plainly in "answer" and return no actions.`
+
+/** Today, as the model is asked to write dates. */
+function todayStamp(): string {
+  return format(new Date(), 'yyyy-MM-dd')
+}
 
 /** One roster line: everything worth matching on, nothing worth paying for. */
 function rosterLine(contact: Contact, index: number, tagMap: Map<string, Tag>): string {
@@ -178,6 +251,7 @@ interface RawAnswer {
   summary?: unknown
   matches?: unknown
   followUps?: unknown
+  actions?: unknown
 }
 
 /**
@@ -203,11 +277,23 @@ export async function askNetwork(
     turns = [
       {
         role: 'user',
-        content: `Roster (${built.included.length} people):\n${built.text}\n\nQuestion: ${asked}`,
+        content: [
+          `Today is ${format(new Date(), 'EEEE, d MMMM yyyy')} (${todayStamp()}), local time.`,
+          '',
+          `Roster (${built.included.length} people):`,
+          built.text,
+          '',
+          `Message: ${asked}`,
+        ].join('\n'),
       },
     ]
   } else {
-    turns = [...turns, { role: 'user', content: `Question: ${asked}` }]
+    // Today's date is repeated on every turn: a thread opened yesterday can
+    // still be told to schedule something "tomorrow".
+    turns = [
+      ...turns,
+      { role: 'user', content: `Today is ${todayStamp()}.\nMessage: ${asked}` },
+    ]
   }
 
   const raw = await askClaudeJson<RawAnswer>({
@@ -249,6 +335,7 @@ export async function askNetwork(
     answer: prose ? truncate(prose, 400) : '',
     matches,
     followUps,
+    actions: parseActions(raw.actions),
   }
 
   return {
@@ -270,6 +357,9 @@ function replay(answer: NetworkAnswer, roster: Contact[]): string {
       n: roster.indexOf(m.contact) + 1,
       why: m.reason,
     })),
+    // Kept so a follow-up ("make it 4pm instead") knows what was already
+    // proposed — and doesn't propose it a second time.
+    actions: answer.actions,
   })
 }
 

@@ -44,12 +44,61 @@ const PRIMARY_NAV = [
   { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare, end: false },
 ]
 
+/**
+ * The phone's bottom bar. Two destinations either side of the assistant, and
+ * everything else behind More — a five-across nav on a 375px screen gives
+ * every item a tap target too small to hit.
+ */
+const MOBILE_NAV = [
+  { to: ROUTES.dashboard, label: 'Home', icon: LayoutDashboard, end: true },
+  { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
+  { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
+]
+
 const SECONDARY_NAV = [
   { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
   { to: ROUTES.templates, label: 'Templates', icon: Mail, end: false },
   { to: ROUTES.tags, label: 'Tags', icon: TagIcon, end: false },
   { to: ROUTES.settings, label: 'Settings', icon: Settings, end: false },
 ]
+
+/** What the phone's More menu holds: everything not on the bottom bar. */
+const MORE_NAV = [
+  { to: ROUTES.college, label: 'College', icon: GraduationCap },
+  { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare },
+  { to: ROUTES.templates, label: 'Templates', icon: Mail },
+  { to: ROUTES.tags, label: 'Tags', icon: TagIcon },
+  { to: ROUTES.settings, label: 'Settings', icon: Settings },
+]
+
+/** One bottom-bar destination, sized for a thumb rather than a cursor. */
+function MobileNavLink({
+  to,
+  label,
+  icon: Icon,
+  end,
+}: {
+  to: string
+  label: string
+  icon: typeof Users
+  end: boolean
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors',
+          isActive ? 'text-indigo-500' : 'text-muted-foreground hover:text-foreground',
+        )
+      }
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </NavLink>
+  )
+}
 
 function Logo() {
   return (
@@ -114,7 +163,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  * and scroll only the region that actually needs it.
  */
 export function AppLayout() {
-  const { openNewContact, openVoiceCapture, openSearch, openAskNetwork } = useUI()
+  const { openNewContact, openVoiceCapture, openSearch, openAssistant } = useUI()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [shareOpen, setShareOpen] = React.useState(false)
@@ -159,11 +208,11 @@ export function AppLayout() {
             </kbd>
           </button>
           <button
-            onClick={() => openAskNetwork()}
+            onClick={() => openAssistant()}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Sparkles className="h-4 w-4" />
-            <span className="flex-1 text-left">Ask your network</span>
+            <span className="flex-1 text-left">Assistant</span>
           </button>
         </div>
 
@@ -204,7 +253,7 @@ export function AppLayout() {
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar — fixed, never scrolls */}
-        <header className="flex shrink-0 items-center gap-2 border-b bg-background/80 px-4 py-3 backdrop-blur md:hidden">
+        <header className="flex shrink-0 items-center gap-2 border-b bg-background/80 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
           <Logo />
           <div className="ml-auto flex items-center gap-1">
             <Button
@@ -216,14 +265,9 @@ export function AppLayout() {
               <Search className="h-4 w-4" />
             </Button>
             <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={openNewContact}
-              aria-label="New contact"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {/* Voice stays in the top bar: the assistant owns the centre of
+                the bottom nav, and capture is the other thing you do standing
+                up with one hand. */}
             <Button size="icon" onClick={openVoiceCapture} aria-label="Say who you met">
               <Mic className="h-4 w-4" />
             </Button>
@@ -236,29 +280,37 @@ export function AppLayout() {
           <Outlet />
         </main>
 
-        {/* Mobile bottom nav — fixed, never scrolls */}
-        <nav className="flex shrink-0 border-t bg-background/95 backdrop-blur md:hidden">
-          {PRIMARY_NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors',
-                  isActive
-                    ? 'text-indigo-500'
-                    : 'text-muted-foreground hover:text-foreground',
-                )
-              }
-            >
-              <item.icon className="h-5 w-5" />
-              {item.label}
-            </NavLink>
+        {/* Mobile bottom nav — fixed, never scrolls. The assistant sits in the
+            middle: on a phone it is the fastest way both to find someone and
+            to record what just happened, so it gets the thumb's natural
+            resting spot rather than a menu item. */}
+        <nav className="flex shrink-0 items-stretch border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+          {MOBILE_NAV.slice(0, 2).map((item) => (
+            <MobileNavLink key={item.to} {...item} />
           ))}
+
+          {/* Kept inside the bar rather than raised above it: the content
+              column clips its overflow, so a button poking over the top edge
+              would be cut in half. */}
+          <button
+            type="button"
+            onClick={() => openAssistant()}
+            aria-label="Open the assistant"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white shadow-sm shadow-indigo-500/40 transition-transform active:scale-95">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <span className="text-[11px] font-medium text-indigo-500">Assistant</span>
+          </button>
+
+          {MOBILE_NAV.slice(2).map((item) => (
+            <MobileNavLink key={item.to} {...item} />
+          ))}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+              <button className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground">
                 <MoreHorizontal className="h-5 w-5" />
                 More
               </button>
@@ -268,15 +320,15 @@ export function AppLayout() {
                 {displayName(user)}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openAskNetwork()}>
-                <Sparkles className="h-4 w-4" />
-                Ask your network
+              <DropdownMenuItem onClick={openNewContact}>
+                <Plus className="h-4 w-4" />
+                New contact
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShareOpen(true)}>
                 <QrCode className="h-4 w-4" />
                 Share profile
               </DropdownMenuItem>
-              {SECONDARY_NAV.map((item) => (
+              {MORE_NAV.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
                   onClick={() => navigate(item.to)}

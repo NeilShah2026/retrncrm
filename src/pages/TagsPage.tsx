@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Pencil, Plus, Tag as TagIcon, Trash2 } from 'lucide-react'
+import { Check, Pencil, Plus, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
 import { useContacts, useTags } from '@/hooks/useData'
 import { tagRepo } from '@/services'
 import { TAG_COLORS, TAG_COLOR_KEYS, tagColor } from '@/lib/constants'
@@ -31,6 +32,7 @@ export function TagsPage() {
   const [editorOpen, setEditorOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Tag | null>(null)
   const [deleting, setDeleting] = React.useState<Tag | null>(null)
+  const [autoTagOpen, setAutoTagOpen] = React.useState(false)
 
   const counts = React.useMemo(() => {
     const map = new Map<string, number>()
@@ -41,6 +43,7 @@ export function TagsPage() {
   }, [contacts])
 
   const loading = tags === undefined
+  const untagged = (contacts ?? []).filter((c) => c.tagIds.length === 0).length
 
   function openNew() {
     setEditing(null)
@@ -65,6 +68,16 @@ export function TagsPage() {
           title="Tags"
           description="Organize your network with color-coded, reusable tags."
         >
+          {(contacts?.length ?? 0) > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setAutoTagOpen(true)}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Auto-tag
+            </Button>
+          )}
           <Button onClick={openNew} className="gap-2">
             <Plus className="h-4 w-4" />
             New tag
@@ -82,58 +95,95 @@ export function TagsPage() {
         <EmptyState
           icon={TagIcon}
           title="No tags yet"
-          description="Create tags like “VC”, “mentor”, or “potential client” to group and filter your contacts."
-          action={<Button onClick={openNew}>Create your first tag</Button>}
+          description="Create tags like “VC”, “mentor”, or “potential client” to group and filter your contacts — or let AI read your contacts and propose the first set."
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              {untagged > 0 && (
+                <Button onClick={() => setAutoTagOpen(true)} className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Auto-tag {untagged} {untagged === 1 ? 'person' : 'people'}
+                </Button>
+              )}
+              <Button variant={untagged > 0 ? 'outline' : 'default'} onClick={openNew}>
+                Create your first tag
+              </Button>
+            </div>
+          }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {tags.map((tag) => {
-            const c = tagColor(tag.color)
-            const count = counts.get(tag.id) ?? 0
-            return (
-              <Card key={tag.id} className="group">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <span className={cn('h-3 w-3 rounded-full', c.dot)} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{tag.name}</p>
-                    {count > 0 ? (
-                      <Link
-                        to={ROUTES.contactsSearch(tag.name)}
-                        className="text-xs text-muted-foreground hover:text-foreground"
+        <div className="space-y-3">
+          {untagged > 0 && (
+            <button
+              type="button"
+              onClick={() => setAutoTagOpen(true)}
+              className="flex w-full items-center gap-3 rounded-lg border border-dashed border-indigo-400/50 bg-indigo-50/40 p-3 text-left transition-colors hover:bg-indigo-50 dark:bg-indigo-500/5 dark:hover:bg-indigo-500/10"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-indigo-500" />
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="font-medium">
+                  {untagged} {untagged === 1 ? 'person has' : 'people have'} no tags
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Read their records and propose tags — you approve them before
+                  anything is saved.
+                </span>
+              </span>
+              <span className="shrink-0 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                Auto-tag
+              </span>
+            </button>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {tags.map((tag) => {
+              const c = tagColor(tag.color)
+              const count = counts.get(tag.id) ?? 0
+              return (
+                <Card key={tag.id} className="group">
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <span className={cn('h-3 w-3 rounded-full', c.dot)} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{tag.name}</p>
+                      {count > 0 ? (
+                        <Link
+                          to={ROUTES.contactsSearch(tag.name)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          {count} {count === 1 ? 'contact' : 'contacts'}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No contacts
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEdit(tag)}
+                        aria-label={`Edit ${tag.name}`}
                       >
-                        {count} {count === 1 ? 'contact' : 'contacts'}
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        No contacts
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openEdit(tag)}
-                      aria-label={`Edit ${tag.name}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleting(tag)}
-                      aria-label={`Delete ${tag.name}`}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleting(tag)}
+                        aria-label={`Delete ${tag.name}`}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
+
+      <AutoTagDialog open={autoTagOpen} onOpenChange={setAutoTagOpen} />
 
       <TagEditorDialog
         open={editorOpen}

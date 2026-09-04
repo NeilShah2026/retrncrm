@@ -32,7 +32,7 @@ interface Props {
   onNewContact: () => void
   onVoiceCapture: () => void
   /** Hands the typed query to the natural-language search over contacts. */
-  onAskNetwork: (question: string) => void
+  onAssistant: (question: string) => void
 }
 
 export function CommandPalette({
@@ -40,7 +40,7 @@ export function CommandPalette({
   onOpenChange,
   onNewContact,
   onVoiceCapture,
-  onAskNetwork,
+  onAssistant,
 }: Props) {
   const navigate = useNavigate()
   const contacts = useContacts()
@@ -85,9 +85,9 @@ export function CommandPalette({
             <CommandItem
               value="ask-network"
               keywords={[query]}
-              onSelect={() => run(() => onAskNetwork(query))}
+              onSelect={() => run(() => onAssistant(query))}
             >
-              <Sparkles /> Ask your network: “{query}”
+              <Sparkles /> Ask or tell the assistant: “{query}”
             </CommandItem>
           </CommandGroup>
         )}
@@ -125,9 +125,9 @@ export function CommandPalette({
             </CommandItem>
             <CommandItem
               value="ask-network-blank"
-              onSelect={() => run(() => onAskNetwork(''))}
+              onSelect={() => run(() => onAssistant(''))}
             >
-              <Sparkles /> Ask your network a question
+              <Sparkles /> Open the assistant
             </CommandItem>
             <CommandItem
               value="go-dashboard"

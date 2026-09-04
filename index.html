@@ -3,7 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the safe-area insets the layout uses actually
+         mean something on a notched phone; interactive-widget keeps the
+         on-screen keyboard from covering the assistant's composer. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="Retrn — a personal CRM for the people you meet beyond LinkedIn." />
     <title>Retrn · Personal CRM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

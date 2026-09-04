@@ -36,6 +36,7 @@ import {
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { StrengthMeter } from '@/components/common/StrengthMeter'
 import { TagSelect } from './TagSelect'
+import { TagSuggestBar } from './TagSuggestBar'
 import { contactRepo } from '@/services'
 import { useContacts } from '@/hooks/useData'
 import {
@@ -781,12 +782,19 @@ export function ContactFormDialog({
                 </Button>
               </div>
 
-              {/* Tags */}
+              {/* Tags — suggested from what's already been filled in, so the
+                  field that usually gets skipped fills itself. */}
               <div className="space-y-2">
                 <Label>Tags</Label>
                 <TagSelect
                   value={form.tagIds}
                   onChange={(v) => set('tagIds', v)}
+                />
+                <TagSuggestBar
+                  subject={form}
+                  value={form.tagIds}
+                  onChange={(v) => set('tagIds', v)}
+                  auto={!editing}
                 />
               </div>
 

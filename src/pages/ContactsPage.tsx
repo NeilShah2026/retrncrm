@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LayoutGrid, List, Search, Users, X } from 'lucide-react'
+import { LayoutGrid, List, Search, Sparkles, Users, X } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -11,6 +11,7 @@ import { ContactsTable } from '@/components/contacts/ContactsTable'
 import { ContactCard } from '@/components/contacts/ContactCard'
 import { FilterPanel } from '@/components/contacts/FilterPanel'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
+import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useContacts, useTagMap, useTags } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -55,6 +56,7 @@ export function ContactsPage() {
   const effectiveView: ViewMode = isMobile ? 'grid' : view
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [deleting, setDeleting] = React.useState<Contact | null>(null)
+  const [autoTagOpen, setAutoTagOpen] = React.useState(false)
 
   React.useEffect(() => {
     localStorage.setItem(VIEW_KEY, view)
@@ -122,9 +124,23 @@ export function ContactsPage() {
                 : `${totalCount} ${totalCount === 1 ? 'person' : 'people'} in your network`
             }
           >
+            {totalCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setAutoTagOpen(true)}
+                className="gap-2"
+                title="Let AI propose tags for the people you never got round to tagging"
+              >
+                <Sparkles className="h-4 w-4" />
+                {/* On a phone the label is the first thing to go — the icon
+                    plus the Tags-page banner carry it. */}
+                <span className="hidden sm:inline">Auto-tag</span>
+              </Button>
+            )}
             <Button onClick={openNewContact} className="gap-2">
               <Users className="h-4 w-4" />
-              New contact
+              <span className="hidden sm:inline">New contact</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </PageHeader>
 
@@ -135,8 +151,8 @@ export function ContactsPage() {
               <Input
                 value={query}
                 onChange={(e) => updateQuery(e.target.value)}
-                placeholder="Search name, company, notes, where you met…"
-                className="pl-9"
+                placeholder="Search name, company, notes…"
+                className="h-10 pl-9 text-base sm:h-9 sm:text-sm"
               />
               {query && (
                 <button
@@ -250,6 +266,8 @@ export function ContactsPage() {
         onOpenChange={(o) => !o && setEditing(null)}
         contact={editing}
       />
+
+      <AutoTagDialog open={autoTagOpen} onOpenChange={setAutoTagOpen} />
 
       <ConfirmDialog
         open={Boolean(deleting)}

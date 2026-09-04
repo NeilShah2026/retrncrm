@@ -23,13 +23,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { ContactFormDialog } from './ContactFormDialog'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { useContacts, useTags } from '@/hooks/useData'
-import { contactRepo, tagRepo } from '@/services'
+import { contactRepo } from '@/services'
 import { captureFields, parseSpokenContact } from '@/lib/voiceParse'
 import type { ParsedCapture } from '@/lib/voiceParse'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { refineCapture } from '@/lib/ai/capture'
 import type { CaptureRefinement } from '@/lib/ai/capture'
-import { TAG_COLOR_KEYS } from '@/lib/constants'
+import { ensureTags } from '@/lib/tagging'
 import { fullName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
@@ -91,6 +91,12 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
   const speech = useSpeechRecognition()
   const tags = useTags() ?? []
   const contacts = useContacts() ?? []
+
+  // `refine` is a stable callback (it must not restart the idle timer on
+  // every render), so it reads the tag list through a ref rather than closing
+  // over it.
+  const tagsRef = React.useRef(tags)
+  tagsRef.current = tags
 
   const [text, setText] = React.useState('')
   // True once the user edits by hand — dictation stops overwriting it.
@@ -158,7 +164,12 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
     if (!sentence) return
     setAiBusy(true)
     try {
-      const result = await refineCapture(sentence, parseSpokenContact(sentence))
+      const result = await refineCapture(
+        sentence,
+        parseSpokenContact(sentence),
+        // Tags read live so the pass reuses whatever vocabulary exists now.
+        tagsRef.current.map((t) => t.name),
+      )
       setAi({ source: sentence, refinement: result })
       if (result.changes.length === 0) {
         toast.info('Nothing to add — we already had it all.')
@@ -203,21 +214,12 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
     return () => clearTimeout(timer)
   }, [speech.listening, edited, open, aiOff, aiBusy, saving, source, ai, refine])
 
-  /** Match spoken tag names to existing tags, creating the ones that are new. */
+  /**
+   * Match the tags shown in the review chips to existing tags, creating the
+   * ones that are new. Only tags the user has seen get written.
+   */
   async function resolveTags(names: string[]): Promise<string[]> {
-    const ids: string[] = []
-    for (const name of names) {
-      const existing = tags.find(
-        (t) => t.name.toLowerCase() === name.toLowerCase(),
-      )
-      if (existing) {
-        ids.push(existing.id)
-        continue
-      }
-      const color = TAG_COLOR_KEYS[(tags.length + ids.length) % TAG_COLOR_KEYS.length]
-      const created = await tagRepo.create({ name, color })
-      ids.push(created.id)
-    }
+    const { ids } = await ensureTags(names, tags)
     return ids
   }
 

@@ -98,7 +98,7 @@ export function BriefingCard({
   ready,
 }: Props) {
   const navigate = useNavigate()
-  const { openAskNetwork } = useUI()
+  const { openAssistant } = useUI()
 
   const snapshot = React.useMemo(
     () => buildSnapshot(contacts, opportunities, events),
@@ -241,15 +241,15 @@ export function BriefingCard({
             e.preventDefault()
             const q = question.trim()
             if (!q) return
-            openAskNetwork(q)
+            openAssistant(q)
             setQuestion('')
           }}
-          className="mt-4 flex gap-2 border-t pt-4"
+          className="mt-4 hidden gap-2 border-t pt-4 md:flex"
         >
           <Input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask your network — “who do I know in fintech?”"
+            placeholder="Ask, or say what happened…"
             className="h-9"
           />
           <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!question.trim()}>
@@ -257,12 +257,12 @@ export function BriefingCard({
             <span className="hidden sm:inline">Ask</span>
           </Button>
         </form>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 hidden flex-wrap gap-1.5 md:flex">
           {ASK_SUGGESTIONS.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => openAskNetwork(s)}
+              onClick={() => openAssistant(s)}
               className="rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {s}

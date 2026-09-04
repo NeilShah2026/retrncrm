@@ -94,12 +94,22 @@ Restore starter content** brings the example contact and templates back.
   feed you can subscribe to (**Subscribe**).
 - **Outreach templates** — reusable messages with `{{firstName}}` /
   `{{company}}` mail-merge, composed straight to email.
-- **Tags** — create, rename, color-code, delete (auto-detaches from contacts).
+- **Tags** — create, rename, color-code, delete (auto-detaches from contacts),
+  and **auto-tag**: read the whole network at once and approve the tags it
+  proposes, rather than tagging people one at a time forever (see *AI tagging*).
 - **Import / export** — full JSON backup + restore (merge or replace), CSV export.
 - **Keyboard** — `⌘/Ctrl-K` command palette, `V` to say who you met, `N` for
   the new-contact form.
-- Dark mode (follows system by default), responsive down to mobile, empty states,
-  loading skeletons, and toast confirmations throughout.
+- **On a phone** — the app is built for the thumb, not scaled down from the
+  desktop. The assistant sits in the middle of the bottom bar (Home ·
+  Contacts · **Assistant** · Calendar · More) and again at the top of the home
+  screen as a full-width composer with rotating examples, because typing a
+  sentence beats navigating to a form when you're standing up. Dialogs are
+  bottom sheets, the calendar opens on the agenda rather than a seven-column
+  grid, contacts render as cards, every field is 16px so iOS never zooms the
+  page on focus, and the layout respects the notch and the on-screen keyboard.
+- Dark mode (follows system by default), empty states, loading skeletons, and
+  toast confirmations throughout.
 
 ### Activity, not a logbook
 
@@ -131,15 +141,40 @@ unconfigured, and **no AI call ever gates a save**.
   it prunes the list rather than buying a new one, and the answer is cached
   against a fingerprint of the facts behind it, so a day of tapping *Caught up*
   costs about one request. With AI off the same list is written by plain rules.
-- **Ask your network** — natural-language questions over your own contacts
-  ("who do I know in fintech in Boston?", "how many people do I know at
-  Fidelity?"), from `⌘K`, the sidebar, or the dashboard's ask box. It holds a
-  thread — the roster is sent once and follow-ups ride on it, so "which of them
-  have I not spoken to since spring?" costs a sentence — and offers the next
-  questions worth asking. Falls back to the existing Fuse.js search.
+- **The assistant** — one box that both answers questions about your network
+  and records what you tell it, reached from `⌘K`, the sidebar, the dashboard,
+  or the phone's bottom bar.
+  - *Ask* — natural-language questions over your own contacts ("who do I know
+    in fintech in Boston?", "how many people do I know at Fidelity?"). It holds
+    a thread — the roster is sent once and follow-ups ride on it, so "which of
+    them have I not spoken to since spring?" costs a sentence — and offers the
+    next questions worth asking. Falls back to the existing Fuse.js search.
+  - *Tell* — "met Priya at the AI meetup, she's a PM at Klaviyo, coffee next
+    Tuesday at 3" comes back as a **plan**: add this contact, schedule that
+    meeting. Seven kinds of action are possible — add a contact, schedule a
+    meeting, mark someone caught up, add a note, tag someone, set a follow-up
+    cadence, add a pipeline opportunity — and the plan is itemised on screen
+    with each line switchable off. Nothing is written until you tap *Do it*.
+    Relative times ("next Tuesday at 3") are resolved to real timestamps by the
+    model, which is told today's date; names are resolved to contacts by
+    `lib/ai/actions.ts`, which refuses anything ambiguous rather than writing
+    to the wrong Sarah. There is no delete action, by design: the worst a wrong
+    plan can do is leave something to tidy up.
 - **Draft outreach** — a first-person draft in the compose dialog, using the
   contact's context and the template's tone. Never sends anything itself.
 - **Coffee-chat prep** — generated talking points you can save to the contact.
+- **AI tagging** — tags read off the record instead of typed. Tagging is the
+  chore of a personal CRM: the payoff arrives months later ("who do I know in
+  fintech?") and the cost lands the moment you meet someone, so it never gets
+  done. Three places it now happens for you, all of them proposals you approve:
+  the contact form suggests tags on its own once the fields settle; a dictated
+  sentence gets tagged in the same pass that fills the rest of the form; and
+  **Auto-tag** (Contacts and Tags headers) reads everyone with no tags in one
+  batched run and lays the result out as a checklist. Your existing tags are
+  the vocabulary — a new tag is a last resort, because a network sliced forty
+  ways is a network with no tags at all — and a run can only ever *add* tags.
+  With AI off, the same affordances fall back to `src/lib/tagging.ts`, which
+  matches your existing tags against what's written on the record.
 
 The model is reached only through `api/ai.ts` (a Vercel edge function wrapping
 `api/_lib/ai.ts`). The gateway key is a **server-only** env var and must never
@@ -184,9 +219,13 @@ src/
     routes.ts             Centralized route paths (the app lives under /app)
   lib/
     voiceParse.ts         Spoken sentence -> contact fields (local, no API)
+    tagging.ts            Tag matching/creation + the rules-based suggester
     caughtUp.ts           One-tap last-contact reset
     ai/                   Client + per-feature prompts, all via /api/ai
                           (briefing.ts also ships the rules-based fallback)
+      network.ts          The assistant: asks, and returns proposed actions
+      actions.ts          Action schema, validation, preview text, executor
+      tagging.ts          Single + bulk tag suggestion
   hooks/useSpeechRecognition.ts   Web Speech API wrapper
 api/
   ai.ts                   Edge entry point for the model proxy
