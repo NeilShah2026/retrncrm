@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -124,6 +125,17 @@ export function PipelinePage() {
     <PageShell
       width="wide"
       scrollBody={false}
+      // The board is a fixed pane with per-column scrolling, so an inline
+      // title it is — and the columns get the height back.
+      mobile={{
+        title: 'Pipeline',
+        largeTitle: false,
+        trailing: (
+          <BarButton onClick={() => openNew()} aria-label="New opportunity">
+            <Plus strokeWidth={2.4} />
+          </BarButton>
+        ),
+      }}
       header={
         <PageHeader
           title="Pipeline"

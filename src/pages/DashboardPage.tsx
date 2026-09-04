@@ -9,9 +9,11 @@ import {
   KanbanSquare,
   CalendarDays,
   CalendarClock,
+  Search,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -48,7 +50,7 @@ export function DashboardPage() {
   const events = useEvents()
   const contactMap = useContactMap()
   const tagMap = useTagMap()
-  const { openNewContact, openVoiceCapture, openAssistant } = useUI()
+  const { openNewContact, openVoiceCapture, openAssistant, openSearch } = useUI()
 
   const stats = computeStats(contacts, events, opportunities)
   const pipeline = computePipelineStats(opportunities)
@@ -59,23 +61,34 @@ export function DashboardPage() {
 
   return (
     <PageShell
+      // The home tab is the one screen with no title. "Dashboard" only ever
+      // named the tab you had just tapped, and a phone has no room to spend on
+      // a word that tells you nothing — so the bar carries the app's mark and
+      // the two things you do standing up, and the content starts at the top.
+      mobile={{
+        leading: <MobileBrand />,
+        trailing: (
+          <>
+            <BarButton onClick={openSearch} aria-label="Search">
+              <Search />
+            </BarButton>
+            <BarButton onClick={openVoiceCapture} aria-label="Say who you met">
+              <Mic />
+            </BarButton>
+          </>
+        ),
+      }}
       header={
         <PageHeader
           title="Dashboard"
           description="What to do next, who you're seeing, and who's gone quiet."
         >
-          {/* Voice leads: adding someone should cost a sentence, not a form.
-              Both are hidden on a phone, where the top bar's mic, the
-              assistant bar below and the bottom-bar button already carry it. */}
-          <Button onClick={openVoiceCapture} className="hidden gap-2 sm:inline-flex">
+          {/* Voice leads: adding someone should cost a sentence, not a form. */}
+          <Button onClick={openVoiceCapture} className="gap-2">
             <Mic className="h-4 w-4" />
             Say who you met
           </Button>
-          <Button
-            variant="outline"
-            onClick={openNewContact}
-            className="hidden gap-2 sm:inline-flex"
-          >
+          <Button variant="outline" onClick={openNewContact} className="gap-2">
             <UserPlus className="h-4 w-4" />
             New contact
           </Button>
@@ -273,6 +286,22 @@ export function DashboardPage() {
   )
 }
 
+/**
+ * The app's mark, sized for a navigation bar. This is the only screen that
+ * shows it: on a phone the app's identity lives on the home screen icon, so
+ * repeating it on every screen would just be a website's masthead.
+ */
+function MobileBrand() {
+  return (
+    <div className="flex items-center gap-1.5 pl-0.5">
+      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-indigo-500 text-white">
+        <Users className="h-3.5 w-3.5" />
+      </span>
+      <span className="text-[17px] font-semibold tracking-[-0.02em]">Retrn</span>
+    </div>
+  )
+}
+
 interface Stats {
   total: number
   recent: Contact[]
@@ -375,7 +404,10 @@ function StatTile({
 
 function DashboardSkeleton() {
   return (
-    <PageShell header={<PageHeader title="Dashboard" description="Loading your network…" />}>
+    <PageShell
+      mobile={{ leading: <MobileBrand /> }}
+      header={<PageHeader title="Dashboard" description="Loading your network…" />}
+    >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-20 w-full" />

@@ -73,13 +73,24 @@
     }
   }
 
-  /* A tap should never leave a grey flash behind on a custom control. */
+  /* A tap should never leave a grey flash behind on a custom control, and
+     nothing interactive should wait 300ms for a double-tap that will never
+     come. */
   @media (hover: none) {
     button,
     a,
     [role='button'] {
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
+  }
+
+  /* Rubber-banding should stop at the scroll region you are actually in. On a
+     phone the app is a fixed-height box with its own scrollers, so letting a
+     flick bubble to the document just detaches the chrome from the content. */
+  html,
+  body {
+    overscroll-behavior: none;
   }
 }
 
@@ -96,6 +107,71 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border));
     border-radius: 9999px;
+  }
+  /* Touch devices overlay their own scroll indicator; a drawn track just
+     eats a column of content. */
+  @media (hover: none) {
+    .scrollbar-thin {
+      scrollbar-width: none;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  /*
+   * The translucent material iOS uses behind a navigation bar and a tab bar:
+   * the content beneath stays faintly visible and over-saturated rather than
+   * being hidden behind a flat panel. Falls back to an opaque bar wherever
+   * backdrop-filter isn't supported, so text never lands on live content.
+   */
+  .material-bar {
+    background-color: hsl(var(--background));
+  }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .material-bar {
+      background-color: hsl(var(--background) / 0.72);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+    }
+  }
+
+  /* A hairline: one device pixel, not one CSS pixel. */
+  .hairline-t {
+    border-top: 1px solid hsl(var(--border));
+  }
+  .hairline-b {
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  @media (min-resolution: 2dppx) {
+    .hairline-t,
+    .hairline-b {
+      border-width: 0.5px;
+    }
+  }
+
+  /* iOS large title: 34pt bold, tightly tracked. */
+  .text-large-title {
+    font-size: 1.9375rem;
+    line-height: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+  }
+
+  /* Chrome is furniture — dragging a selection across a tab bar is never what
+     someone meant to do. */
+  .chrome {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* iOS answers a touch by dimming, not by changing colour. */
+  .press {
+    transition: opacity 100ms ease-out;
+  }
+  .press:active {
+    opacity: 0.4;
   }
 }
 

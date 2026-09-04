@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
@@ -91,9 +92,52 @@ export function CalendarPage() {
     setFormOpen(true)
   }
 
+  /** Month vs agenda, as the segmented control iOS uses for exactly this. */
+  const mobileViewSwitch = (
+    <div className="flex rounded-[9px] bg-muted p-0.5">
+      {(['month', 'agenda'] as const).map((v) => (
+        <button
+          key={v}
+          onClick={() => setView(v)}
+          aria-pressed={view === v}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-1.5 rounded-[7px] py-1.5 text-[13px] font-medium capitalize transition-colors',
+            view === v
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground',
+          )}
+        >
+          {v === 'month' ? (
+            <LayoutGrid className="h-3.5 w-3.5" />
+          ) : (
+            <List className="h-3.5 w-3.5" />
+          )}
+          {v}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <PageShell
       width="wide"
+      mobile={{
+        title: 'Calendar',
+        toolbar: mobileViewSwitch,
+        trailing: (
+          <>
+            <BarButton
+              onClick={() => setSyncOpen(true)}
+              aria-label="Subscribe to this calendar"
+            >
+              <CalendarCheck />
+            </BarButton>
+            <BarButton onClick={() => openNew()} aria-label="New meeting">
+              <CalendarPlus />
+            </BarButton>
+          </>
+        ),
+      }}
       header={
         <PageHeader
           title="Calendar"

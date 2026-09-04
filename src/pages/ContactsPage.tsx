@@ -1,14 +1,16 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LayoutGrid, List, Search, Sparkles, Users, X } from 'lucide-react'
+import { LayoutGrid, List, Plus, Search, Sparkles, Users, X } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ContactsTable } from '@/components/contacts/ContactsTable'
 import { ContactCard } from '@/components/contacts/ContactCard'
+import { ContactListRow } from '@/components/contacts/ContactListRow'
 import { FilterPanel } from '@/components/contacts/FilterPanel'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
@@ -111,9 +113,98 @@ export function ContactsPage() {
   const loading = contacts === undefined
   const totalCount = contacts?.length ?? 0
 
+  /**
+   * Search + filters. Rendered into exactly one place — the phone's toolbar
+   * under the navigation bar, or the desktop header — so there is never a
+   * second, hidden copy of the field holding the same state.
+   */
+  function renderToolbar() {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => updateQuery(e.target.value)}
+            placeholder="Search name, company, notes…"
+            // A phone's search field is a rounded, filled capsule sitting in
+            // the bar's material — not an outlined desktop text input.
+            className="h-9 rounded-[10px] border-0 bg-muted pl-9 text-base shadow-none md:h-9 md:rounded-md md:border md:bg-background md:text-sm"
+          />
+          {query && (
+            <button
+              onClick={() => updateQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <FilterPanel
+            contacts={contacts ?? []}
+            tags={tags}
+            filters={filters}
+            onChange={setFilters}
+          />
+          <div className="hidden overflow-hidden rounded-md border md:flex">
+            <button
+              onClick={() => setView('table')}
+              className={cn(
+                'flex h-8 w-9 items-center justify-center transition-colors',
+                view === 'table'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50',
+              )}
+              aria-label="Table view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={cn(
+                'flex h-8 w-9 items-center justify-center border-l transition-colors',
+                view === 'grid'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50',
+              )}
+              aria-label="Grid view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PageShell
       scrollBody={false}
+      // The list is a fixed pane with its own scroller, so there is nothing
+      // for a large title to scroll away with. iOS uses the inline title in
+      // exactly this situation, and it buys the list two more rows.
+      mobile={{
+        title: 'Contacts',
+        largeTitle: false,
+        toolbar: isMobile ? renderToolbar() : undefined,
+        trailing: (
+          <>
+            {totalCount > 0 && (
+              <BarButton
+                onClick={() => setAutoTagOpen(true)}
+                aria-label="Let AI propose tags"
+              >
+                <Sparkles />
+              </BarButton>
+            )}
+            <BarButton onClick={openNewContact} aria-label="New contact">
+              <Plus strokeWidth={2.4} />
+            </BarButton>
+          </>
+        ),
+      }}
       header={
         <div className="space-y-3">
           <PageHeader
@@ -132,73 +223,16 @@ export function ContactsPage() {
                 title="Let AI propose tags for the people you never got round to tagging"
               >
                 <Sparkles className="h-4 w-4" />
-                {/* On a phone the label is the first thing to go — the icon
-                    plus the Tags-page banner carry it. */}
-                <span className="hidden sm:inline">Auto-tag</span>
+                Auto-tag
               </Button>
             )}
             <Button onClick={openNewContact} className="gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">New contact</span>
-              <span className="sm:hidden">Add</span>
+              New contact
             </Button>
           </PageHeader>
 
-          {/* Toolbar */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => updateQuery(e.target.value)}
-                placeholder="Search name, company, notes…"
-                className="h-10 pl-9 text-base sm:h-9 sm:text-sm"
-              />
-              {query && (
-                <button
-                  onClick={() => updateQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent"
-                  aria-label="Clear search"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <FilterPanel
-                contacts={contacts ?? []}
-                tags={tags}
-                filters={filters}
-                onChange={setFilters}
-              />
-              <div className="hidden overflow-hidden rounded-md border md:flex">
-                <button
-                  onClick={() => setView('table')}
-                  className={cn(
-                    'flex h-8 w-9 items-center justify-center transition-colors',
-                    view === 'table'
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50',
-                  )}
-                  aria-label="Table view"
-                >
-                  <List className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setView('grid')}
-                  className={cn(
-                    'flex h-8 w-9 items-center justify-center border-l transition-colors',
-                    view === 'grid'
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50',
-                  )}
-                  aria-label="Grid view"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          {!isMobile && renderToolbar()}
         </div>
       }
     >
@@ -243,6 +277,26 @@ export function ContactsPage() {
               onDelete={setDeleting}
             />
           </div>
+        </div>
+      ) : isMobile ? (
+        /* A phone shows people the way every phone shows people: one inset
+           grouped list of rows, each opening the person. The card's hover
+           menu has nowhere to live on a touch screen anyway — edit and delete
+           are on the person's own screen, one tap away. */
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+          <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border">
+            {visible.map((c, i) => (
+              <ContactListRow
+                key={c.id}
+                contact={c}
+                tagMap={tagMap}
+                last={i === visible.length - 1}
+              />
+            ))}
+          </div>
+          <p className="px-1 pb-2 pt-3 text-center text-[13px] text-muted-foreground">
+            {visible.length} {visible.length === 1 ? 'person' : 'people'}
+          </p>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">

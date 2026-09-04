@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { CollegePicker } from '@/components/college/CollegePicker'
@@ -84,7 +85,10 @@ export function CollegePage() {
   // ---- No college chosen yet ----
   if (!college) {
     return (
-      <PageShell header={<PageHeader title="College" description="Your campus network, in one place." />}>
+      <PageShell
+        mobile={{ title: 'College' }}
+        header={<PageHeader title="College" description="Your campus network, in one place." />}
+      >
         <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500">
             <GraduationCap className="h-7 w-7" />
@@ -114,6 +118,34 @@ export function CollegePage() {
 
   return (
     <PageShell
+      mobile={{
+        title: college,
+        subtitle: `${atCollege.length} in your campus network`,
+        // Changing school is a rare, deliberate act — on a phone it takes over
+        // the toolbar rather than trying to share the bar with the title.
+        toolbar: changing ? (
+          <CollegePicker
+            value={college}
+            onSelect={(c) => {
+              void updateCollege(c)
+              setChanging(false)
+            }}
+          />
+        ) : undefined,
+        trailing: (
+          <>
+            <BarButton
+              onClick={() => setChanging((v) => !v)}
+              aria-label="Change college"
+            >
+              <Pencil />
+            </BarButton>
+            <BarButton onClick={() => openAdd('alumni')} aria-label="Add person">
+              <Plus strokeWidth={2.4} />
+            </BarButton>
+          </>
+        ),
+      }}
       header={
         <PageHeader title={college} description={`${atCollege.length} in your campus network`}>
           {changing ? (

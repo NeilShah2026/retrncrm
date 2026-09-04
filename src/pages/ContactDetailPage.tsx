@@ -42,6 +42,7 @@ import { StrengthMeter } from '@/components/common/StrengthMeter'
 import { ReconnectBadge } from '@/components/common/ReconnectBadge'
 import { EmptyState } from '@/components/common/EmptyState'
 import { PageShell } from '@/components/layout/PageShell'
+import { BackBarButton, BarButton } from '@/components/layout/MobileNavBar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { MergeContactDialog } from '@/components/contacts/MergeContactDialog'
@@ -90,7 +91,10 @@ export function ContactDetailPage() {
 
   if (contact === null) {
     return (
-      <PageShell header={<PageHeaderBar />}>
+      <PageShell
+        mobile={{ title: 'Contact', largeTitle: false, leading: <BackBarButton label="Contacts" /> }}
+        header={<PageHeaderBar />}
+      >
         <EmptyState
           icon={UserX}
           title="Contact not found"
@@ -140,6 +144,39 @@ export function ContactDetailPage() {
 
   return (
     <PageShell
+      // A pushed screen: the bar names where back goes, the title is the
+      // person, and the actions are glyphs. The identity itself belongs to the
+      // hero below — repeating the avatar and job title in the bar would be
+      // saying the same thing twice on the smallest screen there is.
+      mobile={{
+        title: fullName(contact),
+        largeTitle: false,
+        leading: <BackBarButton label="Contacts" />,
+        trailing: (
+          <>
+            <BarButton onClick={() => setPrepping(true)} aria-label="Prep for a chat">
+              <Coffee />
+            </BarButton>
+            <BarButton
+              onClick={() => void markCaughtUp(current)}
+              aria-label="Mark as caught up"
+            >
+              <Check strokeWidth={2.4} />
+            </BarButton>
+            <ContactActionsMenu
+              onCompose={() => setComposing(true)}
+              onEdit={() => setEditing(true)}
+              onMerge={() => setMerging(true)}
+              onDelete={() => setDeleting(true)}
+              trigger={
+                <BarButton aria-label="More">
+                  <MoreHorizontal />
+                </BarButton>
+              }
+            />
+          </>
+        ),
+      }}
       header={
         <PageHeaderBar
           contact={contact}
@@ -644,34 +681,59 @@ function PageHeaderBar({
           >
             <Check className="h-4 w-4" />
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ContactActionsMenu
+            onCompose={onCompose}
+            onEdit={onEdit}
+            onMerge={onMerge}
+            onDelete={onDelete}
+            trigger={
               <Button variant="outline" size="icon-sm" aria-label="More">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onCompose}>
-                <Send className="h-4 w-4" /> Send a message
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>
-                <Pencil className="h-4 w-4" /> Edit contact
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onMerge}>
-                <Merge className="h-4 w-4" /> Merge duplicate…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={onDelete}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" /> Delete contact
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
         </div>
       )}
     </div>
+  )
+}
+
+/** The overflow actions, shared by the desktop header and the phone's bar. */
+function ContactActionsMenu({
+  trigger,
+  onCompose,
+  onEdit,
+  onMerge,
+  onDelete,
+}: {
+  trigger: React.ReactNode
+  onCompose?: () => void
+  onEdit?: () => void
+  onMerge?: () => void
+  onDelete?: () => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onCompose}>
+          <Send className="h-4 w-4" /> Send a message
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onEdit}>
+          <Pencil className="h-4 w-4" /> Edit contact
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onMerge}>
+          <Merge className="h-4 w-4" /> Merge duplicate…
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={onDelete}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" /> Delete contact
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -765,7 +827,10 @@ function InfoRow({
 
 function DetailSkeleton() {
   return (
-    <PageShell header={<PageHeaderBar />}>
+    <PageShell
+      mobile={{ largeTitle: false, leading: <BackBarButton label="Contacts" /> }}
+      header={<PageHeaderBar />}
+    >
       <div className="flex items-start gap-4">
         <Skeleton className="h-20 w-20 rounded-full" />
         <div className="space-y-2">

@@ -10,6 +10,23 @@ export default {
     },
     extend: {
       fontFamily: {
+        // San Francisco first: on an iPhone the app should be set in the same
+        // face as the rest of the system, so it reads as an app rather than as
+        // a website. Everything after it is the fallback ladder for other
+        // platforms.
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'SF Pro Text',
+          'SF Pro Display',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+        ],
         serif: [
           'Fraunces',
           'ui-serif',

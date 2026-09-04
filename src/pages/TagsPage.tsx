@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, Pencil, Plus, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,6 +64,24 @@ export function TagsPage() {
 
   return (
     <PageShell
+      mobile={{
+        title: 'Tags',
+        trailing: (
+          <>
+            {(contacts?.length ?? 0) > 0 && (
+              <BarButton
+                onClick={() => setAutoTagOpen(true)}
+                aria-label="Let AI propose tags"
+              >
+                <Sparkles />
+              </BarButton>
+            )}
+            <BarButton onClick={openNew} aria-label="New tag">
+              <Plus strokeWidth={2.4} />
+            </BarButton>
+          </>
+        ),
+      }}
       header={
         <PageHeader
           title="Tags"

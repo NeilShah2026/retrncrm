@@ -154,6 +154,7 @@ export function SettingsPage() {
 
   return (
     <PageShell
+      mobile={{ title: 'Settings' }}
       header={
         <PageHeader
           title="Settings & data"

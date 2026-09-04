@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Mail, Pencil, Plus, Send, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
+import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,14 @@ export function TemplatesPage() {
 
   return (
     <PageShell
+      mobile={{
+        title: 'Templates',
+        trailing: (
+          <BarButton onClick={openNew} aria-label="New template">
+            <Plus strokeWidth={2.4} />
+          </BarButton>
+        ),
+      }}
       header={
         <PageHeader
           title="Templates"

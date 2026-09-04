@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from './ThemeToggle'
+import { MoreSheet } from './MoreSheet'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
@@ -45,11 +46,11 @@ const PRIMARY_NAV = [
 ]
 
 /**
- * The phone's bottom bar. Two destinations either side of the assistant, and
+ * The phone's tab bar. Two destinations either side of the assistant, and
  * everything else behind More — a five-across nav on a 375px screen gives
  * every item a tap target too small to hit.
  */
-const MOBILE_NAV = [
+const TAB_NAV = [
   { to: ROUTES.dashboard, label: 'Home', icon: LayoutDashboard, end: true },
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
   { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
@@ -62,17 +63,13 @@ const SECONDARY_NAV = [
   { to: ROUTES.settings, label: 'Settings', icon: Settings, end: false },
 ]
 
-/** What the phone's More menu holds: everything not on the bottom bar. */
-const MORE_NAV = [
-  { to: ROUTES.college, label: 'College', icon: GraduationCap },
-  { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare },
-  { to: ROUTES.templates, label: 'Templates', icon: Mail },
-  { to: ROUTES.tags, label: 'Tags', icon: TagIcon },
-  { to: ROUTES.settings, label: 'Settings', icon: Settings },
-]
-
-/** One bottom-bar destination, sized for a thumb rather than a cursor. */
-function MobileNavLink({
+/**
+ * One tab. 49pt tall with a 25pt glyph and a 10pt label — the proportions a
+ * UITabBar uses, which is most of why one reads as native and a row of
+ * web buttons doesn't. Selection is shown by tint and weight, never by a pill
+ * or a background.
+ */
+function TabItem({
   to,
   label,
   icon: Icon,
@@ -89,13 +86,19 @@ function MobileNavLink({
       end={end}
       className={({ isActive }) =>
         cn(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors',
-          isActive ? 'text-indigo-500' : 'text-muted-foreground hover:text-foreground',
+          'press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px]',
+          isActive ? 'text-indigo-500' : 'text-muted-foreground',
         )
       }
     >
-      <Icon className="h-5 w-5" />
-      {label}
+      {({ isActive }) => (
+        <>
+          <Icon className="h-[25px] w-[25px]" strokeWidth={isActive ? 2.4 : 1.8} />
+          <span className="text-[10px] font-medium leading-none tracking-[-0.01em]">
+            {label}
+          </span>
+        </>
+      )}
     </NavLink>
   )
 }
@@ -157,16 +160,19 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
 
 /**
  * App shell. This owns exactly two things that must never scroll: the
- * sidebar and the mobile chrome (top bar / bottom nav). Everything else — the
- * per-page header and its scrollable body — is each page's own
- * responsibility (see PageShell), so a page can pin its header/table-header
- * and scroll only the region that actually needs it.
+ * sidebar and the phone's tab bar. Everything else — including the phone's
+ * navigation bar, which belongs to the screen and not to the app — is each
+ * page's own responsibility (see PageShell).
+ *
+ * Note what the phone deliberately does *not* have: an app-level top bar. A
+ * global chrome bar stacked above a per-screen header is a website's anatomy;
+ * an iPhone app gives each screen a single navigation bar and puts the app's
+ * identity in the icon on the home screen.
  */
 export function AppLayout() {
   const { openNewContact, openVoiceCapture, openSearch, openAssistant } = useUI()
-  const { user, signOut } = useAuth()
-  const navigate = useNavigate()
   const [shareOpen, setShareOpen] = React.useState(false)
+  const [moreOpen, setMoreOpen] = React.useState(false)
 
   // Past meetings roll into the linked contacts' timelines automatically.
   useAutoLogMeetings()
@@ -252,41 +258,19 @@ export function AppLayout() {
 
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Mobile top bar — fixed, never scrolls */}
-        <header className="flex shrink-0 items-center gap-2 border-b bg-background/80 px-4 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
-          <Logo />
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={openSearch}
-              aria-label="Search"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-            <ThemeToggle />
-            {/* Voice stays in the top bar: the assistant owns the centre of
-                the bottom nav, and capture is the other thing you do standing
-                up with one hand. */}
-            <Button size="icon" onClick={openVoiceCapture} aria-label="Say who you met">
-              <Mic className="h-4 w-4" />
-            </Button>
-          </div>
-        </header>
-
-        {/* Page outlet — a fixed-height box; each page owns its own header
-            (pinned) + scrollable body split via PageShell. */}
+        {/* Page outlet — a fixed-height box; each page owns its own navigation
+            bar (pinned) + scrollable body split via PageShell. */}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Outlet />
         </main>
 
-        {/* Mobile bottom nav — fixed, never scrolls. The assistant sits in the
+        {/* Phone tab bar — fixed, never scrolls. The assistant sits in the
             middle: on a phone it is the fastest way both to find someone and
             to record what just happened, so it gets the thumb's natural
             resting spot rather than a menu item. */}
-        <nav className="flex shrink-0 items-stretch border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-          {MOBILE_NAV.slice(0, 2).map((item) => (
-            <MobileNavLink key={item.to} {...item} />
+        <nav className="chrome material-bar hairline-t flex shrink-0 items-stretch pb-[env(safe-area-inset-bottom)] md:hidden">
+          {TAB_NAV.slice(0, 2).map((item) => (
+            <TabItem key={item.to} {...item} />
           ))}
 
           {/* Kept inside the bar rather than raised above it: the content
@@ -296,57 +280,39 @@ export function AppLayout() {
             type="button"
             onClick={() => openAssistant()}
             aria-label="Open the assistant"
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5"
+            className="press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px]"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white shadow-sm shadow-indigo-500/40 transition-transform active:scale-95">
-              <Sparkles className="h-5 w-5" />
+            <span className="flex h-[27px] w-[27px] items-center justify-center rounded-full bg-indigo-500 text-white">
+              <Sparkles className="h-4 w-4" strokeWidth={2.4} />
             </span>
-            <span className="text-[11px] font-medium text-indigo-500">Assistant</span>
+            <span className="text-[10px] font-medium leading-none tracking-[-0.01em] text-indigo-500">
+              Assistant
+            </span>
           </button>
 
-          {MOBILE_NAV.slice(2).map((item) => (
-            <MobileNavLink key={item.to} {...item} />
+          {TAB_NAV.slice(2).map((item) => (
+            <TabItem key={item.to} {...item} />
           ))}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground">
-                <MoreHorizontal className="h-5 w-5" />
-                More
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" className="mb-1 w-56">
-              <DropdownMenuLabel className="truncate font-normal">
-                {displayName(user)}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={openNewContact}>
-                <Plus className="h-4 w-4" />
-                New contact
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShareOpen(true)}>
-                <QrCode className="h-4 w-4" />
-                Share profile
-              </DropdownMenuItem>
-              {MORE_NAV.map((item) => (
-                <DropdownMenuItem
-                  key={item.to}
-                  onClick={() => navigate(item.to)}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void signOut()}>
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-label="More"
+            className="press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px] text-muted-foreground"
+          >
+            <MoreHorizontal className="h-[25px] w-[25px]" strokeWidth={1.8} />
+            <span className="text-[10px] font-medium leading-none tracking-[-0.01em]">
+              More
+            </span>
+          </button>
         </nav>
       </div>
 
+      <MoreSheet
+        open={moreOpen}
+        onOpenChange={setMoreOpen}
+        onShareProfile={() => setShareOpen(true)}
+      />
       <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
       <ExtensionBanner />
     </div>
