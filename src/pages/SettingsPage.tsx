@@ -1,20 +1,17 @@
 import * as React from 'react'
+import { Link } from 'react-router-dom'
 import {
-  Download,
   Upload,
   FileJson,
   FileSpreadsheet,
   Trash2,
   RotateCcw,
-  Database,
-  ShieldCheck,
-  Sparkles,
+  CircleHelp,
   LogOut,
-  UserCircle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
-import { Card, CardContent } from '@/components/ui/card'
+import { Panel, PanelHeader, PanelSection } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import {
@@ -25,24 +22,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  useContacts,
-  useOpportunities,
-  useTags,
-  useTemplates,
-} from '@/hooks/useData'
+import { useContacts, useOpportunities, useTags, useTemplates } from '@/hooks/useData'
 import { contactRepo, opportunityRepo, tagRepo, templateRepo } from '@/services'
 import { ShareableProfileCard } from '@/components/profile/ShareableProfileCard'
 import { EduVerificationCard } from '@/components/settings/EduVerificationCard'
 import { useAuth } from '@/auth/AuthProvider'
 import { useUI } from '@/context/ui-context'
 import { buildStarterContent } from '@/lib/starterContent'
-import {
-  exportCsv,
-  exportJson,
-  parseImportBundle,
-  type ParsedImport,
-} from '@/lib/exchange'
+import { exportCsv, exportJson, parseImportBundle, type ParsedImport } from '@/lib/exchange'
+import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
 
 export function SettingsPage() {
@@ -54,9 +42,7 @@ export function SettingsPage() {
   const templates = useTemplates() ?? []
   const fileRef = React.useRef<HTMLInputElement>(null)
 
-  const [pendingImport, setPendingImport] = React.useState<ParsedImport | null>(
-    null,
-  )
+  const [pendingImport, setPendingImport] = React.useState<ParsedImport | null>(null)
   const [confirmClear, setConfirmClear] = React.useState(false)
   const [confirmReset, setConfirmReset] = React.useState(false)
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
@@ -81,14 +67,12 @@ export function SettingsPage() {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const parsed = parseImportBundle(reader.result as string)
-        setPendingImport(parsed)
+        setPendingImport(parseImportBundle(reader.result as string))
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Import failed.')
       }
     }
     reader.readAsText(file)
-    // Reset so the same file can be chosen again later.
     e.target.value = ''
   }
 
@@ -103,16 +87,10 @@ export function SettingsPage() {
       } else {
         await tagRepo.replaceAll(mergeById(tags, pendingImport.tags))
         await contactRepo.replaceAll(mergeById(contacts, pendingImport.contacts))
-        await opportunityRepo.replaceAll(
-          mergeById(opportunities, pendingImport.opportunities),
-        )
-        await templateRepo.replaceAll(
-          mergeById(templates, pendingImport.templates),
-        )
+        await opportunityRepo.replaceAll(mergeById(opportunities, pendingImport.opportunities))
+        await templateRepo.replaceAll(mergeById(templates, pendingImport.templates))
       }
-      toast.success(
-        `Imported ${pendingImport.contacts.length} contacts (${mode})`,
-      )
+      toast.success(`Imported ${pendingImport.contacts.length} contacts (${mode})`)
     } catch (err) {
       console.error(err)
       toast.error('Import failed while writing data.')
@@ -122,26 +100,14 @@ export function SettingsPage() {
   }
 
   async function handleClear() {
-    await Promise.all([
-      contactRepo.clear(),
-      tagRepo.clear(),
-      opportunityRepo.clear(),
-      templateRepo.clear(),
-    ])
+    await Promise.all([contactRepo.clear(), tagRepo.clear(), opportunityRepo.clear(), templateRepo.clear()])
     toast.success('All data cleared')
   }
 
   async function handleReset() {
-    await Promise.all([
-      contactRepo.clear(),
-      tagRepo.clear(),
-      opportunityRepo.clear(),
-      templateRepo.clear(),
-    ])
+    await Promise.all([contactRepo.clear(), tagRepo.clear(), opportunityRepo.clear(), templateRepo.clear()])
     const content = buildStarterContent()
-    for (const tag of content.tags) {
-      await tagRepo.create({ name: tag.name, color: tag.color })
-    }
+    for (const tag of content.tags) await tagRepo.create({ name: tag.name, color: tag.color })
     for (const contact of content.contacts) {
       const { id: _id, createdAt: _c, updatedAt: _u, ...draft } = contact
       await contactRepo.create(draft)
@@ -153,229 +119,136 @@ export function SettingsPage() {
     toast.success('Restored starter content')
   }
 
+  const interactions = contacts.reduce((n, c) => n + c.interactions.length, 0)
+
   return (
     <PageShell
       mobile={{ title: 'Settings' }}
       header={
         <PageHeader
           title="Settings & data"
-          description="Your data is synced to your account. Back it up or move it anytime."
+          description="Your data is private to your account. Back it up or move it any time."
         />
       }
     >
-
-      {/* Privacy note */}
-      <Card className="mb-6 border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-500/5">
-        <CardContent className="flex items-start gap-3 p-4">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <div className="text-sm">
-            <p className="font-medium">Private to your account</p>
-            <p className="text-muted-foreground">
-              Your data is stored in Supabase, scoped to your account by
-              row-level security — nobody else can read or write it. Export a
-              backup any time from below.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Shareable profile */}
-      <div className="mb-6">
+      <div className="mx-auto max-w-3xl space-y-4">
         <ShareableProfileCard />
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Babson free access */}
         <EduVerificationCard />
 
-        {/* Account */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <UserCircle className="h-4 w-4" />
-              <h2 className="font-semibold">Account</h2>
-            </div>
-            <p className="mb-4 truncate text-sm text-muted-foreground">
+        <Panel>
+          <PanelHeader
+            action={
+              <Button variant="outline" size="sm" onClick={() => setConfirmSignOut(true)}>
+                <LogOut />
+                Sign out
+              </Button>
+            }
+          >
+            Account
+          </PanelHeader>
+          <PanelSection className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 text-sm">
+            <span className="text-muted-foreground">
               Signed in as <span className="text-foreground">{user?.email}</span>
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmSignOut(true)}
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Export */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              <h2 className="font-semibold">Export</h2>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Download your full network. JSON is a complete backup you can
-              re-import; CSV opens in any spreadsheet.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={handleExportJson}
-                className="gap-2"
-              >
-                <FileJson className="h-4 w-4" />
-                Export JSON
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportCsv}
-                className="gap-2"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Export CSV
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Import */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              <h2 className="font-semibold">Import</h2>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Restore from a JSON backup. You'll choose whether to merge with or
-              replace your current data.
-            </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={handleFile}
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileRef.current?.click()}
-              className="gap-2"
-            >
-              <FileJson className="h-4 w-4" />
-              Choose JSON file…
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Help */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              <h2 className="font-semibold">Help</h2>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              New here, or just want a refresher? Replay the welcome tour.
-            </p>
-            <Button variant="outline" onClick={openWelcomeTour} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Replay welcome tour
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Stats */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              <h2 className="font-semibold">Your data</h2>
-            </div>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Contacts</dt>
-                <dd className="text-2xl font-semibold">{contacts.length}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Tags</dt>
-                <dd className="text-2xl font-semibold">{tags.length}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Interactions</dt>
-                <dd className="text-2xl font-semibold">
-                  {contacts.reduce((n, c) => n + c.interactions.length, 0)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Opportunities</dt>
-                <dd className="text-2xl font-semibold">{opportunities.length}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Templates</dt>
-                <dd className="text-2xl font-semibold">{templates.length}</dd>
-              </div>
+            </span>
+            <dl className="tnum flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <Stat n={contacts.length} label="contacts" />
+              <Stat n={interactions} label="activities" />
+              <Stat n={tags.length} label="tags" />
+              <Stat n={opportunities.length} label="opportunities" />
+              <Stat n={templates.length} label="templates" />
             </dl>
-          </CardContent>
-        </Card>
+          </PanelSection>
+          <PanelSection className="text-xs text-muted-foreground">
+            Stored in your own account, readable only by you.{' '}
+            <Link to={ROUTES.privacy} className="text-brand hover:underline">
+              Privacy policy
+            </Link>
+          </PanelSection>
+        </Panel>
 
-        {/* Danger zone */}
-        <Card className="border-destructive/30">
-          <CardContent className="p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Trash2 className="h-4 w-4 text-destructive" />
-              <h2 className="font-semibold">Reset</h2>
+        <Panel>
+          <PanelHeader>Backup</PanelHeader>
+          <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <p className="font-medium">Export</p>
+              <p className="text-muted-foreground">JSON is a full backup you can re-import. CSV opens in any spreadsheet.</p>
             </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Start fresh, or restore the example contact and starter
-              templates.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmReset(true)}
-                className="gap-2"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Restore starter content
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportJson}>
+                <FileJson />
+                JSON
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setConfirmClear(true)}
-                className="gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Clear all data
+              <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                <FileSpreadsheet />
+                CSV
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </PanelSection>
+          <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <p className="font-medium">Import</p>
+              <p className="text-muted-foreground">Restore from a JSON backup. You choose merge or replace next.</p>
+            </div>
+            <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={handleFile} />
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} className="shrink-0">
+              <Upload />
+              Choose file
+            </Button>
+          </PanelSection>
+        </Panel>
+
+        <Panel>
+          <PanelHeader>Help</PanelHeader>
+          <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">New here, or want a refresher on how Retrn fits together?</p>
+            <Button variant="outline" size="sm" onClick={openWelcomeTour} className="shrink-0">
+              <CircleHelp />
+              Replay the tour
+            </Button>
+          </PanelSection>
+        </Panel>
+
+        <Panel className="border-danger/40">
+          <PanelHeader className="text-danger">Danger zone</PanelHeader>
+          <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <p className="font-medium">Restore starter content</p>
+              <p className="text-muted-foreground">Replaces everything with the example contact and starter templates.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setConfirmReset(true)} className="shrink-0">
+              <RotateCcw />
+              Restore
+            </Button>
+          </PanelSection>
+          <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <p className="font-medium">Clear all data</p>
+              <p className="text-muted-foreground">Deletes every contact, activity, tag, opportunity and template. Export first.</p>
+            </div>
+            <Button variant="destructive" size="sm" onClick={() => setConfirmClear(true)} className="shrink-0">
+              <Trash2 />
+              Clear everything
+            </Button>
+          </PanelSection>
+        </Panel>
       </div>
 
-      {/* Import mode dialog — offers both Merge and Replace */}
-      <Dialog
-        open={Boolean(pendingImport)}
-        onOpenChange={(o) => !o && setPendingImport(null)}
-      >
+      <Dialog open={Boolean(pendingImport)} onOpenChange={(o) => !o && setPendingImport(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Import data</DialogTitle>
             <DialogDescription>
               {pendingImport
-                ? `Found ${pendingImport.contacts.length} contacts and ${pendingImport.tags.length} tags in this file. Merge adds them to your current data; Replace overwrites everything.`
+                ? `Found ${pendingImport.contacts.length} contacts and ${pendingImport.tags.length} tags in this file. Merge adds them to what you have; Replace overwrites everything.`
                 : ''}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
+          <DialogFooter>
             <Button variant="ghost" onClick={() => setPendingImport(null)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void doImport('replace')}
-            >
+            <Button variant="destructive" onClick={() => void doImport('replace')}>
               Replace all
             </Button>
             <Button onClick={() => void doImport('merge')}>Merge</Button>
@@ -387,8 +260,9 @@ export function SettingsPage() {
         open={confirmClear}
         onOpenChange={setConfirmClear}
         title="Clear all data?"
-        description="This permanently deletes every contact, interaction, and tag from your account. Export a backup first if you want to keep it."
+        description="This permanently deletes every contact, activity, tag, opportunity and template in your account. Export a backup first if you want to keep any of it."
         confirmLabel="Clear everything"
+        confirmWord="delete"
         destructive
         onConfirm={handleClear}
       />
@@ -397,7 +271,8 @@ export function SettingsPage() {
         onOpenChange={setConfirmReset}
         title="Restore starter content?"
         description="This replaces your current data with the example contact and starter templates. Your existing contacts will be removed."
-        confirmLabel="Restore starter content"
+        confirmLabel="Restore"
+        confirmWord="restore"
         destructive
         onConfirm={handleReset}
       />
@@ -405,11 +280,19 @@ export function SettingsPage() {
         open={confirmSignOut}
         onOpenChange={setConfirmSignOut}
         title="Sign out?"
-        description="You'll need to sign back in to see your network again."
+        description="You’ll need to sign back in to see your network again."
         confirmLabel="Sign out"
         onConfirm={() => void signOut()}
       />
     </PageShell>
+  )
+}
+
+function Stat({ n, label }: { n: number; label: string }) {
+  return (
+    <span>
+      <span className="font-medium text-foreground">{n}</span> {label}
+    </span>
   )
 }
 

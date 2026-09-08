@@ -1,13 +1,25 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LayoutGrid, List, Plus, Search, Sparkles, Users, X } from 'lucide-react'
+import {
+  ClipboardPaste,
+  LayoutGrid,
+  List,
+  PenLine,
+  Plus,
+  Search,
+  Tags,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
+import { NetworkGate } from '@/components/common/NetworkGate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton'
 import { ContactsTable } from '@/components/contacts/ContactsTable'
 import { ContactCard } from '@/components/contacts/ContactCard'
 import { ContactListRow } from '@/components/contacts/ContactListRow'
@@ -21,6 +33,7 @@ import { useUI } from '@/context/ui-context'
 import { contactRepo } from '@/services'
 import {
   applyFilters,
+  countActiveFilters,
   EMPTY_FILTERS,
   sortContacts,
   type ContactFilters,
@@ -36,11 +49,19 @@ import { toast } from 'sonner'
 type ViewMode = 'table' | 'grid'
 const VIEW_KEY = 'retrn-view'
 
+function readView(): ViewMode {
+  try {
+    return (localStorage.getItem(VIEW_KEY) as ViewMode) || 'table'
+  } catch {
+    return 'table'
+  }
+}
+
 export function ContactsPage() {
   const contacts = useContacts()
   const tags = useTags() ?? []
   const tagMap = useTagMap()
-  const { openNewContact } = useUI()
+  const { openNewContact, openVoiceCapture } = useUI()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [query, setQuery] = React.useState(searchParams.get('q') ?? '')
@@ -50,21 +71,21 @@ export function ContactsPage() {
   }))
   const [sortKey, setSortKey] = React.useState<SortKey>('name')
   const [sortDir, setSortDir] = React.useState<SortDir>('asc')
-  const [view, setView] = React.useState<ViewMode>(
-    () => (localStorage.getItem(VIEW_KEY) as ViewMode) ?? 'table',
-  )
+  const [view, setView] = React.useState<ViewMode>(readView)
   const isMobile = useIsMobile()
-  // Wide data tables don't belong on a phone — always show cards there.
   const effectiveView: ViewMode = isMobile ? 'grid' : view
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [deleting, setDeleting] = React.useState<Contact | null>(null)
   const [autoTagOpen, setAutoTagOpen] = React.useState(false)
 
   React.useEffect(() => {
-    localStorage.setItem(VIEW_KEY, view)
+    try {
+      localStorage.setItem(VIEW_KEY, view)
+    } catch {
+      // Private mode: the choice just doesn't persist.
+    }
   }, [view])
 
-  // Keep the URL ?q in sync so the command palette can deep-link a query.
   React.useEffect(() => {
     const urlQ = searchParams.get('q') ?? ''
     if (urlQ !== query) setQuery(urlQ)
@@ -88,10 +109,7 @@ export function ContactsPage() {
     if (!contacts) return []
     const base = query.trim() ? searchContacts(fuse, query) : contacts
     const filtered = applyFilters(base, filters)
-    // Search already ranks by relevance; only re-sort when not searching.
-    return query.trim()
-      ? filtered
-      : sortContacts(filtered, sortKey, sortDir)
+    return query.trim() ? filtered : sortContacts(filtered, sortKey, sortDir)
   }, [contacts, query, fuse, filters, sortKey, sortDir])
 
   function onSort(key: SortKey) {
@@ -110,31 +128,32 @@ export function ContactsPage() {
     toast.success(`Deleted ${name}`)
   }
 
-  const loading = contacts === undefined
   const totalCount = contacts?.length ?? 0
+  const activeFilters = countActiveFilters(filters)
+  const narrowed = Boolean(query.trim()) || activeFilters > 0
 
-  /**
-   * Search + filters. Rendered into exactly one place — the phone's toolbar
-   * under the navigation bar, or the desktop header — so there is never a
-   * second, hidden copy of the field holding the same state.
-   */
+  function clearNarrowing() {
+    updateQuery('')
+    setFilters(EMPTY_FILTERS)
+  }
+
+  /** Search + filters, rendered in exactly one place. */
   function renderToolbar() {
     return (
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative flex-1 sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => updateQuery(e.target.value)}
             placeholder="Search name, company, notes…"
-            // A phone's search field is a rounded, filled capsule sitting in
-            // the bar's material — not an outlined desktop text input.
-            className="h-9 rounded-[10px] border-0 bg-muted pl-9 text-base shadow-none md:h-9 md:rounded-md md:border md:bg-background md:text-sm"
+            aria-label="Search contacts"
+            className="h-9 rounded-[10px] border-0 bg-bg-sunken pl-8 text-base md:h-8 md:rounded-md md:border md:bg-background md:text-sm"
           />
           {query && (
             <button
               onClick={() => updateQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Clear search"
             >
               <X className="h-3.5 w-3.5" />
@@ -148,31 +167,22 @@ export function ContactsPage() {
             filters={filters}
             onChange={setFilters}
           />
-          <div className="hidden overflow-hidden rounded-md border md:flex">
-            <button
-              onClick={() => setView('table')}
-              className={cn(
-                'flex h-8 w-9 items-center justify-center transition-colors',
-                view === 'table'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50',
-              )}
-              aria-label="Table view"
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setView('grid')}
-              className={cn(
-                'flex h-8 w-9 items-center justify-center border-l transition-colors',
-                view === 'grid'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50',
-              )}
-              aria-label="Grid view"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
+          {contacts && contacts.length > 0 && (
+            <span className="tnum hidden text-xs text-muted-foreground sm:inline" aria-live="polite">
+              {narrowed ? `${visible.length} of ${totalCount}` : `${totalCount}`}
+            </span>
+          )}
+          <div
+            className="ml-auto hidden h-8 items-center rounded-md border p-0.5 md:flex"
+            role="group"
+            aria-label="View"
+          >
+            <ViewButton active={view === 'table'} onClick={() => setView('table')} label="Table view">
+              <List className="h-3.5 w-3.5" />
+            </ViewButton>
+            <ViewButton active={view === 'grid'} onClick={() => setView('grid')} label="Grid view">
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </ViewButton>
           </div>
         </div>
       </div>
@@ -182,9 +192,7 @@ export function ContactsPage() {
   return (
     <PageShell
       scrollBody={false}
-      // The list is a fixed pane with its own scroller, so there is nothing
-      // for a large title to scroll away with. iOS uses the inline title in
-      // exactly this situation, and it buys the list two more rows.
+      width="wide"
       mobile={{
         title: 'Contacts',
         largeTitle: false,
@@ -192,11 +200,8 @@ export function ContactsPage() {
         trailing: (
           <>
             {totalCount > 0 && (
-              <BarButton
-                onClick={() => setAutoTagOpen(true)}
-                aria-label="Let AI propose tags"
-              >
-                <Sparkles />
+              <BarButton onClick={() => setAutoTagOpen(true)} aria-label="Suggest tags">
+                <Tags />
               </BarButton>
             )}
             <BarButton onClick={openNewContact} aria-label="New contact">
@@ -210,8 +215,8 @@ export function ContactsPage() {
           <PageHeader
             title="Contacts"
             description={
-              loading
-                ? 'Loading your network…'
+              contacts === undefined
+                ? 'Everyone you’ve met, and when you last spoke.'
                 : `${totalCount} ${totalCount === 1 ? 'person' : 'people'} in your network`
             }
           >
@@ -219,15 +224,14 @@ export function ContactsPage() {
               <Button
                 variant="outline"
                 onClick={() => setAutoTagOpen(true)}
-                className="gap-2"
-                title="Let AI propose tags for the people you never got round to tagging"
+                title="Propose tags for people you haven’t tagged"
               >
-                <Sparkles className="h-4 w-4" />
-                Auto-tag
+                <Tags />
+                Suggest tags
               </Button>
             )}
-            <Button onClick={openNewContact} className="gap-2">
-              <Users className="h-4 w-4" />
+            <Button onClick={openNewContact}>
+              <UserPlus />
               New contact
             </Button>
           </PageHeader>
@@ -236,85 +240,106 @@ export function ContactsPage() {
         </div>
       }
     >
-      {/* This is the ONLY scrollable region on this page — the header and
-          toolbar above never move. */}
-      {loading ? (
-        <ContactsSkeleton view={effectiveView} />
-      ) : totalCount === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No contacts yet"
-          description="Add the people you meet — a name and how you met is enough to start."
-          action={<Button onClick={openNewContact}>Add your first contact</Button>}
-        />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          icon={Search}
-          title="No matches"
-          description="No contacts match your search and filters. Try loosening them."
-          action={
-            <Button
-              variant="outline"
-              onClick={() => {
-                updateQuery('')
-                setFilters(EMPTY_FILTERS)
-              }}
-            >
-              Clear search &amp; filters
-            </Button>
-          }
-        />
-      ) : effectiveView === 'table' ? (
-        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
-          <div className="h-full overflow-auto scrollbar-thin">
-            <ContactsTable
-              contacts={visible}
-              tagMap={tagMap}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onSort={onSort}
-              onEdit={setEditing}
-              onDelete={setDeleting}
+      <NetworkGate
+        data={contacts}
+        table="contacts"
+        skeleton={<ContactsSkeleton view={effectiveView} />}
+        empty={
+          <EmptyState
+            variant="first-run"
+            icon={Users}
+            title="No contacts yet"
+            description="Add the first person you met. A name and where you met is enough."
+            action={
+              <>
+                <Button onClick={openVoiceCapture}>
+                  <PenLine />
+                  Say who you met
+                </Button>
+                <Button variant="outline" onClick={openNewContact}>
+                  <UserPlus />
+                  New contact
+                </Button>
+                <Button variant="outline" onClick={openNewContact}>
+                  <ClipboardPaste />
+                  Paste from LinkedIn
+                </Button>
+              </>
+            }
+          />
+        }
+      >
+        {() =>
+          visible.length === 0 ? (
+            <EmptyState
+              variant="no-results"
+              icon={Search}
+              title={
+                query.trim()
+                  ? `No contacts match “${query.trim()}”`
+                  : 'No contacts match these filters'
+              }
+              description="Clear the search and filters, or add someone new."
+              action={
+                <>
+                  <Button variant="outline" onClick={clearNarrowing}>
+                    Clear search & filters
+                  </Button>
+                  <Button variant="ghost" onClick={openNewContact}>
+                    <UserPlus />
+                    Add someone
+                  </Button>
+                </>
+              }
             />
-          </div>
-        </div>
-      ) : isMobile ? (
-        /* A phone shows people the way every phone shows people: one inset
-           grouped list of rows, each opening the person. The card's hover
-           menu has nowhere to live on a touch screen anyway — edit and delete
-           are on the person's own screen, one tap away. */
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
-          <div className="overflow-hidden rounded-xl bg-card ring-1 ring-border">
-            {visible.map((c, i) => (
-              <ContactListRow
-                key={c.id}
-                contact={c}
-                tagMap={tagMap}
-                last={i === visible.length - 1}
-              />
-            ))}
-          </div>
-          <p className="px-1 pb-2 pt-3 text-center text-[13px] text-muted-foreground">
-            {visible.length} {visible.length === 1 ? 'person' : 'people'}
-          </p>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
-          <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((c) => (
-              <ContactCard
-                key={c.id}
-                contact={c}
-                tagMap={tagMap}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          ) : effectiveView === 'table' ? (
+            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
+              <div className="h-full overflow-auto scrollbar-thin">
+                <ContactsTable
+                  contacts={visible}
+                  tagMap={tagMap}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  onEdit={setEditing}
+                  onDelete={setDeleting}
+                />
+              </div>
+            </div>
+          ) : isMobile ? (
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+              <div className="overflow-hidden rounded-lg border bg-card">
+                {visible.map((c, i) => (
+                  <ContactListRow
+                    key={c.id}
+                    contact={c}
+                    tagMap={tagMap}
+                    last={i === visible.length - 1}
+                  />
+                ))}
+              </div>
+              <p className="tnum px-1 pb-2 pt-3 text-center text-[13px] text-muted-foreground">
+                {visible.length} {visible.length === 1 ? 'person' : 'people'}
+              </p>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+              <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 xl:grid-cols-3">
+                {visible.map((c) => (
+                  <ContactCard
+                    key={c.id}
+                    contact={c}
+                    tagMap={tagMap}
+                    onEdit={setEditing}
+                    onDelete={setDeleting}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        }
+      </NetworkGate>
 
-      {/* Edit dialog (separate instance from the global "new" dialog) */}
       <ContactFormDialog
         open={Boolean(editing)}
         onOpenChange={(o) => !o && setEditing(null)}
@@ -327,7 +352,7 @@ export function ContactsPage() {
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
         title={`Delete ${deleting ? fullName(deleting) : 'contact'}?`}
-        description="This permanently removes the contact and their interaction history. This can't be undone."
+        description="This permanently removes the contact and their activity history. It can’t be undone."
         confirmLabel="Delete"
         destructive
         onConfirm={confirmDelete}
@@ -336,25 +361,55 @@ export function ContactsPage() {
   )
 }
 
+function ViewButton({
+  active,
+  onClick,
+  label,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        'flex h-full w-7 items-center justify-center rounded-sm transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        active ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 function ContactsSkeleton({ view }: { view: ViewMode }) {
   if (view === 'grid') {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-40 w-full" />
+          <div key={i} className="rounded-lg border p-3">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     )
   }
   return (
-    <div className="space-y-2 rounded-xl border p-4">
+    <div className="rounded-lg border" aria-busy="true">
+      <div className="h-8 border-b bg-bg-sunken" />
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-4 flex-1" />
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-20" />
-        </div>
+        <SkeletonRow key={i} />
       ))}
     </div>
   )

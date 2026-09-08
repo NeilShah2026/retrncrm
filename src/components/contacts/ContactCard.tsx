@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, MapPin, MoreHorizontal } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { MoreHorizontal } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { TagBadge } from '@/components/common/TagBadge'
 import { ReconnectBadge } from '@/components/common/ReconnectBadge'
-import { StrengthMeter } from '@/components/common/StrengthMeter'
-import { CONNECTION_TYPES } from '@/lib/constants'
-import { fullName, formatRelative } from '@/lib/format'
+import { fullName, formatRelativeShort } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
 import { markCaughtUp } from '@/lib/caughtUp'
 import type { Contact, Tag } from '@/types'
@@ -26,112 +23,75 @@ interface Props {
   onDelete: (contact: Contact) => void
 }
 
+/** The grid view's unit: a hairline panel, no shadow, no hover lift. */
 export function ContactCard({ contact, tagMap, onEdit, onDelete }: Props) {
   const navigate = useNavigate()
-  const tags = contact.tagIds
-    .map((id) => tagMap.get(id))
-    .filter(Boolean) as Tag[]
+  const tags = contact.tagIds.map((id) => tagMap.get(id)).filter(Boolean) as Tag[]
+  const subtitle = [contact.jobTitle, contact.company].filter(Boolean).join(' · ')
 
   return (
-    <Card
+    <div
+      role="link"
+      tabIndex={0}
       onClick={() => navigate(ROUTES.contact(contact.id))}
-      className="group flex cursor-pointer flex-col p-4 transition-all hover:border-foreground/20 hover:shadow-md"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') navigate(ROUTES.contact(contact.id))
+      }}
+      className="group flex cursor-pointer flex-col rounded-lg border bg-card p-3 transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
     >
       <div className="flex items-start gap-3">
-        <ContactAvatar contact={contact} className="h-11 w-11" />
+        <ContactAvatar contact={contact} className="h-8 w-8" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="truncate font-semibold leading-tight">
-                  {fullName(contact)}
-                </h3>
-                {contact.connectionType && (
-                  <span
-                    className="shrink-0 text-sm"
-                    title={CONNECTION_TYPES[contact.connectionType].label}
-                  >
-                    {CONNECTION_TYPES[contact.connectionType].emoji}
-                  </span>
-                )}
-              </div>
-              {contact.jobTitle && (
-                <p className="truncate text-xs text-muted-foreground">
-                  {contact.jobTitle}
-                </p>
-              )}
-            </div>
-            <div onClick={(e) => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit(contact)}>
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void markCaughtUp(contact)}>
-                    Caught up today
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onDelete(contact)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+          <p className="truncate text-sm font-medium leading-tight">{fullName(contact)}</p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {subtitle || contact.whereWeMet || '—'}
+          </p>
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Actions for ${fullName(contact)}`}
+                className="-mr-1 -mt-1 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 md:data-[state=open]:opacity-100"
+              >
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(contact)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void markCaughtUp(contact)}>
+                Caught up today
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDelete(contact)}
+                className="text-danger focus:text-danger"
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-        {contact.company && (
-          <div className="flex items-center gap-1.5">
-            <Building2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{contact.company}</span>
-          </div>
-        )}
-        {contact.whereWeMet && (
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{contact.whereWeMet}</span>
-          </div>
-        )}
-      </div>
-
-      {tags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {tags.slice(0, 3).map((t) => (
+      <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2.5">
+        <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+          {tags.slice(0, 2).map((t) => (
             <TagBadge key={t.id} tag={t} />
           ))}
-          {tags.length > 3 && (
-            <span className="text-xs text-muted-foreground">
-              +{tags.length - 3}
-            </span>
+          {tags.length > 2 && (
+            <span className="text-xs text-muted-foreground">+{tags.length - 2}</span>
           )}
         </div>
-      )}
-
-      <div className="mt-auto flex items-center justify-between pt-4">
-        <StrengthMeter value={contact.relationshipStrength} />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           <ReconnectBadge contact={contact} />
-          <span className="text-xs text-muted-foreground">
-            {contact.lastContactDate
-              ? formatRelative(contact.lastContactDate)
-              : 'No contact yet'}
-          </span>
+          <time className="tnum">
+            {contact.lastContactDate ? formatRelativeShort(contact.lastContactDate) : '—'}
+          </time>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }

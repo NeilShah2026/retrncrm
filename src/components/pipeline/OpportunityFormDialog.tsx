@@ -163,7 +163,7 @@ export function OpportunityFormDialog({
                 autoFocus
                 value={form.company}
                 onChange={(e) => set('company', e.target.value)}
-                placeholder="Stripe"
+                placeholder="Company"
               />
             </div>
             <div className="space-y-1.5">
@@ -172,7 +172,7 @@ export function OpportunityFormDialog({
                 id="opp-role"
                 value={form.role}
                 onChange={(e) => set('role', e.target.value)}
-                placeholder="SWE Intern (Summer 2026)"
+                placeholder="Role, e.g. Summer analyst"
               />
             </div>
           </div>
@@ -264,7 +264,7 @@ export function OpportunityFormDialog({
                 id="opp-location"
                 value={form.location}
                 onChange={(e) => set('location', e.target.value)}
-                placeholder="San Francisco, CA"
+                placeholder="City or remote"
               />
             </div>
             <div className="space-y-1.5">
@@ -298,7 +298,7 @@ export function OpportunityFormDialog({
               id="opp-notes"
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
-              placeholder="Recruiter said the loop is 4 rounds…"
+              placeholder="Anything worth remembering about this one"
               className="min-h-[70px] font-mono text-xs"
             />
           </div>

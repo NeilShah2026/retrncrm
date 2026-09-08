@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowDown, ArrowUp, ChevronsUpDown, MoreHorizontal } from 'lucide-react'
+import { ArrowDown, ArrowUp, MoreHorizontal } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { TagBadge } from '@/components/common/TagBadge'
 import { ReconnectBadge } from '@/components/common/ReconnectBadge'
-import { CONNECTION_TYPES } from '@/lib/constants'
-import { fullName, formatDate, formatRelative } from '@/lib/format'
+import { FREQUENCY_OPTIONS } from '@/lib/constants'
+import { fullName, formatDateShort, formatRelativeShort } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { markCaughtUp } from '@/lib/caughtUp'
@@ -29,40 +29,47 @@ interface Props {
   onDelete: (contact: Contact) => void
 }
 
+const TH = 'sticky top-0 z-10 h-8 bg-bg-sunken px-3 text-left align-middle text-xs font-medium text-muted-foreground'
+
 function SortHeader({
   label,
+  sortKey,
   active,
   dir,
-  onClick,
+  onSort,
   className,
 }: {
   label: string
+  sortKey: SortKey
   active: boolean
   dir: SortDir
-  onClick: () => void
+  onSort: (key: SortKey) => void
   className?: string
 }) {
   return (
-    <th className={cn('bg-muted px-3 py-2 text-left font-medium', className)}>
+    <th
+      className={cn(TH, className)}
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
       <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          'inline-flex h-full items-center gap-1 rounded-sm transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+          active && 'text-foreground',
+        )}
       >
         {label}
-        {active ? (
-          dir === 'asc' ? (
-            <ArrowUp className="h-3 w-3" />
-          ) : (
-            <ArrowDown className="h-3 w-3" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-3 w-3 opacity-40" />
-        )}
+        {active &&
+          (dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
       </button>
     </th>
   )
 }
 
+/**
+ * The contacts table: 36px rows, a sticky 32px header, hairlines only. Six
+ * columns that answer who / where / how tagged / how long / how often / met.
+ */
 export function ContactsTable({
   contacts,
   tagMap,
@@ -75,131 +82,97 @@ export function ContactsTable({
   const navigate = useNavigate()
 
   return (
-    <table className="w-full min-w-[720px] border-collapse text-sm">
-      <thead className="sticky top-0 z-10 border-b">
-        <tr>
-          <SortHeader
-            label="Name"
-            active={sortKey === 'name'}
-            dir={sortDir}
-            onClick={() => onSort('name')}
-          />
-          <SortHeader
-            label="Company"
-            active={sortKey === 'company'}
-            dir={sortDir}
-            onClick={() => onSort('company')}
-          />
-          <th className="bg-muted px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Tags
-          </th>
-          <SortHeader
-            label="Last contact"
-            active={sortKey === 'lastContact'}
-            dir={sortDir}
-            onClick={() => onSort('lastContact')}
-          />
-          <SortHeader
-            label="Date met"
-            active={sortKey === 'dateMet'}
-            dir={sortDir}
-            onClick={() => onSort('dateMet')}
-          />
-          <th className="w-10 bg-muted px-3 py-2" />
+    <table className="w-full min-w-[840px] border-collapse text-sm">
+      <thead>
+        <tr className="[&>th]:border-b">
+          <SortHeader label="Name" sortKey="name" active={sortKey === 'name'} dir={sortDir} onSort={onSort} className="w-[28%]" />
+          <SortHeader label="Company" sortKey="company" active={sortKey === 'company'} dir={sortDir} onSort={onSort} className="w-[18%]" />
+          <th className={TH}>Tags</th>
+          <SortHeader label="Last contact" sortKey="lastContact" active={sortKey === 'lastContact'} dir={sortDir} onSort={onSort} className="w-[14%]" />
+          <th className={cn(TH, 'w-[10%]')}>Cadence</th>
+          <SortHeader label="Met" sortKey="dateMet" active={sortKey === 'dateMet'} dir={sortDir} onSort={onSort} className="w-[10%]" />
+          <th className={cn(TH, 'w-10')} aria-label="Actions" />
         </tr>
       </thead>
       <tbody>
         {contacts.map((c) => {
-            const tags = c.tagIds
-              .map((id) => tagMap.get(id))
-              .filter(Boolean) as Tag[]
-            return (
-              <tr
-                key={c.id}
-                onClick={() => navigate(ROUTES.contact(c.id))}
-                className="cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/50"
-              >
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-3">
-                    <ContactAvatar contact={c} className="h-8 w-8 text-xs" />
-                    <div className="flex flex-col">
-                      <span className="inline-flex items-center gap-1.5 font-medium">
-                        {fullName(c)}
-                        {c.connectionType && (
-                          <span
-                            className="text-xs"
-                            title={CONNECTION_TYPES[c.connectionType].label}
-                          >
-                            {CONNECTION_TYPES[c.connectionType].emoji}
-                          </span>
-                        )}
-                      </span>
-                      {c.jobTitle && (
-                        <span className="text-xs text-muted-foreground">
-                          {c.jobTitle}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground">
-                  {c.company || '—'}
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    {tags.slice(0, 3).map((t) => (
-                      <TagBadge key={t.id} tag={t} />
-                    ))}
-                    {tags.length > 3 && (
-                      <span className="text-xs text-muted-foreground">
-                        +{tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">
-                      {c.lastContactDate ? formatRelative(c.lastContactDate) : 'Never'}
+          const tags = c.tagIds.map((id) => tagMap.get(id)).filter(Boolean) as Tag[]
+          const cadence = FREQUENCY_OPTIONS[c.contactFrequencyGoal]
+          return (
+            <tr
+              key={c.id}
+              onClick={() => navigate(ROUTES.contact(c.id))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') navigate(ROUTES.contact(c.id))
+              }}
+              tabIndex={0}
+              className="group h-9 cursor-pointer border-b transition-colors duration-fast last:border-b-0 hover:bg-accent/50 focus-visible:bg-accent focus-visible:outline-none"
+            >
+              <td className="px-3 py-0">
+                <div className="flex items-center gap-2.5">
+                  <ContactAvatar contact={c} className="h-5 w-5" />
+                  <span className="truncate font-medium">{fullName(c)}</span>
+                  {c.jobTitle && (
+                    <span className="hidden truncate text-muted-foreground xl:inline">
+                      {c.jobTitle}
                     </span>
-                    <ReconnectBadge contact={c} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground">
-                  {formatDate(c.dateMet)}
-                </td>
-                <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => navigate(ROUTES.contact(c.id))}
-                      >
-                        View profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit(c)}>
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => void markCaughtUp(c)}>
-                        Caught up today
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => onDelete(c)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
-            )
-          })}
+                  )}
+                </div>
+              </td>
+              <td className="truncate px-3 py-0 text-text-secondary">{c.company || '—'}</td>
+              <td className="px-3 py-0">
+                <div className="flex items-center gap-1 overflow-hidden">
+                  {tags.slice(0, 3).map((t) => (
+                    <TagBadge key={t.id} tag={t} />
+                  ))}
+                  {tags.length > 3 && (
+                    <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>
+                  )}
+                </div>
+              </td>
+              <td className="px-3 py-0">
+                <div className="flex items-center gap-2">
+                  <time className="tnum text-text-secondary">
+                    {c.lastContactDate ? formatRelativeShort(c.lastContactDate) : '—'}
+                  </time>
+                  <ReconnectBadge contact={c} />
+                </div>
+              </td>
+              <td className="px-3 py-0 text-text-secondary">{cadence.short}</td>
+              <td className="tnum px-3 py-0 text-text-secondary">{formatDateShort(c.dateMet)}</td>
+              <td className="px-1 py-0 text-right" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Actions for ${fullName(c)}`}
+                      className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                    >
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate(ROUTES.contact(c.id))}>
+                      Open
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit(c)}>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void markCaughtUp(c)}>
+                      Caught up today
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => onDelete(c)}
+                      className="text-danger focus:text-danger"
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )

@@ -1,26 +1,17 @@
 import { Link } from 'react-router-dom'
-import {
-  Users,
-  UserPlus,
-  AlarmClock,
-  ArrowRight,
-  Sparkles,
-  Mic,
-  KanbanSquare,
-  CalendarDays,
-  CalendarClock,
-  Search,
-} from 'lucide-react'
+import { UserPlus, PenLine, CalendarDays, Search } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
-import { Card, CardContent } from '@/components/ui/card'
+import { Logo } from '@/components/layout/AppLayout'
+import { Panel, PanelHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/EmptyState'
+import { NetworkGate } from '@/components/common/NetworkGate'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { AssistantLauncher } from '@/components/ai/AssistantLauncher'
-import { BriefingCard } from '@/components/dashboard/BriefingCard'
+import { NextUp } from '@/components/dashboard/BriefingCard'
 import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
 import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
 import {
@@ -32,8 +23,7 @@ import {
 } from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
 import { getReconnectStatus } from '@/lib/reconnect'
-import { fullName, formatDate } from '@/lib/format'
-import { daysSince } from '@/lib/format'
+import { fullName, formatDateShort, daysSince } from '@/lib/format'
 import { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_KEYS } from '@/lib/constants'
 import type { CalendarEvent, Contact, Opportunity } from '@/types'
 import { cn } from '@/lib/utils'
@@ -41,8 +31,8 @@ import { ROUTES } from '@/lib/routes'
 
 /**
  * The page people land on. It answers three questions in order: what should I
- * do now (the AI briefing), who am I seeing next (the calendar), and who have
- * I let go quiet (the reconnect list) — then the slower context underneath.
+ * do now, who am I seeing next, and who have I let go quiet — then the slower
+ * context underneath.
  */
 export function DashboardPage() {
   const contacts = useContacts()
@@ -50,30 +40,19 @@ export function DashboardPage() {
   const events = useEvents()
   const contactMap = useContactMap()
   const tagMap = useTagMap()
-  const { openNewContact, openVoiceCapture, openAssistant, openSearch } = useUI()
-
-  const stats = computeStats(contacts, events, opportunities)
-  const pipeline = computePipelineStats(opportunities)
-
-  if (contacts === undefined) return <DashboardSkeleton />
-
-  const isEmpty = contacts.length === 0
+  const { openNewContact, openVoiceCapture, openSearch } = useUI()
 
   return (
     <PageShell
-      // The home tab is the one screen with no title. "Dashboard" only ever
-      // named the tab you had just tapped, and a phone has no room to spend on
-      // a word that tells you nothing — so the bar carries the app's mark and
-      // the two things you do standing up, and the content starts at the top.
       mobile={{
-        leading: <MobileBrand />,
+        leading: <Logo className="pl-0.5" />,
         trailing: (
           <>
             <BarButton onClick={openSearch} aria-label="Search">
               <Search />
             </BarButton>
             <BarButton onClick={openVoiceCapture} aria-label="Say who you met">
-              <Mic />
+              <PenLine />
             </BarButton>
           </>
         ),
@@ -81,224 +60,253 @@ export function DashboardPage() {
       header={
         <PageHeader
           title="Dashboard"
-          description="What to do next, who you're seeing, and who's gone quiet."
+          description="What to do next, who you’re seeing, and who’s gone quiet."
         >
-          {/* Voice leads: adding someone should cost a sentence, not a form. */}
-          <Button onClick={openVoiceCapture} className="gap-2">
-            <Mic className="h-4 w-4" />
-            Say who you met
-          </Button>
-          <Button variant="outline" onClick={openNewContact} className="gap-2">
-            <UserPlus className="h-4 w-4" />
+          <Button variant="outline" onClick={openNewContact}>
+            <UserPlus />
             New contact
+          </Button>
+          <Button onClick={openVoiceCapture}>
+            <PenLine />
+            Say who you met
           </Button>
         </PageHeader>
       }
     >
-      {isEmpty ? (
-        <EmptyState
-          icon={Sparkles}
-          title="Welcome to Retrn"
-          description="Your personal CRM for everyone you meet beyond LinkedIn. Tap the mic and say who you met — or type it to the assistant. One sentence is enough."
-          action={
-            <div className="flex flex-col items-center gap-2 sm:flex-row">
-              <Button onClick={openVoiceCapture} className="gap-2">
-                <Mic className="h-4 w-4" />
-                Say who you met
-              </Button>
-              <Button variant="outline" onClick={() => openAssistant()} className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Tell the assistant
-              </Button>
-            </div>
-          }
-        />
-      ) : (
-        <>
-          {/* The phone's headline feature, above everything else. On a laptop
-              the same box lives inside the briefing card. */}
-          <AssistantLauncher className="mb-4 md:hidden" />
-
-          {/* Stat tiles */}
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-            <StatTile
-              icon={Users}
-              label="Total contacts"
-              value={stats.total}
-              accent="text-indigo-500"
-              to={ROUTES.contacts}
-            />
-            <StatTile
-              icon={CalendarClock}
-              label="Meetings this week"
-              value={stats.meetingsThisWeek}
-              accent="text-sky-500"
-              to={ROUTES.calendar}
-            />
-            <StatTile
-              icon={AlarmClock}
-              label="Overdue"
-              value={stats.overdueCount}
-              accent="text-amber-500"
-              to={ROUTES.contactsOverdue}
-            />
-            <StatTile
-              icon={KanbanSquare}
-              label="Open applications"
-              value={stats.openOpportunities}
-              accent="text-violet-500"
-              to={ROUTES.pipeline}
-            />
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* What to do now — model-ordered, with a rules-based fallback. */}
-            <div className="lg:col-span-2">
-              <BriefingCard
-                contacts={contacts}
-                opportunities={opportunities ?? []}
-                events={events ?? []}
-                tagMap={tagMap}
-                ready={opportunities !== undefined && events !== undefined}
-              />
-            </div>
-
-            {/* Who you're seeing next */}
-            <UpcomingMeetings events={events ?? []} contactMap={contactMap} />
-
-            {/* Who's gone quiet */}
-            <div className="lg:col-span-2">
-              <NeedsAttention contacts={contacts} />
-            </div>
-
-            {/* Recently added */}
-            <Card>
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-emerald-500" />
-                  <h2 className="font-semibold">Recently added</h2>
-                </div>
-                <ul className="space-y-1">
-                  {stats.recent.map((c) => (
-                    <li key={c.id}>
-                      <Link
-                        to={ROUTES.contact(c.id)}
-                        className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-accent/60"
-                      >
-                        <ContactAvatar contact={c} className="h-8 w-8 text-xs" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {fullName(c)}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {formatDate(c.createdAt.slice(0, 10))}
-                          </p>
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Pipeline snapshot */}
-            <Card className="lg:col-span-3">
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <KanbanSquare className="h-4 w-4 text-violet-500" />
-                    <h2 className="font-semibold">Recruiting pipeline</h2>
-                  </div>
-                  <Link
-                    to={ROUTES.pipeline}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Open board
-                  </Link>
-                </div>
-
-                {pipeline.total === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No opportunities tracked yet.{' '}
-                    <Link to={ROUTES.pipeline} className="text-indigo-500 hover:underline">
-                      Add your first one
-                    </Link>
-                    .
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {OPPORTUNITY_STAGE_KEYS.map((stage) => {
-                        const count = pipeline.byStage[stage]
-                        if (count === 0) return null
-                        const s = OPPORTUNITY_STAGES[stage]
-                        return (
-                          <Link
-                            key={stage}
-                            to={ROUTES.pipeline}
-                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-accent"
-                          >
-                            <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
-                            <span>{s.label}</span>
-                            <span className="font-semibold">{count}</span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-
-                    {pipeline.upcomingDeadlines.length > 0 && (
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">
-                          Deadlines coming up
-                        </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                          {pipeline.upcomingDeadlines.map((o) => (
-                            <Link
-                              key={o.id}
-                              to={ROUTES.pipeline}
-                              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50"
-                            >
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">
-                                  {o.company}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {o.role} · due {formatDate(o.deadline)}
-                                </p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      )}
+      <NetworkGate
+        data={contacts}
+        table="contacts"
+        skeleton={<DashboardSkeleton />}
+        empty={
+          <EmptyState
+            variant="first-run"
+            icon={UserPlus}
+            title="Add the first person you met"
+            description="One line is enough: their name, where you met, anything worth remembering. Retrn turns it into a contact."
+            action={
+              <>
+                <Button onClick={openVoiceCapture}>
+                  <PenLine />
+                  Say who you met
+                </Button>
+                <Button variant="outline" onClick={openNewContact}>
+                  New contact
+                </Button>
+              </>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <DashboardBody
+            contacts={list}
+            opportunities={opportunities}
+            events={events}
+            contactMap={contactMap}
+            tagMap={tagMap}
+          />
+        )}
+      </NetworkGate>
     </PageShell>
   )
 }
 
-/**
- * The app's mark, sized for a navigation bar. This is the only screen that
- * shows it: on a phone the app's identity lives on the home screen icon, so
- * repeating it on every screen would just be a website's masthead.
- */
-function MobileBrand() {
+function DashboardBody({
+  contacts,
+  opportunities,
+  events,
+  contactMap,
+  tagMap,
+}: {
+  contacts: Contact[]
+  opportunities: Opportunity[] | undefined
+  events: CalendarEvent[] | undefined
+  contactMap: Map<string, Contact>
+  tagMap: ReturnType<typeof useTagMap>
+}) {
+  const stats = computeStats(contacts, events, opportunities)
+  const pipeline = computePipelineStats(opportunities)
+
   return (
-    <div className="flex items-center gap-1.5 pl-0.5">
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-indigo-500 text-white">
-        <Users className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-[17px] font-semibold tracking-[-0.02em]">Retrn</span>
-    </div>
+    <>
+      <AssistantLauncher className="mb-4 md:hidden" />
+
+      <MetricStrip stats={stats} />
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <NextUp
+            contacts={contacts}
+            opportunities={opportunities ?? []}
+            events={events ?? []}
+            tagMap={tagMap}
+            ready={opportunities !== undefined && events !== undefined}
+          />
+        </div>
+
+        <UpcomingMeetings events={events ?? []} contactMap={contactMap} />
+
+        <div className="lg:col-span-2">
+          <NeedsAttention contacts={contacts} />
+        </div>
+
+        <Panel>
+          <PanelHeader>Recently added</PanelHeader>
+          <ul>
+            {stats.recent.map((c) => (
+              <li key={c.id} className="border-b last:border-b-0">
+                <Link
+                  to={ROUTES.contact(c.id)}
+                  className="flex h-10 items-center gap-2.5 px-4 transition-colors duration-fast hover:bg-accent/60 focus-visible:outline-none focus-visible:bg-accent"
+                >
+                  <ContactAvatar contact={c} className="h-6 w-6" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{fullName(c)}</span>
+                  <time className="text-xs text-muted-foreground">
+                    {formatDateShort(c.createdAt.slice(0, 10))}
+                  </time>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+
+        <Panel className="lg:col-span-3">
+          <PanelHeader
+            action={
+              <Button variant="ghost" size="sm" asChild>
+                <Link to={ROUTES.pipeline}>Open board</Link>
+              </Button>
+            }
+          >
+            Pipeline
+          </PanelHeader>
+
+          {pipeline.total === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              No opportunities yet.{' '}
+              <Link to={ROUTES.pipelineNew} className="text-brand hover:underline">
+                Add the first one
+              </Link>
+              .
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3 text-sm">
+                {OPPORTUNITY_STAGE_KEYS.map((stage) => {
+                  const count = pipeline.byStage[stage]
+                  if (count === 0) return null
+                  const s = OPPORTUNITY_STAGES[stage]
+                  return (
+                    <Link
+                      key={stage}
+                      to={ROUTES.pipeline}
+                      className="inline-flex items-center gap-1.5 text-text-secondary hover:text-foreground"
+                    >
+                      <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
+                      {s.label}
+                      <span className="tnum font-medium text-foreground">{count}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {pipeline.upcomingDeadlines.length > 0 && (
+                <div className="border-t">
+                  <p className="text-label px-4 pb-1 pt-3 text-muted-foreground">
+                    Deadlines in the next three weeks
+                  </p>
+                  <ul>
+                    {pipeline.upcomingDeadlines.map((o) => (
+                      <li key={o.id} className="border-b last:border-b-0">
+                        <Link
+                          to={ROUTES.pipeline}
+                          className="flex h-9 items-center gap-2.5 px-4 text-sm transition-colors duration-fast hover:bg-accent/60"
+                        >
+                          <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate">
+                            <span className="font-medium">{o.company}</span>
+                            <span className="text-muted-foreground"> · {o.role}</span>
+                          </span>
+                          <time className="tnum text-xs text-muted-foreground">
+                            {formatDateShort(o.deadline)}
+                          </time>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </Panel>
+      </div>
+    </>
+  )
+}
+
+/**
+ * The numbers, in one line. Unequal on purpose: contacts and overdue are the
+ * two that change what you do today; the rest are context.
+ */
+function MetricStrip({ stats }: { stats: Stats }) {
+  return (
+    <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-2 rounded-lg border px-4 py-3">
+      <Metric
+        to={ROUTES.contacts}
+        value={stats.total}
+        label={stats.total === 1 ? 'contact' : 'contacts'}
+        emphasis
+      />
+      <Metric
+        to={ROUTES.contactsOverdue}
+        value={stats.overdueCount}
+        label="overdue"
+        emphasis
+        tone={stats.overdueCount > 0 ? 'warning' : undefined}
+      />
+      <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+      <Metric to={ROUTES.calendar} value={stats.meetingsThisWeek} label="meetings this week" />
+      <Metric to={ROUTES.pipeline} value={stats.openOpportunities} label="open applications" />
+    </dl>
+  )
+}
+
+function Metric({
+  to,
+  value,
+  label,
+  emphasis,
+  tone,
+}: {
+  to: string
+  value: number
+  label: string
+  emphasis?: boolean
+  tone?: 'warning'
+}) {
+  return (
+    <Link
+      to={to}
+      className="group inline-flex items-baseline gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      <dd
+        className={cn(
+          'tnum font-semibold leading-none',
+          emphasis ? 'text-xl' : 'text-base',
+          tone === 'warning' && 'text-warning',
+        )}
+      >
+        {value}
+      </dd>
+      <dt
+        className={cn(
+          'text-muted-foreground group-hover:text-foreground',
+          emphasis ? 'text-sm' : 'text-xs',
+        )}
+      >
+        {label}
+      </dt>
+    </Link>
   )
 }
 
@@ -319,8 +327,7 @@ function computeStats(
     b.createdAt.localeCompare(a.createdAt),
   )
 
-  // "This week" is the next seven days, not the calendar week — what's ahead
-  // of you on a Friday shouldn't reset to zero on Monday.
+  // "This week" is the next seven days, not the calendar week.
   const meetingsThisWeek = (events ?? []).filter((e) => {
     const days = daysSince(e.startsAt)
     return days !== null && days <= 0 && days >= -7
@@ -341,9 +348,7 @@ interface PipelineStats {
   upcomingDeadlines: Opportunity[]
 }
 
-function computePipelineStats(
-  opportunities: Opportunity[] | undefined,
-): PipelineStats {
+function computePipelineStats(opportunities: Opportunity[] | undefined): PipelineStats {
   const byStage: Record<Opportunity['stage'], number> = {
     researching: 0,
     applied: 0,
@@ -351,9 +356,7 @@ function computePipelineStats(
     offer: 0,
     closed: 0,
   }
-  if (!opportunities) {
-    return { total: 0, byStage, upcomingDeadlines: [] }
-  }
+  if (!opportunities) return { total: 0, byStage, upcomingDeadlines: [] }
   for (const o of opportunities) byStage[o.stage]++
 
   const upcomingDeadlines = opportunities
@@ -368,55 +371,36 @@ function computePipelineStats(
   return { total: opportunities.length, byStage, upcomingDeadlines }
 }
 
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  accent,
-  to,
-}: {
-  icon: typeof Users
-  label: string
-  value: number
-  accent: string
-  to?: string
-}) {
-  const inner = (
-    <Card
-      className={cn(
-        'transition-colors',
-        to && 'cursor-pointer hover:border-foreground/20',
-      )}
-    >
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className={cn('rounded-lg bg-muted p-2', accent)}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-semibold leading-none">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-  return to ? <Link to={to}>{inner}</Link> : inner
-}
-
 function DashboardSkeleton() {
   return (
-    <PageShell
-      mobile={{ leading: <MobileBrand /> }}
-      header={<PageHeader title="Dashboard" description="Loading your network…" />}
-    >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
+    <div aria-busy="true" aria-label="Loading your network">
+      <div className="flex h-12 items-center gap-6 rounded-lg border px-4">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-3 w-28" />
       </div>
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Skeleton className="h-72 w-full lg:col-span-2" />
-        <Skeleton className="h-72 w-full" />
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border lg:col-span-2">
+          <div className="h-11 border-b px-4 py-3">
+            <Skeleton className="h-4 w-20" />
+          </div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex h-11 items-center gap-3 border-b px-4 last:border-b-0">
+              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-lg border">
+          <div className="h-11 border-b px-4 py-3">
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
       </div>
-    </PageShell>
+    </div>
   )
 }
