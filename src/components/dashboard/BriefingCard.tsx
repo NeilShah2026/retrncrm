@@ -177,7 +177,7 @@ export function BriefingCard({
   const empty = snapshot.empty
 
   return (
-    <Card className="border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.05] to-transparent">
+    <Card className="h-full border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.05] to-transparent">
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

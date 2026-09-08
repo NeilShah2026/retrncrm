@@ -1,48 +1,47 @@
-import { Link } from 'react-router-dom'
+import * as React from 'react'
 import {
-  Users,
-  UserPlus,
-  AlarmClock,
-  ArrowRight,
-  Sparkles,
+  Check,
+  LayoutGrid,
   Mic,
-  KanbanSquare,
-  CalendarDays,
-  CalendarClock,
+  RotateCcw,
   Search,
+  Sparkles,
+  UserPlus,
+  Users,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/common/EmptyState'
-import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { AssistantLauncher } from '@/components/ai/AssistantLauncher'
-import { BriefingCard } from '@/components/dashboard/BriefingCard'
-import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
-import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
+import { DashboardGrid } from '@/components/dashboard/DashboardGrid'
+import type { WidgetContext } from '@/components/dashboard/registry'
 import {
   useContacts,
   useContactMap,
   useEvents,
   useOpportunities,
   useTagMap,
+  useTags,
 } from '@/hooks/useData'
+import { useDashboardLayout } from '@/hooks/useDashboardLayout'
 import { useUI } from '@/context/ui-context'
-import { getReconnectStatus } from '@/lib/reconnect'
-import { fullName, formatDate } from '@/lib/format'
-import { daysSince } from '@/lib/format'
-import { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_KEYS } from '@/lib/constants'
-import type { CalendarEvent, Contact, Opportunity } from '@/types'
-import { cn } from '@/lib/utils'
-import { ROUTES } from '@/lib/routes'
+import { computeDashboardStats } from '@/lib/dashboardStats'
+import { isDefaultLayout } from '@/lib/dashboardLayout'
 
 /**
- * The page people land on. It answers three questions in order: what should I
- * do now (the AI briefing), who am I seeing next (the calendar), and who have
- * I let go quiet (the reconnect list) — then the slower context underneath.
+ * The page people land on — and, since no two people use a CRM the same way,
+ * the one page they get to build themselves.
+ *
+ * Out of the box it still answers the three questions in order: what should I
+ * do now (the briefing), who am I seeing next (the calendar), and who have I
+ * let go quiet (the reconnect list). But that order is only a good default.
+ * Someone living out of the recruiting board and someone who mostly captures
+ * people they met want different home screens, so every card here is a widget
+ * that can be moved, resized, put away, or brought back — and the arrangement
+ * is saved on the account, not the browser.
  */
 export function DashboardPage() {
   const contacts = useContacts()
@@ -50,14 +49,32 @@ export function DashboardPage() {
   const events = useEvents()
   const contactMap = useContactMap()
   const tagMap = useTagMap()
+  const tags = useTags()
   const { openNewContact, openVoiceCapture, openAssistant, openSearch } = useUI()
+  const { layout, visible, hidden, move, resize, hide, show, reset } =
+    useDashboardLayout()
 
-  const stats = computeStats(contacts, events, opportunities)
-  const pipeline = computePipelineStats(opportunities)
+  const [editing, setEditing] = React.useState(false)
+
+  const stats = React.useMemo(
+    () => computeDashboardStats(contacts ?? [], events ?? [], opportunities ?? []),
+    [contacts, events, opportunities],
+  )
 
   if (contacts === undefined) return <DashboardSkeleton />
 
   const isEmpty = contacts.length === 0
+
+  const ctx: WidgetContext = {
+    contacts,
+    opportunities: opportunities ?? [],
+    events: events ?? [],
+    contactMap,
+    tagMap,
+    tags: tags ?? [],
+    stats,
+    ready: opportunities !== undefined && events !== undefined,
+  }
 
   return (
     <PageShell
@@ -67,8 +84,27 @@ export function DashboardPage() {
       // the two things you do standing up, and the content starts at the top.
       mobile={{
         leading: <MobileBrand />,
-        trailing: (
+        trailing: isEmpty ? (
           <>
+            <BarButton onClick={openSearch} aria-label="Search">
+              <Search />
+            </BarButton>
+            <BarButton onClick={openVoiceCapture} aria-label="Say who you met">
+              <Mic />
+            </BarButton>
+          </>
+        ) : editing ? (
+          <BarButton onClick={() => setEditing(false)} aria-label="Done arranging">
+            <Check />
+          </BarButton>
+        ) : (
+          <>
+            <BarButton
+              onClick={() => setEditing(true)}
+              aria-label="Arrange your dashboard"
+            >
+              <LayoutGrid />
+            </BarButton>
             <BarButton onClick={openSearch} aria-label="Search">
               <Search />
             </BarButton>
@@ -81,17 +117,51 @@ export function DashboardPage() {
       header={
         <PageHeader
           title="Dashboard"
-          description="What to do next, who you're seeing, and who's gone quiet."
+          description={
+            editing
+              ? 'Drag a widget by its handle. Everything saves as you go.'
+              : "What to do next, who you're seeing, and who's gone quiet."
+          }
         >
-          {/* Voice leads: adding someone should cost a sentence, not a form. */}
-          <Button onClick={openVoiceCapture} className="gap-2">
-            <Mic className="h-4 w-4" />
-            Say who you met
-          </Button>
-          <Button variant="outline" onClick={openNewContact} className="gap-2">
-            <UserPlus className="h-4 w-4" />
-            New contact
-          </Button>
+          {editing ? (
+            <>
+              <Button
+                variant="ghost"
+                onClick={reset}
+                disabled={isDefaultLayout(layout)}
+                className="gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </Button>
+              <Button onClick={() => setEditing(false)} className="gap-2">
+                <Check className="h-4 w-4" />
+                Done
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* Voice leads: adding someone should cost a sentence, not a form. */}
+              <Button onClick={openVoiceCapture} className="gap-2">
+                <Mic className="h-4 w-4" />
+                Say who you met
+              </Button>
+              <Button variant="outline" onClick={openNewContact} className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                New contact
+              </Button>
+              {!isEmpty && (
+                <Button
+                  variant="outline"
+                  onClick={() => setEditing(true)}
+                  className="gap-2"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Customize
+                </Button>
+              )}
+            </>
+          )}
         </PageHeader>
       }
     >
@@ -116,170 +186,41 @@ export function DashboardPage() {
       ) : (
         <>
           {/* The phone's headline feature, above everything else. On a laptop
-              the same box lives inside the briefing card. */}
-          <AssistantLauncher className="mb-4 md:hidden" />
+              the same box lives inside the briefing card. It sits outside the
+              grid deliberately: it's the way into the app, not a panel to be
+              rearranged away. */}
+          {!editing && <AssistantLauncher className="mb-4 md:hidden" />}
 
-          {/* Stat tiles */}
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-            <StatTile
-              icon={Users}
-              label="Total contacts"
-              value={stats.total}
-              accent="text-indigo-500"
-              to={ROUTES.contacts}
-            />
-            <StatTile
-              icon={CalendarClock}
-              label="Meetings this week"
-              value={stats.meetingsThisWeek}
-              accent="text-sky-500"
-              to={ROUTES.calendar}
-            />
-            <StatTile
-              icon={AlarmClock}
-              label="Overdue"
-              value={stats.overdueCount}
-              accent="text-amber-500"
-              to={ROUTES.contactsOverdue}
-            />
-            <StatTile
-              icon={KanbanSquare}
-              label="Open applications"
-              value={stats.openOpportunities}
-              accent="text-violet-500"
-              to={ROUTES.pipeline}
-            />
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* What to do now — model-ordered, with a rules-based fallback. */}
-            <div className="lg:col-span-2">
-              <BriefingCard
-                contacts={contacts}
-                opportunities={opportunities ?? []}
-                events={events ?? []}
-                tagMap={tagMap}
-                ready={opportunities !== undefined && events !== undefined}
-              />
+          {/* A phone has no page header to hang "Done" off, so arranging says
+              so for itself. */}
+          {editing && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/[0.06] px-3 py-2.5 md:hidden">
+              <p className="text-xs text-muted-foreground">
+                Hold a widget's handle to move it.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={reset}
+                disabled={isDefaultLayout(layout)}
+                className="shrink-0 gap-1.5 text-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </Button>
             </div>
+          )}
 
-            {/* Who you're seeing next */}
-            <UpcomingMeetings events={events ?? []} contactMap={contactMap} />
-
-            {/* Who's gone quiet */}
-            <div className="lg:col-span-2">
-              <NeedsAttention contacts={contacts} />
-            </div>
-
-            {/* Recently added */}
-            <Card>
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-emerald-500" />
-                  <h2 className="font-semibold">Recently added</h2>
-                </div>
-                <ul className="space-y-1">
-                  {stats.recent.map((c) => (
-                    <li key={c.id}>
-                      <Link
-                        to={ROUTES.contact(c.id)}
-                        className="flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-accent/60"
-                      >
-                        <ContactAvatar contact={c} className="h-8 w-8 text-xs" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {fullName(c)}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {formatDate(c.createdAt.slice(0, 10))}
-                          </p>
-                        </div>
-                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Pipeline snapshot */}
-            <Card className="lg:col-span-3">
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <KanbanSquare className="h-4 w-4 text-violet-500" />
-                    <h2 className="font-semibold">Recruiting pipeline</h2>
-                  </div>
-                  <Link
-                    to={ROUTES.pipeline}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Open board
-                  </Link>
-                </div>
-
-                {pipeline.total === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No opportunities tracked yet.{' '}
-                    <Link to={ROUTES.pipeline} className="text-indigo-500 hover:underline">
-                      Add your first one
-                    </Link>
-                    .
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {OPPORTUNITY_STAGE_KEYS.map((stage) => {
-                        const count = pipeline.byStage[stage]
-                        if (count === 0) return null
-                        const s = OPPORTUNITY_STAGES[stage]
-                        return (
-                          <Link
-                            key={stage}
-                            to={ROUTES.pipeline}
-                            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-accent"
-                          >
-                            <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
-                            <span>{s.label}</span>
-                            <span className="font-semibold">{count}</span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-
-                    {pipeline.upcomingDeadlines.length > 0 && (
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-muted-foreground">
-                          Deadlines coming up
-                        </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                          {pipeline.upcomingDeadlines.map((o) => (
-                            <Link
-                              key={o.id}
-                              to={ROUTES.pipeline}
-                              className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50"
-                            >
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">
-                                  {o.company}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {o.role} · due {formatDate(o.deadline)}
-                                </p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <DashboardGrid
+            visible={visible}
+            hidden={hidden}
+            ctx={ctx}
+            editing={editing}
+            onMove={move}
+            onResize={resize}
+            onHide={hide}
+            onShow={show}
+          />
         </>
       )}
     </PageShell>
@@ -300,106 +241,6 @@ function MobileBrand() {
       <span className="text-[17px] font-semibold tracking-[-0.02em]">Retrn</span>
     </div>
   )
-}
-
-interface Stats {
-  total: number
-  recent: Contact[]
-  overdueCount: number
-  meetingsThisWeek: number
-  openOpportunities: number
-}
-
-function computeStats(
-  contacts: Contact[] | undefined,
-  events: CalendarEvent[] | undefined,
-  opportunities: Opportunity[] | undefined,
-): Stats {
-  const recentSorted = [...(contacts ?? [])].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  )
-
-  // "This week" is the next seven days, not the calendar week — what's ahead
-  // of you on a Friday shouldn't reset to zero on Monday.
-  const meetingsThisWeek = (events ?? []).filter((e) => {
-    const days = daysSince(e.startsAt)
-    return days !== null && days <= 0 && days >= -7
-  }).length
-
-  return {
-    total: contacts?.length ?? 0,
-    recent: recentSorted.slice(0, 5),
-    overdueCount: (contacts ?? []).filter((c) => getReconnectStatus(c).overdue).length,
-    meetingsThisWeek,
-    openOpportunities: (opportunities ?? []).filter((o) => o.stage !== 'closed').length,
-  }
-}
-
-interface PipelineStats {
-  total: number
-  byStage: Record<Opportunity['stage'], number>
-  upcomingDeadlines: Opportunity[]
-}
-
-function computePipelineStats(
-  opportunities: Opportunity[] | undefined,
-): PipelineStats {
-  const byStage: Record<Opportunity['stage'], number> = {
-    researching: 0,
-    applied: 0,
-    interviewing: 0,
-    offer: 0,
-    closed: 0,
-  }
-  if (!opportunities) {
-    return { total: 0, byStage, upcomingDeadlines: [] }
-  }
-  for (const o of opportunities) byStage[o.stage]++
-
-  const upcomingDeadlines = opportunities
-    .filter((o) => {
-      if (!o.deadline || o.stage === 'closed') return false
-      const d = daysSince(o.deadline)
-      return d !== null && d <= 0 && d >= -21
-    })
-    .sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? ''))
-    .slice(0, 6)
-
-  return { total: opportunities.length, byStage, upcomingDeadlines }
-}
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  accent,
-  to,
-}: {
-  icon: typeof Users
-  label: string
-  value: number
-  accent: string
-  to?: string
-}) {
-  const inner = (
-    <Card
-      className={cn(
-        'transition-colors',
-        to && 'cursor-pointer hover:border-foreground/20',
-      )}
-    >
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className={cn('rounded-lg bg-muted p-2', accent)}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-semibold leading-none">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-  return to ? <Link to={to}>{inner}</Link> : inner
 }
 
 function DashboardSkeleton() {

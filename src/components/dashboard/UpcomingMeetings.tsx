@@ -47,7 +47,7 @@ export function UpcomingMeetings({ events, contactMap, limit = 5 }: Props) {
   }, [events, limit])
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
