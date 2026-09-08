@@ -158,6 +158,21 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['calendar_tokens']['Row']>
         Relationships: []
       }
+      edu_verifications: {
+        Row: {
+          user_id: string
+          email: string
+          domain: string
+          verified_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['edu_verifications']['Row']> & {
+          user_id: string
+          email: string
+          domain: string
+        }
+        Update: Partial<Database['public']['Tables']['edu_verifications']['Row']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

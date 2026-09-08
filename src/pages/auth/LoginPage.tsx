@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, Mail, PartyPopper, ShieldCheck, Users } from 'lucide-react'
+import { ArrowRight, GraduationCap, Mail, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
@@ -30,7 +30,7 @@ export function LoginPage() {
       : ROUTES.dashboard
 
   // Arriving from a paid plan (Student/Standard) → open in sign-up mode and
-  // surface the founding offer, since it's free for anyone who joins in time.
+  // surface the Babson offer, since it makes that plan free for them.
   const plan = params.get('plan')
   const fromPaidPlan = plan === 'student' || plan === 'standard'
 
@@ -115,14 +115,15 @@ export function LoginPage() {
         </Link>
 
         {fromPaidPlan && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-amber-300/25 bg-gradient-to-r from-amber-400/10 via-rose-400/10 to-indigo-500/10 px-4 py-3 text-sm text-white/85">
-            <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/12 via-violet-400/10 to-rose-400/10 px-4 py-3 text-sm text-white/85">
+            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-300" />
             <span>
-              <span className="font-semibold text-white">No card needed.</span>{' '}
-              Sign up before{' '}
-              <span className="font-semibold text-white">August 31, 2026</span> and
-              Retrn is <span className="font-semibold text-white">free for life</span> —
-              including everything in {plan === 'student' ? 'Student' : 'Standard'}.
+              <span className="font-semibold text-white">Babson student?</span> Sign up
+              with your{' '}
+              <span className="font-semibold text-white">@babson.edu</span> email — or
+              verify it later in Settings — and everything in{' '}
+              {plan === 'student' ? 'Student' : 'Standard'} is{' '}
+              <span className="font-semibold text-white">free</span>, no card.
             </span>
           </div>
         )}

@@ -197,6 +197,45 @@ signed-out visitors to `/login`. New accounts are seeded once via
 `src/lib/seedNewUser.ts`, which flags itself done in the user's
 `user_metadata` so it never reseeds.
 
+### Babson free access
+
+Any student who proves control of a `@babson.edu` address gets every paid
+feature at no charge. `useEntitlement()` is the single place the rest of the
+app asks about it — gate paid features on `isPro`, not on the email.
+
+Verification is granted only by `api/verify-edu.ts`, which runs with the
+service role key and writes the `babson_verified` flag into auth
+`app_metadata` (invisible to the browser, carried in the JWT) plus a row in
+`edu_verifications`. `user_metadata` would be wrong here: any signed-in user
+can overwrite that with `updateUser`.
+
+Two ways in, both handled by `src/lib/eduVerification.ts`:
+
+- **Sign in with the Babson address** — password, magic link, or Google.
+  Supabase has already confirmed the address, so `syncAccountEmail()` just
+  records it on the next session.
+- **Verify it from Settings** — for accounts on a personal address.
+  `EduVerificationCard` sends a code to the school address through a
+  *throwaway* Supabase client (`persistSession: false`, its own storage key),
+  because confirming a code signs you in as that address and would otherwise
+  swap the live session out from under the app. The token it mints is passed
+  to the endpoint as proof and then discarded.
+
+Two bits of project setup this needs:
+
+1. `SUPABASE_SERVICE_ROLE_KEY` set in the deployment environment (the iCal
+   feed already needs it). Without it the endpoint returns 503 and the card
+   says verification isn't configured.
+2. The **Magic Link** email template in the Supabase dashboard must include
+   the code, since the Settings flow asks for one rather than a link — add
+   `{{ .Token }}` alongside the existing link:
+
+   ```html
+   <p>Your Retrn verification code is <strong>{{ .Token }}</strong>.</p>
+   ```
+
+Run `supabase/migrations/0003_edu_verification.sql` before either path works.
+
 ## Architecture
 
 The data layer sits behind a repository interface, so the storage engine

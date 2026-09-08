@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Check, PartyPopper } from 'lucide-react'
+import { ArrowRight, Check, GraduationCap } from 'lucide-react'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 
@@ -58,7 +58,7 @@ const TIERS: Tier[] = [
       'CSV/JSON export',
     ],
     cta: 'Verify .edu',
-    ctaMicro: 'Save 67% off Standard — just confirm your school email',
+    ctaMicro: 'Free for Babson students — verify your @babson.edu email',
     href: `${ROUTES.login}?plan=student`,
   },
   {
@@ -115,17 +115,19 @@ export function PricingSection() {
       />
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Founding offer */}
+        {/* Babson offer */}
         <motion.div
           {...fadeUp}
           transition={{ duration: 0.6, ease: EASE }}
-          className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-2.5 rounded-2xl border border-amber-300/25 bg-gradient-to-r from-amber-400/10 via-rose-400/10 to-indigo-500/10 px-4 py-3 text-center text-sm text-white/85"
+          className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-2.5 rounded-2xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/12 via-violet-400/10 to-rose-400/10 px-4 py-3 text-center text-sm text-white/85"
         >
-          <PartyPopper className="h-4 w-4 shrink-0 text-amber-300" />
+          <GraduationCap className="h-4 w-4 shrink-0 text-indigo-300" />
           <span>
-            <span className="font-semibold text-white">Founding offer:</span>{' '}
-            join before <span className="font-semibold text-white">August 31, 2026</span>{' '}
-            and Retrn is <span className="font-semibold text-white">free for life</span>.
+            <span className="font-semibold text-white">Babson students:</span>{' '}
+            any student with a verified{' '}
+            <span className="font-semibold text-white">@babson.edu</span> email gets
+            Retrn <span className="font-semibold text-white">free</span> — every paid
+            feature, no card.
           </span>
         </motion.div>
 

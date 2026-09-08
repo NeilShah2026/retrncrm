@@ -33,6 +33,7 @@ import {
 } from '@/hooks/useData'
 import { contactRepo, opportunityRepo, tagRepo, templateRepo } from '@/services'
 import { ShareableProfileCard } from '@/components/profile/ShareableProfileCard'
+import { EduVerificationCard } from '@/components/settings/EduVerificationCard'
 import { useAuth } from '@/auth/AuthProvider'
 import { useUI } from '@/context/ui-context'
 import { buildStarterContent } from '@/lib/starterContent'
@@ -184,6 +185,9 @@ export function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Babson free access */}
+        <EduVerificationCard />
+
         {/* Account */}
         <Card>
           <CardContent className="p-5">

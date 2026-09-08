@@ -120,23 +120,23 @@ export function TermsPage() {
         </P>
       </Section>
 
-      <Section n={8} title="Founding Member lifetime offer">
+      <Section n={8} title="Babson student free access">
         <P>
-          Anyone who creates a Retrn account <Strong>on or before August 31, 2026</Strong>{' '}
-          becomes a Founding Member and receives <Strong>free lifetime access</Strong>{' '}
-          to Retrn's then-current paid features at no charge. There is no cap on the
-          number of Founding Members.
+          Any student who verifies an active <Strong>@babson.edu</Strong> email address
+          receives <Strong>free access to Retrn's paid features</Strong> at no charge,
+          for as long as that address remains verified. No payment method is required,
+          and there is no cap on the number of Babson students who can claim it.
         </P>
-        <P>"Lifetime" means:</P>
+        <P>How that verification works:</P>
         <UL
           items={[
-            'The offer is tied to your individual account and requires that account to remain active; it is non-transferable.',
-            'It applies for as long as Retrn continues to operate the Service.',
+            'Sign in with your @babson.edu address — by password, magic link, or Google — and the account is verified automatically.',
+            'Or sign in with any other address and verify your @babson.edu email from Settings; we email a code to the school address to confirm you control it.',
+            'One @babson.edu address unlocks one Retrn account. The offer is tied to your individual account and is non-transferable.',
             <>
-              If we discontinue the Service, or in the event of a shutdown,
-              acquisition, or material change to our business, we may end or modify
-              this offer with at least{' '}
-              <PlaceholderInline>30</PlaceholderInline> days' prior notice.
+              If you can no longer receive mail at that address, or we can no longer
+              verify it as an active Babson address, we may end the free access with
+              at least <PlaceholderInline>30</PlaceholderInline> days' prior notice.
             </>,
             'The offer covers standard individual use and does not include future add-ons that carry separate, usage-based costs (e.g., third-party API fees), which will be disclosed before you incur them.',
           ]}

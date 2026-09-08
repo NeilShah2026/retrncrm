@@ -2,6 +2,7 @@ import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
+import { syncAccountEmail } from '@/lib/eduVerification'
 import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
 
 interface AuthResult {
@@ -26,6 +27,17 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
 
+/**
+ * Everything that should happen once we know who is signed in. Both the
+ * initial session check and every later auth change funnel through here.
+ * `syncAccountEmail` is a no-op unless the account email is a school address
+ * that hasn't been recorded yet, so it costs nothing for everyone else.
+ */
+function onSignedIn(user: User): void {
+  void ensureUserSeeded(user)
+  void syncAccountEmail(user)
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -37,12 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return
       setSession(data.session)
       setLoading(false)
-      if (data.session?.user) void ensureUserSeeded(data.session.user)
+      if (data.session?.user) void onSignedIn(data.session.user)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
-      if (next?.user) void ensureUserSeeded(next.user)
+      if (next?.user) void onSignedIn(next.user)
     })
 
     return () => {
