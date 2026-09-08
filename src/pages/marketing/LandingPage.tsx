@@ -47,17 +47,36 @@ export function LandingPage() {
         }}
       />
 
+      {/* Top ambience. Deliberately anchored to the page, not to the hero
+          <section> below — that section clips its own overflow, so a glow
+          parked inside it gets sheared off in a hard line right under the nav.
+          Living here it reaches up behind the bar and through the status-bar
+          safe area, so the color starts at the very top of the screen.
+
+          Two layers: a full-bleed linear wash that guarantees the top edge is
+          tinted at any viewport width (a radial alone leaves dark corners on
+          wide laptops), and the soft indigo bloom over it. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[520px]"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(79,70,229,0.26) 0%, rgba(79,70,229,0.13) 40%, rgba(79,70,229,0.04) 72%, transparent 100%)',
+        }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-[-260px] z-0 h-[860px] w-[1100px] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-[140px]"
+        animate={{ opacity: [0.65, 1, 0.65] }}
+        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
       <MarketingNav />
 
       {/* ================= HERO ================= */}
       <section className="relative overflow-hidden">
-        {/* hero glows */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-[-14%] h-[620px] w-[900px] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-[130px]"
-          animate={{ opacity: [0.65, 1, 0.65] }}
-          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        {/* hero glows (the indigo bloom lives at page level above, so it can
+            bleed up behind the nav instead of being clipped by this section) */}
         <motion.div
           aria-hidden
           className="pointer-events-none absolute right-[-8%] top-[24%] h-[420px] w-[420px] rounded-full bg-fuchsia-500/18 blur-[120px]"

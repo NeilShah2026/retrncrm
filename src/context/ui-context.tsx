@@ -1,10 +1,12 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { CommandPalette } from '@/components/search/CommandPalette'
-import { AssistantDialog } from '@/components/ai/AssistantDialog'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useAuth } from '@/auth/AuthProvider'
+import { useAssistant } from '@/context/assistant-context'
+import { ROUTES } from '@/lib/routes'
 import type { Contact } from '@/types'
 
 interface UIContextValue {
@@ -13,7 +15,10 @@ interface UIContextValue {
   openVoiceCapture: () => void
   openEditContact: (contact: Contact) => void
   openSearch: () => void
-  /** Natural-language search over your contacts, optionally pre-filled. */
+  /**
+   * Go to the assistant, optionally with a first message to run on arrival.
+   * It's a screen rather than a dialog now, so this navigates.
+   */
   openAssistant: (question?: string) => void
   openWelcomeTour: () => void
 }
@@ -34,13 +39,13 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
   const { user, markOnboarded } = useAuth()
+  const navigate = useNavigate()
+  const { handOff } = useAssistant()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tourOpen, setTourOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
-  const [askOpen, setAskOpen] = React.useState(false)
-  const [askQuestion, setAskQuestion] = React.useState<string | undefined>()
 
   const openNewContact = React.useCallback(() => {
     setEditing(null)
@@ -53,10 +58,15 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const openVoiceCapture = React.useCallback(() => setVoiceOpen(true), [])
-  const openAssistant = React.useCallback((question?: string) => {
-    setAskQuestion(question)
-    setAskOpen(true)
-  }, [])
+  const openAssistant = React.useCallback(
+    (question?: string) => {
+      // Queue first, navigate second: the chat picks the message up as it
+      // mounts, so nothing is retyped and nothing runs twice.
+      if (question?.trim()) handOff(question)
+      navigate(ROUTES.assistant)
+    },
+    [handOff, navigate],
+  )
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
   const openWelcomeTour = React.useCallback(() => setTourOpen(true), [])
 
@@ -87,8 +97,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         !formOpen &&
         !searchOpen &&
         !tourOpen &&
-        !voiceOpen &&
-        !askOpen
+        !voiceOpen
       if (!bare) return
       if (e.key.toLowerCase() === 'n') {
         e.preventDefault()
@@ -108,7 +117,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     searchOpen,
     tourOpen,
     voiceOpen,
-    askOpen,
     openNewContact,
     openVoiceCapture,
   ])
@@ -147,11 +155,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         onNewContact={openNewContact}
         onVoiceCapture={openVoiceCapture}
         onAssistant={openAssistant}
-      />
-      <AssistantDialog
-        open={askOpen}
-        onOpenChange={setAskOpen}
-        initialQuestion={askQuestion}
       />
       <WelcomeTour
         open={tourOpen}

@@ -170,7 +170,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  * identity in the icon on the home screen.
  */
 export function AppLayout() {
-  const { openNewContact, openVoiceCapture, openSearch, openAssistant } = useUI()
+  const { openNewContact, openVoiceCapture, openSearch } = useUI()
   const [shareOpen, setShareOpen] = React.useState(false)
   const [moreOpen, setMoreOpen] = React.useState(false)
 
@@ -213,13 +213,20 @@ export function AppLayout() {
               ⌘K
             </kbd>
           </button>
-          <button
-            onClick={() => openAssistant()}
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          <NavLink
+            to={ROUTES.assistant}
+            className={({ isActive }) =>
+              cn(
+                'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                isActive
+                  ? 'bg-indigo-500/10 font-medium text-indigo-600 dark:text-indigo-300'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )
+            }
           >
             <Sparkles className="h-4 w-4" />
             <span className="flex-1 text-left">Assistant</span>
-          </button>
+          </NavLink>
         </div>
 
         <nav className="mt-6 flex-1 space-y-1 px-3">
@@ -276,19 +283,34 @@ export function AppLayout() {
           {/* Kept inside the bar rather than raised above it: the content
               column clips its overflow, so a button poking over the top edge
               would be cut in half. */}
-          <button
-            type="button"
-            onClick={() => openAssistant()}
+          <NavLink
+            to={ROUTES.assistant}
             aria-label="Open the assistant"
             className="press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px]"
           >
-            <span className="flex h-[27px] w-[27px] items-center justify-center rounded-full bg-indigo-500 text-white">
-              <Sparkles className="h-4 w-4" strokeWidth={2.4} />
-            </span>
-            <span className="text-[10px] font-medium leading-none tracking-[-0.01em] text-indigo-500">
-              Assistant
-            </span>
-          </button>
+            {({ isActive }) => (
+              <>
+                <span
+                  className={cn(
+                    'flex h-[27px] w-[27px] items-center justify-center rounded-full transition-colors',
+                    isActive
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-indigo-500 text-white',
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" strokeWidth={2.4} />
+                </span>
+                <span
+                  className={cn(
+                    'text-[10px] leading-none tracking-[-0.01em] text-indigo-500',
+                    isActive ? 'font-semibold' : 'font-medium',
+                  )}
+                >
+                  Assistant
+                </span>
+              </>
+            )}
+          </NavLink>
 
           {TAB_NAV.slice(2).map((item) => (
             <TabItem key={item.to} {...item} />

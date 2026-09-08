@@ -14,8 +14,23 @@ export function MarketingNav() {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
-      className="sticky top-0 z-50 px-4 pt-4 sm:px-6"
+      className="sticky top-0 z-50 px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6"
     >
+      {/* Softens whatever scrolls under the bar — including the status-bar safe
+          area — without painting any color of its own, so the hero glow still
+          reads through to the very top of the screen. Blur only, faded out at
+          the bottom edge so there is no visible seam. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[calc(env(safe-area-inset-top)+4.5rem)] backdrop-blur-[6px]"
+        style={{
+          maskImage:
+            'linear-gradient(180deg, black 0%, black 55%, transparent 100%)',
+          WebkitMaskImage:
+            'linear-gradient(180deg, black 0%, black 55%, transparent 100%)',
+        }}
+      />
+
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-full border border-black/5 bg-white/70 px-4 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         <Link to={ROUTES.home} className="flex items-center gap-2 justify-self-start">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500 text-white">

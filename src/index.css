@@ -175,6 +175,56 @@
   }
 }
 
+/* Assistant chat prose — the same rules as notes, one step up in size, since
+   this is the app talking rather than a field being displayed. */
+.prose-chat {
+  @apply text-[15px] leading-relaxed text-foreground;
+}
+.prose-chat > :first-child { @apply mt-0; }
+.prose-chat > :last-child { @apply mb-0; }
+.prose-chat p { @apply my-2; }
+.prose-chat ul { @apply list-disc pl-5 my-2 space-y-1; }
+.prose-chat ol { @apply list-decimal pl-5 my-2 space-y-1; }
+.prose-chat a {
+  @apply text-primary underline underline-offset-2 hover:opacity-80;
+}
+.prose-chat strong { @apply font-semibold; }
+.prose-chat em { @apply italic; }
+.prose-chat code {
+  @apply rounded bg-muted px-1 py-0.5 text-[13px] font-mono;
+}
+
+/* The assistant's "thinking" line: a highlight travelling across the text,
+   which reads as work in progress in a way a spinner next to prose does not. */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--muted-foreground)) 35%,
+    hsl(var(--foreground)) 50%,
+    hsl(var(--muted-foreground)) 65%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background: none;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
 /* Rendered markdown (contact notes) */
 .prose-notes {
   @apply text-sm leading-relaxed text-foreground;

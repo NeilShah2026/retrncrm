@@ -3,10 +3,12 @@ import { Toaster } from 'sonner'
 import { ThemeProvider, useTheme } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UIProvider } from '@/context/ui-context'
+import { AssistantProvider } from '@/context/assistant-context'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { AssistantPage } from '@/pages/AssistantPage'
 import { ContactsPage } from '@/pages/ContactsPage'
 import { ContactDetailPage } from '@/pages/ContactDetailPage'
 import { TagsPage } from '@/pages/TagsPage'
@@ -43,22 +45,25 @@ function ThemedToaster() {
 function AppEntry() {
   return (
     <RequireAuth>
-      <UIProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="contacts" element={<ContactsPage />} />
-            <Route path="contacts/:id" element={<ContactDetailPage />} />
-            <Route path="college" element={<CollegePage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="pipeline" element={<PipelinePage />} />
-            <Route path="templates" element={<TemplatesPage />} />
-            <Route path="tags" element={<TagsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
-          </Route>
-        </Routes>
-      </UIProvider>
+      <AssistantProvider>
+        <UIProvider>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="assistant" element={<AssistantPage />} />
+              <Route path="contacts" element={<ContactsPage />} />
+              <Route path="contacts/:id" element={<ContactDetailPage />} />
+              <Route path="college" element={<CollegePage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="pipeline" element={<PipelinePage />} />
+              <Route path="templates" element={<TemplatesPage />} />
+              <Route path="tags" element={<TagsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
+            </Route>
+          </Routes>
+        </UIProvider>
+      </AssistantProvider>
     </RequireAuth>
   )
 }
