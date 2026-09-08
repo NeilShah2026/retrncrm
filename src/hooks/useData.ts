@@ -40,27 +40,33 @@ function useRealtimeTable<T>(
   mapRow: (row: never) => T,
 ): T[] | undefined {
   const { user } = useAuth()
+  // Key on the id, not the object: the auth client hands out a fresh user
+  // object on every auth event (initial session, sign-in, token refresh),
+  // and each one used to restart every subscription in the app.
+  const userId = user?.id
   const [data, setData] = React.useState<T[] | undefined>(undefined)
 
   React.useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setData(undefined)
       return
     }
     let active = true
     setData(undefined)
-    markLoading(table)
 
     async function load() {
+      const attempt = markLoading(table)
       const { data: rows, error } = await supabase.from(table).select('*')
-      if (!active) return
+      // Status is settled by attempt id, so a late failure from a torn-down
+      // effect can't mask a newer success — and vice versa. Data is only
+      // applied while this effect is still the live one.
       if (error) {
         console.error(`Failed to load ${table}`, error)
-        markFailed(table, error.message)
+        markFailed(table, error.message, attempt)
         return
       }
-      setData((rows as never[]).map(mapRow))
-      markLoaded(table)
+      if (active) setData((rows as never[]).map(mapRow))
+      markLoaded(table, attempt)
     }
     void load()
     const unregister = registerReloader(table, () => void load())
@@ -69,10 +75,10 @@ function useRealtimeTable<T>(
     // reuses any existing channel with the same topic name, and removal is
     // async — a fast remount can get back an already-subscribed channel.
     const channel = supabase
-      .channel(`${table}-${user.id}-${crypto.randomUUID()}`)
+      .channel(`${table}-${userId}-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
         () => void load(),
       )
       .subscribe()
@@ -82,7 +88,7 @@ function useRealtimeTable<T>(
       unregister()
       void supabase.removeChannel(channel)
     }
-  }, [user, table, mapRow])
+  }, [userId, table, mapRow])
 
   return data
 }

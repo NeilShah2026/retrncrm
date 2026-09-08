@@ -62,13 +62,11 @@ export function DashboardPage() {
           title="Dashboard"
           description="What to do next, who you’re seeing, and who’s gone quiet."
         >
+          {/* The sidebar already carries the primary "Say who you met";
+              the page header offers the form path as the secondary. */}
           <Button variant="outline" onClick={openNewContact}>
             <UserPlus />
             New contact
-          </Button>
-          <Button onClick={openVoiceCapture}>
-            <PenLine />
-            Say who you met
           </Button>
         </PageHeader>
       }

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
  * how the app says "a model wrote this" without a sparkle icon.
  */
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-sm border px-1.5 py-px text-xs font-medium leading-4',
+  'inline-flex items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 py-px text-xs font-medium leading-4',
   {
     variants: {
       variant: {

@@ -130,7 +130,7 @@ export function ContactsTable({
                   )}
                 </div>
               </td>
-              <td className="px-3 py-0">
+              <td className="whitespace-nowrap px-3 py-0">
                 <div className="flex items-center gap-2">
                   <time className="tnum text-text-secondary">
                     {c.lastContactDate ? formatRelativeShort(c.lastContactDate) : '—'}
@@ -138,8 +138,10 @@ export function ContactsTable({
                   <ReconnectBadge contact={c} />
                 </div>
               </td>
-              <td className="px-3 py-0 text-text-secondary">{cadence.short}</td>
-              <td className="tnum px-3 py-0 text-text-secondary">{formatDateShort(c.dateMet)}</td>
+              <td className="whitespace-nowrap px-3 py-0 text-text-secondary">{cadence.short}</td>
+              <td className="tnum whitespace-nowrap px-3 py-0 text-text-secondary">
+                {formatDateShort(c.dateMet)}
+              </td>
               <td className="px-1 py-0 text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

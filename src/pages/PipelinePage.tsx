@@ -196,7 +196,7 @@ export function PipelinePage() {
                   onDrop={() => void moveTo(stage)}
                   className={cn(
                     'flex w-[82vw] max-w-[280px] shrink-0 snap-start flex-col rounded-lg border bg-bg-sunken/40 transition-colors duration-fast',
-                    'sm:w-[240px] xl:w-auto xl:min-w-[200px] xl:flex-1',
+                    'sm:w-[240px] xl:w-auto xl:min-w-[176px] xl:flex-1',
                     dragOverStage === stage && 'border-brand bg-brand/5',
                   )}
                 >
