@@ -2,6 +2,13 @@ import * as React from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/auth/AuthProvider'
 import {
+  markFailed,
+  markLoaded,
+  markLoading,
+  registerReloader,
+  type TableName,
+} from '@/lib/loadStatus'
+import {
   rowToContact,
   rowToOpportunity,
   rowToTag,
@@ -16,14 +23,14 @@ import type {
   Tag,
 } from '@/types'
 
-type TableName = 'contacts' | 'tags' | 'opportunities' | 'templates' | 'events'
-
 /**
  * Reactive read for one table, scoped to the signed-in user. Fetches once on
  * mount/user-change, then re-fetches whenever Supabase Realtime reports any
- * insert/update/delete on that table for this user. Refetching the whole
- * list on any change (rather than patching state surgically) keeps this
- * simple — personal-CRM data is small enough that it's not a real cost.
+ * insert/update/delete on that table for this user.
+ *
+ * `undefined` means "not loaded yet". A failed load stays `undefined` and
+ * reports to `loadStatus`, so a page can tell "empty" from "couldn't reach
+ * the database" — wrap the render in `NetworkGate` to get both for free.
  *
  * Mutations go through the repositories in `@/services`; components never
  * write to Supabase directly.
@@ -42,24 +49,25 @@ function useRealtimeTable<T>(
     }
     let active = true
     setData(undefined)
+    markLoading(table)
 
     async function load() {
       const { data: rows, error } = await supabase.from(table).select('*')
       if (!active) return
       if (error) {
         console.error(`Failed to load ${table}`, error)
-        setData([])
+        markFailed(table, error.message)
         return
       }
       setData((rows as never[]).map(mapRow))
+      markLoaded(table)
     }
     void load()
+    const unregister = registerReloader(table, () => void load())
 
     // Topic must be unique per subscription attempt: Supabase's client
     // reuses any existing channel with the same topic name, and removal is
-    // async — a fast remount (React StrictMode, quick navigation) can call
-    // `.channel()` again before the old one finishes being removed, getting
-    // back an already-subscribed channel and crashing on `.on()`.
+    // async — a fast remount can get back an already-subscribed channel.
     const channel = supabase
       .channel(`${table}-${user.id}-${crypto.randomUUID()}`)
       .on(
@@ -71,6 +79,7 @@ function useRealtimeTable<T>(
 
     return () => {
       active = false
+      unregister()
       void supabase.removeChannel(channel)
     }
   }, [user, table, mapRow])

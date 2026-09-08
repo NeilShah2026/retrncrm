@@ -18,8 +18,14 @@ export const ROUTES = {
   assistant: '/app/assistant',
   college: '/app/college',
   calendar: '/app/calendar',
+  /** Opens the calendar with the new-meeting form already up. */
+  calendarNew: '/app/calendar?new=1',
   pipeline: '/app/pipeline',
+  /** Opens the board with the new-opportunity form already up. */
+  pipelineNew: '/app/pipeline?new=1',
   templates: '/app/templates',
+  /** Opens the templates page with the compose dialog on one template. */
+  templateUse: (id: string) => `/app/templates?use=${encodeURIComponent(id)}`,
   tags: '/app/tags',
   settings: '/app/settings',
 } as const
