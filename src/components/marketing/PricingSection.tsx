@@ -1,18 +1,15 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowRight, Check, GraduationCap } from 'lucide-react'
+import { Check, GraduationCap } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
-
-const EASE = [0.22, 1, 0.36, 1] as const
 
 type Billing = 'monthly' | 'yearly'
 
 interface Tier {
   name: string
-  badge?: string
-  featured?: boolean
+  recommended?: boolean
   price: (b: Billing) => { amount: string; period?: string; note?: string }
   subhead: string
   featuresLead?: string
@@ -30,35 +27,34 @@ const TIERS: Tier[] = [
     subhead: 'Start building your network today',
     features: [
       'Up to 30 contacts',
-      'Manual contact capture (name, company, how you met, notes)',
-      'Tags & filters',
+      'Manual capture: name, company, how you met, notes',
+      'Tags and filters',
       'Last-contact tracking',
       'Dashboard overview',
-      'Private & synced to your account',
+      'Private and synced to your account',
     ],
     cta: 'Get started free',
     href: ROUTES.login,
   },
   {
     name: 'Student',
-    badge: 'Most popular',
-    featured: true,
+    recommended: true,
     price: (b) =>
       b === 'monthly'
         ? { amount: '$5', period: '/mo' }
         : { amount: '$50', period: '/yr', note: 'billed yearly' },
-    subhead: 'Verify your .edu email to unlock everything',
-    featuresLead: 'Everything in Free, plus:',
+    subhead: 'Verify a .edu email for everything',
+    featuresLead: 'Everything in Free, plus',
     features: [
       'Unlimited contacts',
-      'Photo/business card capture (OCR)',
-      'Voice-to-contact quick add',
-      'Recruiting pipeline stages (coffee chat → applied → interview → offer)',
-      'Reconnect suggestions & smart reminders',
-      'CSV/JSON export',
+      'Photo and business-card capture',
+      'One-line capture, typed or spoken',
+      'Recruiting pipeline: coffee chat → applied → interview → offer',
+      'Reconnect suggestions and reminders',
+      'CSV and JSON export',
     ],
     cta: 'Verify .edu',
-    ctaMicro: 'Free for Babson students — verify your @babson.edu email',
+    ctaMicro: 'Free for Babson students with a verified @babson.edu email',
     href: `${ROUTES.login}?plan=student`,
   },
   {
@@ -67,27 +63,27 @@ const TIERS: Tier[] = [
       b === 'monthly'
         ? { amount: '$15', period: '/mo' }
         : { amount: '$150', period: '/yr', note: 'billed yearly' },
-    subhead: 'For professionals building their network',
-    featuresLead: 'Everything in Free, plus:',
+    subhead: 'For professionals building a network',
+    featuresLead: 'Everything in Free, plus',
     features: [
       'Unlimited contacts',
-      'Photo/business card capture (OCR)',
-      'Voice-to-contact quick add',
-      'Pipeline stages & custom statuses',
-      'Reconnect suggestions & smart reminders',
-      'CSV/JSON export',
+      'Photo and business-card capture',
+      'One-line capture, typed or spoken',
+      'Pipeline stages and custom statuses',
+      'Reconnect suggestions and reminders',
+      'CSV and JSON export',
     ],
     cta: 'Get started',
     href: `${ROUTES.login}?plan=standard`,
   },
   {
-    name: 'Groups & Institutions',
+    name: 'Groups & institutions',
     price: () => ({ amount: 'Custom' }),
-    subhead: 'For colleges, clubs, and career centers',
+    subhead: 'For colleges, clubs and career centers',
     features: [
       'Everything in Standard, for every member',
       'Bulk seat licensing',
-      'Admin dashboard (optional, future)',
+      'Admin dashboard (planned)',
       'Onboarding support for your org',
     ],
     cta: 'Contact us',
@@ -96,200 +92,101 @@ const TIERS: Tier[] = [
   },
 ]
 
-const fadeUp = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: '-100px' },
-}
-
+/**
+ * Four tiers in one hairline grid. The recommended plan gets the primary
+ * button and a label — nothing else is louder than anything else.
+ */
 export function PricingSection() {
   const [billing, setBilling] = React.useState<Billing>('monthly')
 
   return (
-    <div id="pricing" className="relative overflow-hidden py-20 sm:py-32">
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-24 h-[380px] w-[620px] -translate-x-1/2 rounded-full bg-indigo-600/12 blur-[130px]"
-        animate={{ opacity: [0.5, 0.9, 0.5] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
+    <section id="pricing" className="border-t bg-bg-sunken/50">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-xl">
+            <p className="text-label text-muted-foreground">Pricing</p>
+            <h2 className="text-display mt-3 text-3xl sm:text-4xl">Start free. Upgrade when you’re ready.</h2>
+          </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Babson offer */}
-        <motion.div
-          {...fadeUp}
-          transition={{ duration: 0.6, ease: EASE }}
-          className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-2.5 rounded-2xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/12 via-violet-400/10 to-rose-400/10 px-4 py-3 text-center text-sm text-white/85"
-        >
-          <GraduationCap className="h-4 w-4 shrink-0 text-indigo-300" />
-          <span>
-            <span className="font-semibold text-white">Babson students:</span>{' '}
-            any student with a verified{' '}
-            <span className="font-semibold text-white">@babson.edu</span> email gets
-            Retrn <span className="font-semibold text-white">free</span> — every paid
-            feature, no card.
-          </span>
-        </motion.div>
-
-        {/* Heading */}
-        <div className="text-center">
-          <motion.p
-            {...fadeUp}
-            transition={{ duration: 0.5, ease: EASE }}
-            className="text-xs font-semibold uppercase tracking-wider text-rose-300"
-          >
-            Pricing
-          </motion.p>
-          <motion.h2
-            {...fadeUp}
-            transition={{ duration: 0.6, delay: 0.05, ease: EASE }}
-            className="mt-3 font-serif text-3xl font-medium tracking-tight text-white sm:text-4xl"
-          >
-            Start free. Upgrade when you're ready.
-          </motion.h2>
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 items-center rounded-md border bg-background p-0.5" role="group" aria-label="Billing period">
+              {(['monthly', 'yearly'] as const).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBilling(b)}
+                  aria-pressed={billing === b}
+                  className={cn(
+                    'h-full rounded-sm px-3 text-xs font-medium capitalize transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                    billing === b ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">Two months free yearly</span>
+          </div>
         </div>
 
-        {/* Billing toggle */}
-        <motion.div
-          {...fadeUp}
-          transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-          className="mt-8 flex items-center justify-center gap-3"
-        >
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1">
-            {(['monthly', 'yearly'] as const).map((b) => (
-              <button
-                key={b}
-                onClick={() => setBilling(b)}
-                className={cn(
-                  'relative rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors',
-                  billing === b ? 'text-black' : 'text-white/60 hover:text-white',
-                )}
-              >
-                {billing === b && (
-                  <motion.span
-                    layoutId="billing-pill"
-                    className="absolute inset-0 rounded-full bg-white"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                  />
-                )}
-                <span className="relative">{b}</span>
-              </button>
-            ))}
-          </div>
-          <span className="hidden text-xs text-emerald-300 sm:inline">
-            2 months free with yearly
+        <p className="mt-8 flex items-start gap-2 text-sm text-text-secondary">
+          <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <span>
+            <span className="font-medium text-foreground">Babson students:</span> a verified
+            @babson.edu email gets every paid feature free, no card.
           </span>
-        </motion.div>
+        </p>
 
-        {/* Cards */}
-        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {TIERS.map((tier, i) => (
-            <PricingCard key={tier.name} tier={tier} billing={billing} index={i} />
+        <div className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-2 xl:grid-cols-4">
+          {TIERS.map((tier) => (
+            <PricingCard key={tier.name} tier={tier} billing={billing} />
           ))}
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function PricingCard({
-  tier,
-  billing,
-  index,
-}: {
-  tier: Tier
-  billing: Billing
-  index: number
-}) {
+function PricingCard({ tier, billing }: { tier: Tier; billing: Billing }) {
   const price = tier.price(billing)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.6, delay: index * 0.07, ease: EASE }}
-      className={cn(
-        'relative flex flex-col rounded-2xl border p-6',
-        tier.featured
-          ? 'border-indigo-400/40 bg-indigo-500/[0.07] shadow-[0_30px_80px_-30px_rgba(99,102,241,0.5)] xl:-translate-y-3'
-          : 'border-white/10 bg-white/[0.02]',
-      )}
-    >
-      {tier.featured && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-px left-1/2 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-indigo-400/70 to-transparent"
-        />
-      )}
-
-      {tier.badge && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-white shadow-lg">
-          {tier.badge}
-        </span>
-      )}
-
-      <div className="mb-1 mt-2 text-sm font-semibold text-white">{tier.name}</div>
-
-      <div className="flex items-baseline gap-1">
-        <span className="font-serif text-4xl font-medium text-white">{price.amount}</span>
-        {price.period && (
-          <span className="text-sm text-white/50">{price.period}</span>
+    <div className="flex flex-col bg-background p-6">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{tier.name}</h3>
+        {tier.recommended && (
+          <span className="rounded-sm border px-1.5 py-px text-xs font-medium text-text-secondary">
+            Recommended
+          </span>
         )}
       </div>
-      <div className="mt-1 h-4 text-xs text-white/40">{price.note ?? ''}</div>
 
-      <p className="mt-3 min-h-[2.5rem] text-sm leading-snug text-white/55">
-        {tier.subhead}
-      </p>
+      <div className="mt-4 flex items-baseline gap-1">
+        <span className="tnum text-3xl font-semibold tracking-[-0.02em]">{price.amount}</span>
+        {price.period && <span className="text-sm text-muted-foreground">{price.period}</span>}
+      </div>
+      <div className="mt-1 h-4 text-xs text-muted-foreground">{price.note ?? ''}</div>
 
-      {tier.external ? (
-        <a
-          href={tier.href}
-          className={cn(
-            'mt-5 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all hover:scale-[1.02]',
-            'border border-white/15 text-white hover:bg-white/[0.06]',
-          )}
-        >
-          {tier.cta}
-        </a>
-      ) : (
-        <Link
-          to={tier.href}
-          className={cn(
-            'mt-5 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all hover:scale-[1.02]',
-            tier.featured
-              ? 'bg-white text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.25)]'
-              : 'border border-white/15 text-white hover:bg-white/[0.06]',
-          )}
-        >
-          {tier.cta}
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      )}
+      <p className="mt-3 min-h-[2.5rem] text-sm leading-snug text-text-secondary">{tier.subhead}</p>
+
+      <Button variant={tier.recommended ? 'default' : 'outline'} asChild className="mt-5 w-full">
+        {tier.external ? <a href={tier.href}>{tier.cta}</a> : <Link to={tier.href}>{tier.cta}</Link>}
+      </Button>
 
       {tier.ctaMicro && (
-        <p className="mt-2 text-center text-[11px] leading-snug text-indigo-200/70">
-          {tier.ctaMicro}
-        </p>
+        <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">{tier.ctaMicro}</p>
       )}
 
-      <div className="mt-6 space-y-2.5 border-t border-white/[0.08] pt-6">
+      <ul className="mt-6 space-y-2 border-t pt-5">
         {tier.featuresLead && (
-          <p className="text-xs font-medium text-white/70">{tier.featuresLead}</p>
+          <li className="text-xs font-medium text-text-secondary">{tier.featuresLead}</li>
         )}
         {tier.features.map((f) => (
-          <div key={f} className="flex items-start gap-2.5">
-            <Check
-              className={cn(
-                'mt-0.5 h-4 w-4 shrink-0',
-                tier.featured ? 'text-indigo-300' : 'text-emerald-400/80',
-              )}
-            />
-            <span className="text-sm leading-snug text-white/70">{f}</span>
-          </div>
+          <li key={f} className="flex items-start gap-2 text-sm leading-snug text-text-secondary">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {f}
+          </li>
         ))}
-      </div>
-    </motion.div>
+      </ul>
+    </div>
   )
 }

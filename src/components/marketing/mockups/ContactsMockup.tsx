@@ -1,108 +1,69 @@
-import { motion } from 'framer-motion'
-import { Link2, MapPin, Sparkles } from 'lucide-react'
 import { MockAvatar, MockSurface, MockTag } from './primitives'
 
 interface Person {
-  initials: string
-  color: React.ComponentProps<typeof MockAvatar>['color']
   name: string
   role: string
-  met: string
-  tags: { label: string; tone: React.ComponentProps<typeof MockTag>['tone'] }[]
+  company: string
+  tags: { label: string; tone: 'blue' | 'green' | 'amber' | 'teal' | 'slate' }[]
+  last: string
+  cadence: string
 }
 
 const PEOPLE: Person[] = [
-  {
-    initials: 'DO',
-    color: 'orange',
-    name: 'David Osei',
-    role: 'Co-founder & CTO · Vanta',
-    met: 'MIT Hackathon',
-    tags: [
-      { label: 'founder', tone: 'indigo' },
-      { label: 'mentor', tone: 'violet' },
-    ],
-  },
-  {
-    initials: 'PN',
-    color: 'fuchsia',
-    name: 'Priya Nair',
-    role: 'Product Manager · Figma',
-    met: 'Career fair',
-    tags: [{ label: 'recruiter', tone: 'emerald' }],
-  },
-  {
-    initials: 'MC',
-    color: 'sky',
-    name: 'Marcus Chen',
-    role: 'SWE · Stripe',
-    met: 'Coffee chat',
-    tags: [{ label: 'referral', tone: 'amber' }],
-  },
+  { name: 'David Osei', role: 'Co-founder', company: 'Vanta', tags: [{ label: 'founder', tone: 'blue' }, { label: 'mentor', tone: 'teal' }], last: '3mo', cadence: 'Quarterly' },
+  { name: 'Priya Nair', role: 'Product Manager', company: 'Figma', tags: [{ label: 'recruiter', tone: 'green' }], last: '2w', cadence: 'Monthly' },
+  { name: 'Marcus Chen', role: 'Software Engineer', company: 'Stripe', tags: [{ label: 'referral', tone: 'amber' }], last: '5d', cadence: '—' },
+  { name: 'Grace Liu', role: 'Scout', company: 'Sequoia', tags: [{ label: 'investor', tone: 'slate' }], last: '9mo', cadence: 'Quarterly' },
 ]
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.55, delay: 0.15 + i * 0.12, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-}
-
+/** The contacts table, plus the one-line capture bar above it. */
 export function ContactsMockup() {
   return (
-    <MockSurface className="w-full max-w-md p-5">
-      {/* LinkedIn paste bar */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="mb-4 flex items-center gap-2.5 rounded-xl border border-indigo-400/20 bg-indigo-500/[0.07] px-3 py-2.5"
-      >
-        <Link2 className="h-4 w-4 shrink-0 text-indigo-300" />
-        <span className="flex-1 truncate text-[13px] text-white/50">
-          linkedin.com/in/davidosei
+    <MockSurface className="w-full">
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <span className="flex h-7 flex-1 items-center rounded-md border px-2 text-[12px] text-muted-foreground">
+          Sarah Chen, PM at Fidelity, career fair, follow up in a month
         </span>
-        <span className="flex items-center gap-1 rounded-lg bg-indigo-500 px-2.5 py-1 text-[11px] font-semibold text-white">
-          <Sparkles className="h-3 w-3" />
-          Autofill
+        <span className="flex h-7 items-center rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground">
+          Save contact
         </span>
-      </motion.div>
-
-      <div className="space-y-2">
-        {PEOPLE.map((p, i) => (
-          <motion.div
-            key={p.name}
-            custom={i}
-            variants={cardVariants}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-40px' }}
-            className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
-          >
-            <MockAvatar initials={p.initials} color={p.color} size={38} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-[13px] font-semibold text-white">
-                  {p.name}
-                </span>
-                {p.tags.map((t) => (
-                  <MockTag key={t.label} tone={t.tone}>
-                    {t.label}
-                  </MockTag>
-                ))}
-              </div>
-              <p className="mt-0.5 truncate text-[11px] text-white/45">{p.role}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1 text-[10px] text-white/35">
-              <MapPin className="h-3 w-3" />
-              {p.met}
-            </div>
-          </motion.div>
-        ))}
       </div>
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="h-7 bg-bg-sunken text-left text-[11px] text-muted-foreground [&>th]:border-b [&>th]:px-3 [&>th]:font-medium">
+            <th>Name</th>
+            <th>Company</th>
+            <th className="hidden sm:table-cell">Tags</th>
+            <th>Last</th>
+            <th className="hidden sm:table-cell">Cadence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PEOPLE.map((p) => (
+            <tr key={p.name} className="h-9 border-b last:border-b-0 [&>td]:px-3">
+              <td>
+                <span className="flex items-center gap-2">
+                  <MockAvatar name={p.name} size={20} />
+                  <span className="truncate font-medium">{p.name}</span>
+                  <span className="hidden truncate text-muted-foreground lg:inline">{p.role}</span>
+                </span>
+              </td>
+              <td className="text-text-secondary">{p.company}</td>
+              <td className="hidden sm:table-cell">
+                <span className="flex gap-1">
+                  {p.tags.map((t) => (
+                    <MockTag key={t.label} tone={t.tone}>
+                      {t.label}
+                    </MockTag>
+                  ))}
+                </span>
+              </td>
+              <td className="tnum text-text-secondary">{p.last}</td>
+              <td className="hidden text-text-secondary sm:table-cell">{p.cadence}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </MockSurface>
   )
 }

@@ -89,7 +89,7 @@ export function EduVerificationCard() {
           </div>
           <p className="text-sm text-muted-foreground">
             <span className="break-all font-medium text-foreground">{edu.email}</span>{' '}
-            is verified, so every paid feature is unlocked on this account at no
+            is verified, so every paid feature is on for this account at no
             charge.
           </p>
           {edu.via === 'account-email' ? (
