@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
 import { syncAccountEmail } from '@/lib/eduVerification'
 import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
+import type { DashboardLayout } from '@/lib/dashboardLayout'
 
 interface AuthResult {
   error: string | null
@@ -22,6 +23,8 @@ interface AuthContextValue {
   updateName: (name: string) => Promise<AuthResult>
   updateCollege: (college: string) => Promise<AuthResult>
   updateProfile: (profile: ShareProfile) => Promise<AuthResult>
+  /** Persists the home screen's widget layout on the account, not the device. */
+  updateDashboardLayout: (layout: DashboardLayout) => Promise<AuthResult>
   markOnboarded: () => Promise<AuthResult>
 }
 
@@ -122,6 +125,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   )
 
+  const updateDashboardLayout = React.useCallback(
+    async (layout: DashboardLayout): Promise<AuthResult> => {
+      const { error } = await supabase.auth.updateUser({
+        data: { dashboard_layout: layout },
+      })
+      return { error: error?.message ?? null }
+    },
+    [],
+  )
+
   const markOnboarded = React.useCallback(async (): Promise<AuthResult> => {
     const { error } = await supabase.auth.updateUser({ data: { onboarded: true } })
     return { error: error?.message ?? null }
@@ -140,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateName,
       updateCollege,
       updateProfile,
+      updateDashboardLayout,
       markOnboarded,
     }),
     [
@@ -153,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateName,
       updateCollege,
       updateProfile,
+      updateDashboardLayout,
       markOnboarded,
     ],
   )

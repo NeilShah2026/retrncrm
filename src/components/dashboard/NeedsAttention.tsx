@@ -39,18 +39,20 @@ export function NeedsAttention({ contacts, limit = 6 }: Props) {
   )
 
   return (
-    <Panel>
-      <PanelHeader
-        action={
-          overdue.length > 0 && (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to={ROUTES.contactsOverdue}>View all</Link>
-            </Button>
-          )
-        }
-      >
-        Needs a nudge
-      </PanelHeader>
+    <Card className="h-full">
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlarmClock className="h-4 w-4 text-amber-500" />
+            <h2 className="font-semibold">Needs a nudge</h2>
+          </div>
+          <Link
+            to={ROUTES.contactsOverdue}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            View all
+          </Link>
+        </div>
 
       {overdue.length === 0 ? (
         <p className="px-4 py-6 text-sm text-muted-foreground">
