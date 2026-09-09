@@ -20,7 +20,9 @@ import {
   useEvents,
   useOpportunities,
   useTagMap,
+  useTags,
 } from '@/hooks/useData'
+import { useDashboardLayout } from '@/hooks/useDashboardLayout'
 import { useUI } from '@/context/ui-context'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { fullName, formatDateShort, daysSince } from '@/lib/format'
@@ -42,12 +44,29 @@ export function DashboardPage() {
   const tagMap = useTagMap()
   const { openNewContact, openVoiceCapture, openSearch } = useUI()
 
+  const ctx: WidgetContext = {
+    contacts,
+    opportunities: opportunities ?? [],
+    events: events ?? [],
+    contactMap,
+    tagMap,
+    tags: tags ?? [],
+    stats,
+    ready: opportunities !== undefined && events !== undefined,
+  }
+
   return (
     <PageShell
       mobile={{
         leading: <Logo className="pl-0.5" />,
         trailing: (
           <>
+            <BarButton
+              onClick={() => setEditing(true)}
+              aria-label="Arrange your dashboard"
+            >
+              <LayoutGrid />
+            </BarButton>
             <BarButton onClick={openSearch} aria-label="Search">
               <Search />
             </BarButton>
