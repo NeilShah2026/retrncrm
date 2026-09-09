@@ -48,6 +48,16 @@ export function UpcomingMeetings({ events, contactMap, limit = 5 }: Props) {
             onClick={() => setFormOpen(true)}
             aria-label="New meeting"
             title="New meeting"
+    <Card className="h-full">
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-sky-500" />
+            <h2 className="font-semibold">Upcoming meetings</h2>
+          </div>
+          <Link
+            to={ROUTES.calendar}
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             <CalendarPlus />
           </Button>

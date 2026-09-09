@@ -130,6 +130,18 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
     <Panel>
       <PanelHeader
         action={
+    <Card className="h-full border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.05] to-transparent">
+      <CardContent className="p-5">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+            <h2 className="font-semibold">Your briefing</h2>
+            {briefing && !briefing.fromModel && !empty && (
+              <span className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+                {isAiAvailable() ? 'from your data' : 'AI off'}
+              </span>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"
