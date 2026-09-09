@@ -2,6 +2,13 @@ import * as React from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/auth/AuthProvider'
 import {
+  markFailed,
+  markLoaded,
+  markLoading,
+  registerReloader,
+  type TableName,
+} from '@/lib/loadStatus'
+import {
   rowToContact,
   rowToOpportunity,
   rowToTag,
@@ -16,14 +23,14 @@ import type {
   Tag,
 } from '@/types'
 
-type TableName = 'contacts' | 'tags' | 'opportunities' | 'templates' | 'events'
-
 /**
  * Reactive read for one table, scoped to the signed-in user. Fetches once on
  * mount/user-change, then re-fetches whenever Supabase Realtime reports any
- * insert/update/delete on that table for this user. Refetching the whole
- * list on any change (rather than patching state surgically) keeps this
- * simple — personal-CRM data is small enough that it's not a real cost.
+ * insert/update/delete on that table for this user.
+ *
+ * `undefined` means "not loaded yet". A failed load stays `undefined` and
+ * reports to `loadStatus`, so a page can tell "empty" from "couldn't reach
+ * the database" — wrap the render in `NetworkGate` to get both for free.
  *
  * Mutations go through the repositories in `@/services`; components never
  * write to Supabase directly.
@@ -33,10 +40,14 @@ function useRealtimeTable<T>(
   mapRow: (row: never) => T,
 ): T[] | undefined {
   const { user } = useAuth()
+  // Key on the id, not the object: the auth client hands out a fresh user
+  // object on every auth event (initial session, sign-in, token refresh),
+  // and each one used to restart every subscription in the app.
+  const userId = user?.id
   const [data, setData] = React.useState<T[] | undefined>(undefined)
 
   React.useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setData(undefined)
       return
     }
@@ -44,36 +55,40 @@ function useRealtimeTable<T>(
     setData(undefined)
 
     async function load() {
+      const attempt = markLoading(table)
       const { data: rows, error } = await supabase.from(table).select('*')
-      if (!active) return
+      // Status is settled by attempt id, so a late failure from a torn-down
+      // effect can't mask a newer success — and vice versa. Data is only
+      // applied while this effect is still the live one.
       if (error) {
         console.error(`Failed to load ${table}`, error)
-        setData([])
+        markFailed(table, error.message, attempt)
         return
       }
-      setData((rows as never[]).map(mapRow))
+      if (active) setData((rows as never[]).map(mapRow))
+      markLoaded(table, attempt)
     }
     void load()
+    const unregister = registerReloader(table, () => void load())
 
     // Topic must be unique per subscription attempt: Supabase's client
     // reuses any existing channel with the same topic name, and removal is
-    // async — a fast remount (React StrictMode, quick navigation) can call
-    // `.channel()` again before the old one finishes being removed, getting
-    // back an already-subscribed channel and crashing on `.on()`.
+    // async — a fast remount can get back an already-subscribed channel.
     const channel = supabase
-      .channel(`${table}-${user.id}-${crypto.randomUUID()}`)
+      .channel(`${table}-${userId}-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
         () => void load(),
       )
       .subscribe()
 
     return () => {
       active = false
+      unregister()
       void supabase.removeChannel(channel)
     }
-  }, [user, table, mapRow])
+  }, [userId, table, mapRow])
 
   return data
 }

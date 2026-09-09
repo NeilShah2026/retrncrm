@@ -158,7 +158,7 @@ export function PrivacyPolicyPage() {
         </P>
         <P>
           You may request deletion of your entire account by emailing{' '}
-          <a href="mailto:privacy@retrncrm.com" className="text-white underline">
+          <a href="mailto:privacy@retrncrm.com" className="text-brand underline underline-offset-2">
             privacy@retrncrm.com
           </a>
           . When you delete your account, we permanently remove your account data
@@ -184,7 +184,7 @@ export function PrivacyPolicyPage() {
         />
         <P>
           To exercise these rights, use the in-app tools or email{' '}
-          <a href="mailto:privacy@retrncrm.com" className="text-white underline">
+          <a href="mailto:privacy@retrncrm.com" className="text-brand underline underline-offset-2">
             privacy@retrncrm.com
           </a>
           . We will not discriminate against you for exercising them.
@@ -269,7 +269,7 @@ export function PrivacyPolicyPage() {
       <Section n={16} title="Contact us">
         <P>
           Questions about this policy or your data? Email{' '}
-          <a href="mailto:privacy@retrncrm.com" className="text-white underline">
+          <a href="mailto:privacy@retrncrm.com" className="text-brand underline underline-offset-2">
             privacy@retrncrm.com
           </a>
           .

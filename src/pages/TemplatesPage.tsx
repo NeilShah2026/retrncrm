@@ -1,13 +1,21 @@
 import * as React from 'react'
-import { Mail, Pencil, Plus, Send, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Mail, MoreHorizontal, Plus, Send } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
-import { Card, CardContent } from '@/components/ui/card'
+import { NetworkGate } from '@/components/common/NetworkGate'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonRow } from '@/components/ui/skeleton'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TemplateFormDialog } from '@/components/templates/TemplateFormDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
@@ -19,14 +27,22 @@ import { toast } from 'sonner'
 
 export function TemplatesPage() {
   const templates = useTemplates()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<OutreachTemplate | null>(null)
   const [deleting, setDeleting] = React.useState<OutreachTemplate | null>(null)
-  const [composeTemplateId, setComposeTemplateId] = React.useState<
-    string | null
-  >(null)
+  const [composeTemplateId, setComposeTemplateId] = React.useState<string | null>(null)
 
-  const loading = templates === undefined
+  // ⌘K → "Use template" lands here with ?use=<id>.
+  React.useEffect(() => {
+    const use = searchParams.get('use')
+    if (use) {
+      setComposeTemplateId(use)
+      const next = new URLSearchParams(searchParams)
+      next.delete('use')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   function openNew() {
     setEditing(null)
@@ -41,7 +57,7 @@ export function TemplatesPage() {
   async function confirmDelete() {
     if (!deleting) return
     await templateRepo.remove(deleting.id)
-    toast.success(`Deleted "${deleting.name}"`)
+    toast.success(`Deleted “${deleting.name}”`)
   }
 
   return (
@@ -57,91 +73,94 @@ export function TemplatesPage() {
       header={
         <PageHeader
           title="Templates"
-          description="Reusable outreach messages — compose one and we'll fill in the details."
+          description="Outreach you reuse. Pick one and a contact; the placeholders fill from their record."
         >
-          <Button onClick={openNew} className="gap-2">
-            <Plus className="h-4 w-4" />
+          <Button onClick={openNew}>
+            <Plus />
             New template
           </Button>
         </PageHeader>
       }
     >
-      {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full" />
-          ))}
-        </div>
-      ) : templates.length === 0 ? (
-        <EmptyState
-          icon={Mail}
-          title="No templates yet"
-          description="Save a coffee-chat request, thank-you note, or referral ask once and reuse it for every contact."
-          action={<Button onClick={openNew}>Create your first template</Button>}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {templates.map((t) => {
-            const cat = TEMPLATE_CATEGORIES[t.category]
-            return (
-              <Card key={t.id} className="group flex flex-col">
-                <CardContent className="flex flex-1 flex-col p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{t.name}</p>
-                      <Badge variant="secondary" className="mt-1 text-[10px]">
-                        {cat.emoji} {cat.label}
-                      </Badge>
-                    </div>
-                    <div className="flex shrink-0 gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(t)}
-                        aria-label={`Edit ${t.name}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleting(t)}
-                        aria-label={`Delete ${t.name}`}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  {t.subject && (
-                    <p className="mt-2 truncate text-xs font-medium text-muted-foreground">
-                      {t.subject}
-                    </p>
-                  )}
-                  <p className="mt-1 line-clamp-3 flex-1 whitespace-pre-line text-xs text-muted-foreground">
-                    {t.body}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-3 gap-1.5 self-start"
+      <NetworkGate
+        data={templates}
+        table="templates"
+        skeleton={
+          <div className="rounded-lg border" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonRow key={i} className="h-12" />
+            ))}
+          </div>
+        }
+        empty={
+          <EmptyState
+            variant="first-run"
+            icon={Mail}
+            title="No templates yet"
+            description="Save a coffee-chat request, a thank-you, or a referral ask once and reuse it for anyone."
+            action={
+              <Button onClick={openNew}>
+                <Plus />
+                New template
+              </Button>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <ul className="overflow-hidden rounded-lg border bg-card">
+            {list.map((t) => {
+              const cat = TEMPLATE_CATEGORIES[t.category]
+              return (
+                <li
+                  key={t.id}
+                  className="group flex items-center gap-3 border-b px-3 py-2 last:border-b-0 hover:bg-accent/40"
+                >
+                  <button
+                    type="button"
                     onClick={() => setComposeTemplateId(t.id)}
+                    className="flex min-w-0 flex-1 flex-col text-left focus-visible:outline-none"
                   >
-                    <Send className="h-3.5 w-3.5" />
-                    Use template
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{t.name}</span>
+                      <Badge variant="outline">{cat.label}</Badge>
+                    </span>
+                    <span className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {t.subject ? (
+                        <>
+                          <span className="text-text-secondary">{t.subject}</span>
+                          <span> — </span>
+                        </>
+                      ) : null}
+                      {t.body.replace(/\s+/g, ' ').slice(0, 140)}
+                    </span>
+                  </button>
+                  <Button size="sm" variant="outline" onClick={() => setComposeTemplateId(t.id)}>
+                    <Send />
+                    Use
                   </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${t.name}`} className="text-muted-foreground">
+                        <MoreHorizontal />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(t)}>Edit</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setDeleting(t)} className="text-danger focus:text-danger">
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </NetworkGate>
 
-      <TemplateFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        template={editing}
-      />
+      <TemplateFormDialog open={formOpen} onOpenChange={setFormOpen} template={editing} />
       <ComposeDialog
         open={Boolean(composeTemplateId)}
         onOpenChange={(o) => !o && setComposeTemplateId(null)}
@@ -150,7 +169,7 @@ export function TemplatesPage() {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Delete "${deleting?.name}"?`}
+        title={`Delete “${deleting?.name}”?`}
         confirmLabel="Delete"
         destructive
         onConfirm={confirmDelete}

@@ -6,7 +6,6 @@ import {
   ClipboardPaste,
   Link2,
   Plus,
-  Sparkles,
   Upload,
   X,
 } from 'lucide-react'
@@ -343,15 +342,15 @@ export function ContactFormDialog({
           <Popover open={liOpen} onOpenChange={setLiOpen}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" className="w-full gap-2">
-                <ClipboardPaste className="h-4 w-4 text-[#0a66c2]" />
-                Paste from LinkedIn to auto-fill
+                <ClipboardPaste />
+                Paste from LinkedIn
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-[min(30rem,88vw)]">
               <p className="mb-2 text-xs text-muted-foreground">
                 Open their LinkedIn profile, select the top section (or the whole
                 page), copy, and paste below — or just paste the profile URL.
-                We'll fill what we can; you review before saving.
+                What can be read is filled in; you review before saving.
               </p>
               <Textarea
                 autoFocus
@@ -375,7 +374,6 @@ export function ContactFormDialog({
                   onClick={applyLinkedIn}
                   className="gap-1"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
                   Fill fields
                 </Button>
               </div>
@@ -457,7 +455,7 @@ export function ContactFormDialog({
                   autoFocus
                   value={form.firstName}
                   onChange={(e) => set('firstName', e.target.value)}
-                  placeholder="Jane"
+                  placeholder="First name"
                 />
               </div>
               <div className="space-y-1.5">
@@ -466,7 +464,7 @@ export function ContactFormDialog({
                   id="lastName"
                   value={form.lastName}
                   onChange={(e) => set('lastName', e.target.value)}
-                  placeholder="Doe"
+                  placeholder="Last name"
                 />
               </div>
               <div className="space-y-1.5">
@@ -475,7 +473,7 @@ export function ContactFormDialog({
                   id="company"
                   value={form.company}
                   onChange={(e) => set('company', e.target.value)}
-                  placeholder="Acme Inc."
+                  placeholder="Company"
                 />
               </div>
               <div className="space-y-1.5">
@@ -484,7 +482,7 @@ export function ContactFormDialog({
                   id="jobTitle"
                   value={form.jobTitle}
                   onChange={(e) => set('jobTitle', e.target.value)}
-                  placeholder="Product Manager"
+                  placeholder="Role or title"
                 />
               </div>
             </div>
@@ -543,7 +541,7 @@ export function ContactFormDialog({
               id="howWeMet"
               value={form.howWeMet}
               onChange={(e) => set('howWeMet', e.target.value)}
-              placeholder="Sat next to him on the bus to Boston…"
+              placeholder="How you met, in a sentence"
               className="min-h-[60px]"
             />
           </div>
@@ -615,7 +613,7 @@ export function ContactFormDialog({
                     id="whereWeMet"
                     value={form.whereWeMet}
                     onChange={(e) => set('whereWeMet', e.target.value)}
-                    placeholder="Peter Pan bus, NYC → Boston"
+                    placeholder="Career fair, a class, a flight…"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -633,7 +631,7 @@ export function ContactFormDialog({
                     id="industry"
                     value={form.industry}
                     onChange={(e) => set('industry', e.target.value)}
-                    placeholder="Finance"
+                    placeholder="Industry"
                   />
                 </div>
               </div>
@@ -646,7 +644,7 @@ export function ContactFormDialog({
                     id="school"
                     value={form.school}
                     onChange={(e) => set('school', e.target.value)}
-                    placeholder="Babson College"
+                    placeholder="School"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -655,7 +653,7 @@ export function ContactFormDialog({
                     id="gradYear"
                     value={form.gradYear}
                     onChange={(e) => set('gradYear', e.target.value)}
-                    placeholder="2026"
+                    placeholder="YYYY"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -664,7 +662,7 @@ export function ContactFormDialog({
                     id="major"
                     value={form.major}
                     onChange={(e) => set('major', e.target.value)}
-                    placeholder="Finance"
+                    placeholder="Industry"
                   />
                 </div>
               </div>
@@ -707,7 +705,7 @@ export function ContactFormDialog({
                     type="email"
                     value={form.email}
                     onChange={(e) => set('email', e.target.value)}
-                    placeholder="jane@example.com"
+                    placeholder="name@school.edu"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -852,7 +850,7 @@ export function ContactFormDialog({
                   id="notes"
                   value={form.notes}
                   onChange={(e) => set('notes', e.target.value)}
-                  placeholder="**Follow up** about the seed round…"
+                  placeholder="Anything worth remembering. Markdown works."
                   className="min-h-[100px] font-mono text-xs"
                 />
               </div>

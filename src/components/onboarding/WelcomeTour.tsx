@@ -1,11 +1,5 @@
 import * as React from 'react'
-import {
-  ArrowRight,
-  Coffee,
-  KanbanSquare,
-  Sparkles,
-  Users,
-} from 'lucide-react'
+import { ArrowRight, Coffee, KanbanSquare, Hand, Users } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +7,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/auth/AuthProvider'
 import { cn } from '@/lib/utils'
 
@@ -35,44 +30,33 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    icon: Sparkles,
-    eyebrow: 'Welcome to Retrn',
+    icon: Hand,
+    eyebrow: 'Welcome',
     title: 'What should we call you?',
-    body: "We'll use it around the app instead of your email.",
+    body: 'Used around the app instead of your email.',
     kind: 'name',
-  },
-  {
-    icon: Sparkles,
-    eyebrow: 'Welcome to Retrn',
-    title: 'Every person you meet, one search away',
-    body: "Career fairs, coffee chats, a bus ride, a flight — Retrn is where you keep track of everyone, so nobody you meet ever falls through the cracks.",
   },
   {
     icon: Users,
     eyebrow: 'Capture',
-    title: 'Add anyone in seconds',
-    body: 'A name and how you met is enough to save. Press "N" anywhere in the app to add someone, or paste a LinkedIn profile to auto-fill the details.',
+    title: 'Every person you meet, one search away',
+    body: 'Career fairs, coffee chats, a bus ride, a flight. Type one line about who you met and Retrn turns it into a contact. Press N anywhere to add someone.',
   },
   {
     icon: Coffee,
     eyebrow: 'Stay in touch',
-    title: "Retrn tells you who to reach out to, and when",
-    body: 'Set a reconnect goal on anyone — monthly, quarterly, whatever fits — and your dashboard will surface exactly who\'s overdue, with a one-click prep brief before you reach out.',
+    title: 'Retrn tells you who to reach out to, and when',
+    body: 'Set a reconnect goal on anyone — monthly, quarterly — and the dashboard surfaces exactly who’s overdue, with a prep brief before you reach out.',
   },
   {
     icon: KanbanSquare,
     eyebrow: 'Follow through',
     title: 'Track your pipeline, not just your contacts',
-    body: 'Log every internship and job on a simple board, link the people who can help, and send outreach with ready-made templates — no blank page, ever.',
+    body: 'Log every internship and job on a board, link the people who can help, and send outreach from templates that fill in from their record.',
   },
 ]
 
-export function WelcomeTour({
-  open,
-  onOpenChange,
-  onDismiss,
-  onComplete,
-}: Props) {
+export function WelcomeTour({ open, onOpenChange, onDismiss, onComplete }: Props) {
   const { user, updateName } = useAuth()
   const [step, setStep] = React.useState(0)
   const [name, setName] = React.useState('')
@@ -80,11 +64,6 @@ export function WelcomeTour({
   const current = STEPS[step]
   const isNameStep = current.kind === 'name'
 
-  // Read the latest user via a ref rather than a dependency: `updateName`
-  // below triggers a Supabase auth-state change, which gives us a new
-  // `user` object while the dialog is still open. If `user` were a
-  // dependency, that alone would re-run this effect and snap `step` back
-  // to 0 right after advancing — "Continue" would look like it does nothing.
   const userRef = React.useRef(user)
   userRef.current = user
 
@@ -118,23 +97,19 @@ export function WelcomeTour({
         <DialogTitle className="sr-only">{current.title}</DialogTitle>
         <DialogDescription className="sr-only">{current.body}</DialogDescription>
 
-        <div className="flex flex-col items-center px-2 pb-2 pt-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-lg">
-            <current.icon className="h-7 w-7" />
-          </div>
+        <div className="flex flex-col px-1 pb-1 pt-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-bg-sunken text-text-secondary">
+            <current.icon className="h-4 w-4" />
+          </span>
 
-          <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-indigo-600">
-            {current.eyebrow}
+          <p className="text-label mt-5 text-muted-foreground">
+            {current.eyebrow} · {step + 1} of {STEPS.length}
           </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            {current.title}
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            {current.body}
-          </p>
+          <h2 className="mt-1.5 text-xl font-semibold tracking-[-0.02em]">{current.title}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{current.body}</p>
 
           {isNameStep && (
-            <input
+            <Input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -142,29 +117,25 @@ export function WelcomeTour({
                 if (e.key === 'Enter') next()
               }}
               placeholder="Your first name"
-              className="mt-4 w-full rounded-lg border bg-background px-3.5 py-2.5 text-center text-sm outline-none transition-colors focus:border-indigo-400"
+              aria-label="Your first name"
+              className="mt-4 h-9"
             />
           )}
 
-          <div className="mt-6 flex items-center gap-1.5">
+          <div className="mt-6 flex items-center gap-1" aria-hidden>
             {STEPS.map((_, i) => (
               <span
                 key={i}
                 className={cn(
-                  'h-1.5 rounded-full transition-all',
-                  i === step ? 'w-5 bg-indigo-500' : 'w-1.5 bg-muted',
+                  'h-1 rounded-full transition-all duration-base',
+                  i === step ? 'w-4 bg-foreground' : 'w-1.5 bg-border',
                 )}
               />
             ))}
           </div>
 
-          <div className="mt-7 flex w-full items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={skip}
-              className="text-muted-foreground"
-            >
+          <div className="mt-5 flex w-full items-center justify-between gap-2">
+            <Button variant="ghost" size="sm" onClick={skip} className="text-muted-foreground">
               Skip
             </Button>
             <div className="flex items-center gap-2">
@@ -173,9 +144,9 @@ export function WelcomeTour({
                   Back
                 </Button>
               )}
-              <Button size="sm" onClick={next} className="gap-1.5">
+              <Button size="sm" onClick={next}>
                 {isNameStep ? 'Continue' : last ? 'Add your first contact' : 'Next'}
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight />
               </Button>
             </div>
           </div>

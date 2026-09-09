@@ -7,7 +7,7 @@ import {
   MapPin,
   Save,
   Send,
-  Sparkles,
+  Lightbulb,
 } from 'lucide-react'
 import {
   Dialog,
@@ -181,12 +181,12 @@ ${suggested}` : suggested))
                     variant="ghost"
                     onClick={() => void suggestPoints()}
                     disabled={suggesting}
-                    className="h-6 gap-1 px-2 text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                    className="h-6 gap-1 px-2 text-xs text-muted-foreground"
                   >
                     {suggesting ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <Sparkles className="h-3 w-3" />
+                      <Lightbulb className="h-3 w-3" />
                     )}
                     {suggesting ? 'Thinking…' : 'Suggest'}
                   </Button>
@@ -258,7 +258,6 @@ ${suggested}` : suggested))
 
           {recent.length === 0 && !contact.howWeMet && !notesHtml && (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              <Sparkles className="mx-auto mb-1.5 h-4 w-4" />
               No history yet — this'll be your first real conversation.
             </p>
           )}

@@ -1,15 +1,7 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import {
-  ArrowUp,
-  Check,
-  Copy,
-  Mic,
-  NotebookPen,
-  Search,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowUp, Check, Copy, Mic, NotebookPen, Search } from 'lucide-react'
 import { useAssistant, type AssistantTurn } from '@/context/assistant-context'
 import { useUI } from '@/context/ui-context'
 import { useContacts, useTagMap, useTags } from '@/hooks/useData'
@@ -21,27 +13,18 @@ import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { renderMarkdown } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { ActionPlan, MatchList } from './AssistantBlocks'
 import type { Contact } from '@/types'
 
 /**
- * The assistant, as a full conversation.
- *
- * This used to be a dialog, which meant the thread was a guest on top of the
- * app: capped height, a scroll region inside a scroll region, and nowhere for
- * an answer to breathe. As a screen it can do what a chat is supposed to do —
- * one column, messages that render their own embedded UI (a plan you approve,
- * the people it found), and a composer that stays where your thumb left it.
- *
- * Asking and telling share the one box on purpose. "Who do I know in fintech?"
- * and "met Priya at the AI meetup, coffee Tuesday at 3" are the same gesture to
- * the person typing; only the reply differs — matches for one, a plan for the
- * other. The model proposes; the person approves; only then is anything
- * written. If the model is unreachable this quietly becomes the fuzzy search it
- * was built on top of — a worse answer, but never no answer.
+ * The assistant, as a thread. Asking and telling share one box: "Who do I
+ * know in fintech?" and "met Priya at the AI meetup" are the same gesture to
+ * the person typing; only the reply differs. The model proposes; the person
+ * approves; only then is anything written. If the model is unreachable this
+ * becomes the fuzzy search it was built on.
  */
 
-/** Openers, grouped so the two halves of the feature are both discoverable. */
 const SUGGESTION_GROUPS = [
   {
     label: 'Ask about your network',
@@ -53,20 +36,19 @@ const SUGGESTION_GROUPS = [
     ],
   },
   {
-    label: 'Record what happened',
+    label: 'Say what happened',
     icon: NotebookPen,
     items: [
-      'Met Priya at the AI meetup — PM at Klaviyo',
+      'Met Priya at the AI meetup, PM at Klaviyo',
       'Coffee with Sarah next Tuesday at 3',
-      'I spoke to Marcus today',
+      'Spoke to Marcus today',
     ],
   },
 ]
 
-/** What the composer offers when it is empty, one at a time. */
 const PLACEHOLDERS = [
-  'Ask about your network, or say what happened…',
-  'Met Priya at the AI meetup — PM at Klaviyo',
+  'Ask about your network, or say what happened',
+  'Met Priya at the AI meetup, PM at Klaviyo',
   'Who should I reconnect with this week?',
 ]
 
@@ -82,29 +64,14 @@ export function AssistantChat() {
   const isMobile = useIsMobile()
 
   const loaded = useContacts()
-  // Stable identity: the roster and the Fuse index both key off this.
   const contacts = React.useMemo(() => loaded ?? [], [loaded])
   const tags = useTags() ?? []
   const tagMap = useTagMap()
 
-  const {
-    turns,
-    setTurns,
-    busy,
-    setBusy,
-    draft,
-    setDraft,
-    session,
-    epoch,
-    pending,
-    handoff,
-  } = useAssistant()
+  const { turns, setTurns, busy, setBusy, draft, setDraft, session, epoch, pending, handoff } =
+    useAssistant()
 
   const threadEnd = React.useRef<HTMLDivElement>(null)
-
-  // Follow-ups land at the bottom of the thread; keep them in view. `auto`
-  // rather than `smooth` on the first paint so returning to a thread you
-  // already had doesn't animate through the whole history.
   const firstPaint = React.useRef(true)
   React.useEffect(() => {
     threadEnd.current?.scrollIntoView({
@@ -114,12 +81,8 @@ export function AssistantChat() {
     firstPaint.current = false
   }, [turns, busy])
 
-  const fuse = React.useMemo(
-    () => buildSearchIndex(contacts, tagMap),
-    [contacts, tagMap],
-  )
+  const fuse = React.useMemo(() => buildSearchIndex(contacts, tagMap), [contacts, tagMap])
 
-  /** The non-AI path, used on its own merits and as the failure path. */
   const keywordFallback = React.useCallback(
     (q: string): AssistantTurn => {
       const found = searchContacts(fuse, q).slice(0, 8)
@@ -131,7 +94,7 @@ export function AssistantChat() {
         answer: {
           answer: found.length
             ? 'Keyword matches from your contacts.'
-            : 'No keyword matches either — try a company or a tag.',
+            : 'No keyword matches either. Try a company or a tag.',
           matches: found.map((contact) => ({ contact, reason: '' })),
           followUps: [],
           actions: [],
@@ -145,19 +108,12 @@ export function AssistantChat() {
     async (q: string) => {
       const trimmed = q.trim()
       if (!trimmed || busy) return
-      // If "New chat" is pressed while this is in flight, the answer belongs to
-      // a thread that no longer exists — drop it rather than resurrecting it.
       const startedAt = epoch.current
       setBusy(true)
       setDraft('')
       try {
         const current = session.current ?? startSession()
-        const { answer, session: next } = await askNetwork(
-          current,
-          trimmed,
-          contacts,
-          tagMap,
-        )
+        const { answer, session: next } = await askNetwork(current, trimmed, contacts, tagMap)
         if (epoch.current !== startedAt) return
         session.current = next
         setTurns((t) => [
@@ -167,42 +123,26 @@ export function AssistantChat() {
             question: trimmed,
             answer,
             fellBack: false,
-            // Everything proposed starts approved; the work is unchecking.
             chosen: answer.actions.map(() => true),
           },
         ])
       } catch (err) {
         if (epoch.current !== startedAt) return
         if (err instanceof AiUnavailableError) {
-          toast.info('AI isn’t set up here — showing keyword matches.')
+          toast.info('AI isn’t set up here. Showing keyword matches.')
         } else {
           console.error(err)
-          toast.error('Couldn’t do that — showing keyword matches instead.')
+          toast.error('Couldn’t do that. Showing keyword matches instead.')
         }
-        // A thread the model never saw can't be followed up on.
         session.current = null
         setTurns((t) => [...t, keywordFallback(trimmed)])
       } finally {
         if (epoch.current === startedAt) setBusy(false)
       }
     },
-    [
-      busy,
-      contacts,
-      tagMap,
-      keywordFallback,
-      session,
-      epoch,
-      setBusy,
-      setDraft,
-      setTurns,
-    ],
+    [busy, contacts, tagMap, keywordFallback, session, epoch, setBusy, setDraft, setTurns],
   )
 
-  // A message handed over from ⌘K, the dashboard, or the nav runs itself — but
-  // only once the contacts have loaded, since there's no roster to ask against
-  // before then. `handoff` is in the deps so a second handover of the *same*
-  // text still fires.
   const askRef = React.useRef(ask)
   askRef.current = ask
   React.useEffect(() => {
@@ -220,24 +160,18 @@ export function AssistantChat() {
     setTurns((t) =>
       t.map((turn) =>
         turn.id === id
-          ? {
-              ...turn,
-              chosen: turn.chosen.map((on, j) => (j === actionIndex ? !on : on)),
-            }
+          ? { ...turn, chosen: turn.chosen.map((on, j) => (j === actionIndex ? !on : on)) }
           : turn,
       ),
     )
   }
 
-  /** Run the approved half of one turn's plan. This is the only writing path. */
   async function runPlan(turn: AssistantTurn) {
     const plan = (turn.answer?.actions ?? []).filter((_, i) => turn.chosen[i])
     if (!plan.length) return
-
     patchTurn(turn.id, { applying: true })
     const outcomes = await applyActions(plan, { contacts, tags })
     patchTurn(turn.id, { applying: false, outcomes })
-
     const done = outcomes.filter((o) => o.status === 'done').length
     const missed = outcomes.length - done
     if (done) {
@@ -245,11 +179,8 @@ export function AssistantChat() {
         description: missed ? `${missed} needed a human — see the list.` : undefined,
       })
     } else {
-      toast.error('Nothing was saved — see the reasons in the list.')
+      toast.error('Nothing was saved. See the reasons in the list.')
     }
-
-    // The roster the thread is holding predates whatever this just created,
-    // so the next message rebuilds it rather than answering from a stale one.
     session.current = null
   }
 
@@ -263,13 +194,9 @@ export function AssistantChat() {
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
         <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-4 md:px-6">
           {!started ? (
-            <EmptyState
-              canAsk={canAsk}
-              contactCount={contacts.length}
-              onPick={(s) => void ask(s)}
-            />
+            <Opening canAsk={canAsk} contactCount={contacts.length} onPick={(s) => void ask(s)} />
           ) : (
-            <div className="space-y-7">
+            <div className="space-y-8">
               {turns.map((turn) => (
                 <TurnBlock
                   key={turn.id}
@@ -304,12 +231,8 @@ export function AssistantChat() {
   )
 }
 
-/**
- * The opening screen. Two columns of openers rather than one list, because
- * the two things this box does — answering and recording — look nothing alike
- * and nobody guesses the second one on their own.
- */
-function EmptyState({
+/** The opening screen: a plain heading and two short lists of openers. */
+function Opening({
   canAsk,
   contactCount,
   onPick,
@@ -319,25 +242,20 @@ function EmptyState({
   onPick: (s: string) => void
 }) {
   return (
-    <div className="flex flex-col items-center py-10 text-center sm:py-16">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/25">
-        <Sparkles className="h-5 w-5" />
-      </div>
-      <h1 className="mt-4 font-serif text-2xl font-medium tracking-tight sm:text-3xl">
-        What can I help you with?
-      </h1>
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">
+    <div className="py-8 sm:py-14">
+      <h1 className="text-xl font-semibold tracking-[-0.02em]">Ask about your network</h1>
+      <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
         {canAsk
-          ? `Ask about the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you've saved, or just say what happened — you approve anything before it's saved.`
-          : 'Add a few people first — there’s nothing to work with yet.'}
+          ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you’ve saved. Say what happened and it proposes what to record; you approve before anything is saved.`
+          : 'Add a few people first. There’s nothing to ask about yet.'}
       </p>
 
       {canAsk && (
-        <div className="mt-8 grid w-full gap-3 text-left sm:grid-cols-2">
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
           {SUGGESTION_GROUPS.map((group) => (
-            <div key={group.label} className="space-y-2">
-              <div className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <group.icon className="h-3.5 w-3.5" />
+            <div key={group.label} className="rounded-lg border">
+              <div className="flex h-9 items-center gap-1.5 border-b px-3 text-xs font-medium text-text-secondary">
+                <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
                 {group.label}
               </div>
               {group.items.map((item) => (
@@ -345,7 +263,7 @@ function EmptyState({
                   key={item}
                   type="button"
                   onClick={() => onPick(item)}
-                  className="block w-full rounded-xl border bg-card/50 px-3.5 py-2.5 text-left text-sm leading-snug transition-colors hover:border-indigo-500/40 hover:bg-accent"
+                  className="flex h-10 w-full items-center border-b px-3 text-left text-sm transition-colors duration-fast last:border-b-0 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
                 >
                   {item}
                 </button>
@@ -358,7 +276,7 @@ function EmptyState({
   )
 }
 
-/** One exchange: what you said, then everything that came back for it. */
+/** One exchange: what you said, then what came back for it. */
 function TurnBlock({
   turn,
   onOpenContact,
@@ -373,66 +291,43 @@ function TurnBlock({
   onGo: (route: string) => void
 }) {
   const { question, answer, fellBack } = turn
-  const empty =
-    answer &&
-    !answer.answer &&
-    answer.matches.length === 0 &&
-    answer.actions.length === 0
+  const empty = answer && !answer.answer && answer.matches.length === 0 && answer.actions.length === 0
 
   return (
     <div className="space-y-4">
-      {/* You. Right-aligned and bubbled — the one thing in the thread that is
-          quoting the person rather than answering them. */}
       <div className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-[15px] leading-relaxed">
+        <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-bg-sunken px-3.5 py-2 text-[15px] leading-relaxed">
           {question}
         </p>
       </div>
 
-      {/* The assistant. Full width, no bubble — a bubble around a block of
-          embedded UI reads as a quote rather than as the app talking. */}
-      <div className="flex gap-3">
-        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white">
-          <Sparkles className="h-3.5 w-3.5" />
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-3">
-          {fellBack && (
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-500">
-              Keyword search
-            </p>
-          )}
-
-          {answer?.answer && <AnswerProse text={answer.answer} />}
-
-          {empty && (
-            <p className="text-[15px] text-muted-foreground">
-              Nobody in your contacts fits that.
-            </p>
-          )}
-
-          {answer && answer.actions.length > 0 && (
-            <ActionPlan
-              actions={answer.actions}
-              chosen={turn.chosen}
-              applying={Boolean(turn.applying)}
-              outcomes={turn.outcomes}
-              onToggle={onToggleAction}
-              onRun={onRun}
-              onGo={onGo}
-            />
-          )}
-
-          {answer && answer.matches.length > 0 && (
-            <MatchList matches={answer.matches} onOpen={onOpenContact} />
-          )}
-        </div>
+      <div className="space-y-3 border-l-2 border-border pl-4">
+        {fellBack && (
+          <p className="text-label text-warning">Keyword search</p>
+        )}
+        {answer?.answer && <AnswerProse text={answer.answer} />}
+        {empty && (
+          <p className="text-[15px] text-muted-foreground">Nobody in your contacts fits that.</p>
+        )}
+        {answer && answer.actions.length > 0 && (
+          <ActionPlan
+            actions={answer.actions}
+            chosen={turn.chosen}
+            applying={Boolean(turn.applying)}
+            outcomes={turn.outcomes}
+            onToggle={onToggleAction}
+            onRun={onRun}
+            onGo={onGo}
+          />
+        )}
+        {answer && answer.matches.length > 0 && (
+          <MatchList matches={answer.matches} onOpen={onOpenContact} />
+        )}
       </div>
     </div>
   )
 }
 
-/** The prose half of an answer, with a copy affordance on hover. */
 function AnswerProse({ text }: { text: string }) {
   const [copied, setCopied] = React.useState(false)
   const html = React.useMemo(() => renderMarkdown(text), [text])
@@ -449,28 +344,21 @@ function AnswerProse({ text }: { text: string }) {
 
   return (
     <div className="group/prose">
-      <div
-        className="prose-chat"
-        // Sanitized in renderMarkdown (marked → DOMPurify).
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-      {/* Under the message rather than floating over its first line, which is
-          where a hover-revealed button ends up covering the text it belongs to. */}
+      {/* Sanitized in renderMarkdown (marked → DOMPurify). */}
+      <div className="prose-chat" dangerouslySetInnerHTML={{ __html: html }} />
       <button
         type="button"
         onClick={() => void copy()}
         aria-label="Copy this answer"
-        className="mt-1 flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/prose:opacity-100"
+        className="mt-1 flex items-center gap-1 rounded-sm px-1 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity duration-fast hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand group-hover/prose:opacity-100"
       >
         {copied ? (
           <>
-            <Check className="h-3 w-3 text-emerald-500" />
-            Copied
+            <Check className="h-3 w-3 text-success" /> Copied
           </>
         ) : (
           <>
-            <Copy className="h-3 w-3" />
-            Copy
+            <Copy className="h-3 w-3" /> Copy
           </>
         )}
       </button>
@@ -478,13 +366,12 @@ function AnswerProse({ text }: { text: string }) {
   )
 }
 
-/** What the model is doing, said in stages so a slow answer still reads as progress. */
 function Thinking({ contactCount, first }: { contactCount: number; first: boolean }) {
   const stages = React.useMemo(
     () =>
       first
         ? [
-            `Reading through ${contactCount} ${contactCount === 1 ? 'person' : 'people'}…`,
+            `Reading ${contactCount} ${contactCount === 1 ? 'person' : 'people'}…`,
             'Working out what you meant…',
             'Putting an answer together…',
           ]
@@ -495,32 +382,20 @@ function Thinking({ contactCount, first }: { contactCount: number; first: boolea
 
   React.useEffect(() => {
     setStage(0)
-    const timer = setInterval(
-      () => setStage((s) => Math.min(s + 1, stages.length - 1)),
-      2600,
-    )
+    const timer = setInterval(() => setStage((s) => Math.min(s + 1, stages.length - 1)), 2600)
     return () => clearInterval(timer)
   }, [stages])
 
   return (
-    <div className="flex gap-3">
-      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white">
-        <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-      </div>
-      <p className="shimmer pt-0.5 text-[15px]" aria-live="polite">
+    <div className="border-l-2 border-border pl-4">
+      <p className="shimmer text-[15px]" aria-live="polite">
         {stages[stage]}
       </p>
     </div>
   )
 }
 
-/**
- * The composer, pinned to the bottom of the screen.
- *
- * A textarea rather than an input: this box takes whole sentences about people
- * you just met, and a single-line field that scrolls sideways makes you lose
- * the start of your own thought.
- */
+/** The composer: a textarea, a small mic, a send button. Pinned to the bottom. */
 function Composer({
   value,
   onChange,
@@ -549,19 +424,12 @@ function Composer({
   const box = React.useRef<HTMLTextAreaElement>(null)
   const [placeholder, setPlaceholder] = React.useState(0)
 
-  // Cycling the placeholder is how someone learns this box takes instructions
-  // and not just questions — one static hint only ever teaches one of them.
   React.useEffect(() => {
     if (value || started) return
-    const timer = setInterval(
-      () => setPlaceholder((i) => (i + 1) % PLACEHOLDERS.length),
-      4000,
-    )
+    const timer = setInterval(() => setPlaceholder((i) => (i + 1) % PLACEHOLDERS.length), 4000)
     return () => clearInterval(timer)
   }, [value, started])
 
-  // Grow with the content, up to a ceiling — past that the box scrolls rather
-  // than eating the conversation above it.
   React.useEffect(() => {
     const el = box.current
     if (!el) return
@@ -572,16 +440,16 @@ function Composer({
   const canSend = Boolean(value.trim()) && !busy && !disabled
 
   return (
-    <div className="shrink-0 bg-gradient-to-t from-background via-background to-transparent pt-2">
-      <div className="mx-auto w-full max-w-3xl px-4 pb-3 md:px-6 md:pb-4">
+    <div className="shrink-0 border-t bg-background">
+      <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-3 md:px-6">
         {followUps.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
             {followUps.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => onFollowUp(f)}
-                className="rounded-full border border-indigo-500/30 bg-indigo-500/[0.06] px-3 py-1.5 text-xs text-indigo-600 transition-colors hover:bg-indigo-500/10 dark:text-indigo-300"
+                className="rounded-sm text-xs text-text-secondary underline-offset-2 transition-colors duration-fast hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 {f}
               </button>
@@ -595,8 +463,9 @@ function Composer({
             if (canSend) onSubmit()
           }}
           className={cn(
-            'rounded-2xl border bg-card shadow-sm transition-colors',
-            'focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/15',
+            'flex items-end gap-1 rounded-lg border bg-background p-1.5 pl-3 transition-colors duration-fast',
+            'focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25',
+            disabled && 'opacity-60',
           )}
         >
           <textarea
@@ -605,8 +474,6 @@ function Composer({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => {
-              // Enter sends on a keyboard; on a phone it has to insert a
-              // newline, since there is no shift to hold.
               if (e.key === 'Enter' && !e.shiftKey && sendOnEnter) {
                 e.preventDefault()
                 if (canSend) onSubmit()
@@ -614,47 +481,33 @@ function Composer({
             }}
             placeholder={
               disabled
-                ? 'Add a few people first…'
+                ? 'Add a few people first'
                 : started
-                  ? 'Ask or tell it something else…'
+                  ? 'Ask or say something else'
                   : PLACEHOLDERS[placeholder]
             }
-            aria-label="Ask the assistant, or tell it what happened"
+            aria-label="Ask about your network, or say what happened"
             disabled={disabled}
-            className="max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+            className="max-h-[200px] min-h-[32px] w-full resize-none bg-transparent py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/70"
           />
-
-          <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
-            <button
-              type="button"
-              onClick={onVoice}
-              aria-label="Say who you met"
-              className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Mic className="h-4 w-4" />
-              <span className="hidden sm:inline">Say it instead</span>
-            </button>
-
-            <button
-              type="submit"
-              disabled={!canSend}
-              aria-label="Send"
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-full transition-all',
-                canSend
-                  ? 'bg-indigo-500 text-white hover:bg-indigo-600 active:scale-95'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onVoice}
+            aria-label="Say who you met"
+            title="Say who you met"
+            className="shrink-0 text-muted-foreground"
+          >
+            <Mic />
+          </Button>
+          <Button type="submit" size="icon" disabled={!canSend} aria-label="Send" className="shrink-0">
+            <ArrowUp />
+          </Button>
         </form>
 
-        <p className="mt-2 h-4 text-center text-[11px] text-muted-foreground">
-          {showDisclaimer
-            ? 'Answers come from what you’ve written down — check anything that matters.'
-            : ''}
+        <p className="mt-1.5 h-4 text-xs text-muted-foreground">
+          {showDisclaimer ? 'Answers come from what you’ve written down. Check anything that matters.' : ''}
         </p>
       </div>
     </div>

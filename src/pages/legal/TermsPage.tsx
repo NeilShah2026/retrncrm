@@ -109,7 +109,7 @@ export function TermsPage() {
         <P>
           We offer a <Strong>14-day money-back guarantee</Strong> on paid plans. If
           you are not satisfied, email{' '}
-          <a href="mailto:billing@retrncrm.com" className="text-white underline">
+          <a href="mailto:billing@retrncrm.com" className="text-brand underline underline-offset-2">
             billing@retrncrm.com
           </a>{' '}
           within 14 days of your initial purchase or renewal and we will refund that
@@ -132,7 +132,7 @@ export function TermsPage() {
           items={[
             'Sign in with your @babson.edu address — by password, magic link, or Google — and the account is verified automatically.',
             'Or sign in with any other address and verify your @babson.edu email from Settings; we email a code to the school address to confirm you control it.',
-            'One @babson.edu address unlocks one Retrn account. The offer is tied to your individual account and is non-transferable.',
+            'One @babson.edu address covers one Retrn account. The offer is tied to your individual account and is non-transferable.',
             <>
               If you can no longer receive mail at that address, or we can no longer
               verify it as an active Babson address, we may end the free access with
@@ -232,7 +232,7 @@ export function TermsPage() {
       <Section n={17} title="Contact">
         <P>
           Questions about these Terms? Email{' '}
-          <a href="mailto:hello@retrncrm.com" className="text-white underline">
+          <a href="mailto:hello@retrncrm.com" className="text-brand underline underline-offset-2">
             hello@retrncrm.com
           </a>
           .

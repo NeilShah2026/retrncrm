@@ -81,15 +81,15 @@ export function EduVerificationCard() {
   // --- Verified -------------------------------------------------------------
   if (edu.verified) {
     return (
-      <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-500/30 dark:bg-indigo-500/5">
+      <Card>
         <CardContent className="p-5">
           <div className="mb-3 flex items-center gap-2">
-            <BadgeCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <BadgeCheck className="h-4 w-4 text-success" />
             <h2 className="font-semibold">Babson student — free</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             <span className="break-all font-medium text-foreground">{edu.email}</span>{' '}
-            is verified, so every paid feature is unlocked on this account at no
+            is verified, so every paid feature is on for this account at no
             charge.
           </p>
           {edu.via === 'account-email' ? (

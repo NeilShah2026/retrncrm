@@ -6,14 +6,13 @@ import {
   CheckCircle2,
   Clock,
   KanbanSquare,
-  Loader2,
   NotebookPen,
   Tag as TagIcon,
   TriangleAlert,
   UserPlus,
-  Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SuggestedBadge } from '@/components/ui/badge'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { markCaughtUp } from '@/lib/caughtUp'
 import { describeAction, type ActionOutcome, type AssistantAction } from '@/lib/ai/actions'
@@ -22,13 +21,9 @@ import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
 
 /**
- * The things the assistant can put *inside* a message.
- *
- * A chat that could only reply in prose would have to describe a person and
- * then make you go find them. These blocks are the answer itself — a plan you
- * can edit and run, a person you can open or catch up with, a receipt for what
- * was saved — so the thread is somewhere work happens rather than somewhere
- * work gets described.
+ * The things the assistant can put inside a message: a plan you can edit and
+ * run, the people it found, a receipt for what was saved. They look like the
+ * rest of the product — hairline panels, rows — not like chat bubbles.
  */
 
 const ACTION_ICON: Record<AssistantAction['type'], typeof UserPlus> = {
@@ -41,13 +36,6 @@ const ACTION_ICON: Record<AssistantAction['type'], typeof UserPlus> = {
   add_opportunity: KanbanSquare,
 }
 
-/**
- * The plan, before it happens.
- *
- * Every line says what it will do in the user's own terms and can be switched
- * off. Once run, the same block becomes the receipt — what was saved, what was
- * skipped and why, and where each result lives. Nothing here deletes anything.
- */
 export function ActionPlan({
   actions,
   chosen,
@@ -68,130 +56,112 @@ export function ActionPlan({
   if (outcomes) {
     const saved = outcomes.filter((o) => o.status === 'done').length
     return (
-      <div className="overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04]">
-        <div className="flex items-center gap-2 border-b border-emerald-500/20 px-3.5 py-2">
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+      <div className="overflow-hidden rounded-lg border">
+        <div className="flex h-9 items-center gap-2 border-b bg-success-soft/60 px-3">
+          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+          <span className="text-xs font-medium text-success">
             {saved === outcomes.length
               ? saved === 1
-                ? 'Saved it'
+                ? 'Saved'
                 : `Saved all ${saved}`
               : `Saved ${saved} of ${outcomes.length}`}
           </span>
         </div>
-        <div className="space-y-1.5 p-3">
+        <ul>
           {outcomes.map((outcome, i) => {
             const ok = outcome.status === 'done'
             return (
-              <div key={i} className="flex items-start gap-2 text-sm">
+              <li key={i} className="flex items-start gap-2 border-b px-3 py-2 text-sm last:border-b-0">
                 {ok ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 ) : (
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className={cn(!ok && 'text-muted-foreground')}>
-                    {outcome.message}
-                  </span>
+                  <span className={cn(!ok && 'text-muted-foreground')}>{outcome.message}</span>
                   {outcome.route && ok && (
                     <button
                       type="button"
                       onClick={() => onGo(outcome.route!)}
-                      className="ml-1.5 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                      className="ml-1.5 text-xs font-medium text-brand hover:underline"
                     >
                       Open
                     </button>
                   )}
                 </span>
-              </div>
+              </li>
             )
           })}
-        </div>
+        </ul>
       </div>
     )
   }
 
   const count = chosen.filter(Boolean).length
   return (
-    <div className="overflow-hidden rounded-xl border border-indigo-500/30 bg-indigo-500/[0.04]">
-      <div className="flex items-center justify-between gap-2 border-b border-indigo-500/20 px-3.5 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex h-9 items-center justify-between gap-2 border-b bg-bg-sunken/60 px-3">
+        <span className="flex items-center gap-2 text-xs font-medium text-text-secondary">
           About to save
+          <SuggestedBadge />
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          {count} of {actions.length} selected
+        <span className="tnum text-xs text-muted-foreground">
+          {count} of {actions.length}
         </span>
       </div>
 
-      <div className="space-y-1 p-2">
+      <ul>
         {actions.map((action, i) => {
           const { label, detail } = describeAction(action)
           const Icon = ACTION_ICON[action.type]
           const on = chosen[i]
           return (
-            <button
-              key={i}
-              type="button"
-              disabled={applying}
-              aria-pressed={on}
-              onClick={() => onToggle(i)}
-              className={cn(
-                'flex w-full items-start gap-2.5 rounded-lg p-2 text-left transition-colors',
-                on ? 'bg-background/70' : 'opacity-45',
-                !applying && 'hover:bg-background',
-              )}
-            >
-              <span
+            <li key={i} className="border-b last:border-b-0">
+              <button
+                type="button"
+                disabled={applying}
+                aria-pressed={on}
+                onClick={() => onToggle(i)}
                 className={cn(
-                  'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                  on
-                    ? 'border-indigo-500 bg-indigo-500 text-white'
-                    : 'border-muted-foreground/40',
+                  'flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors duration-fast focus-visible:bg-accent focus-visible:outline-none',
+                  on ? 'hover:bg-accent/60' : 'opacity-50 hover:opacity-80',
                 )}
               >
-                {on && <Check className="h-3 w-3" />}
-              </span>
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium leading-snug">{label}</span>
-                {detail && (
-                  <span className="block text-xs leading-snug text-muted-foreground">
-                    {detail}
-                  </span>
-                )}
-              </span>
-            </button>
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors duration-fast',
+                    on ? 'border-primary bg-primary text-primary-foreground' : 'border-border-strong',
+                  )}
+                >
+                  {on && <Check className="h-3 w-3" strokeWidth={3} />}
+                </span>
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm leading-snug">{label}</span>
+                  {detail && (
+                    <span className="block text-xs leading-snug text-muted-foreground">{detail}</span>
+                  )}
+                </span>
+              </button>
+            </li>
           )
         })}
-      </div>
+      </ul>
 
-      <div className="border-t border-indigo-500/20 p-2">
-        <Button
-          size="sm"
-          onClick={onRun}
-          disabled={applying || count === 0}
-          className="w-full gap-2"
-        >
-          {applying ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
+      <div className="flex justify-end border-t p-2">
+        <Button size="sm" onClick={onRun} disabled={applying || count === 0} loading={applying}>
           {applying
-            ? 'Saving…'
+            ? 'Saving'
             : count === actions.length
-              ? 'Do it'
-              : `Do ${count} of ${actions.length}`}
+              ? 'Save'
+              : `Save ${count} of ${actions.length}`}
         </Button>
       </div>
     </div>
   )
 }
 
-/**
- * The people an answer found, as an embedded block rather than a paragraph
- * naming them.
- */
+/** The people an answer found, as rows. */
 export function MatchList({
   matches,
   onOpen,
@@ -200,31 +170,19 @@ export function MatchList({
   onOpen: (contact: Contact) => void
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card/50">
-      <div className="flex items-center gap-2 border-b px-3.5 py-2">
-        <Users className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {matches.length} {matches.length === 1 ? 'person' : 'people'}
-        </span>
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex h-9 items-center border-b bg-bg-sunken/60 px-3 text-xs font-medium text-text-secondary">
+        {matches.length} {matches.length === 1 ? 'person' : 'people'}
       </div>
-      <div className="divide-y">
+      <ul>
         {matches.map(({ contact, reason }) => (
-          <MatchRow
-            key={contact.id}
-            contact={contact}
-            reason={reason}
-            onOpen={() => onOpen(contact)}
-          />
+          <MatchRow key={contact.id} contact={contact} reason={reason} onOpen={() => onOpen(contact)} />
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
 
-/**
- * A match is only useful if you can act on it here — opening the profile, or
- * resetting the reconnect clock when the answer *was* "you already spoke".
- */
 function MatchRow({
   contact,
   reason,
@@ -241,23 +199,22 @@ function MatchRow({
     try {
       await markCaughtUp(contact)
     } catch {
-      // Put the button back so the tap can be retried.
       setCaughtUp(false)
     }
   }
 
   return (
-    <div className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-accent/50">
+    <li className="group flex items-center gap-3 border-b px-3 last:border-b-0 hover:bg-accent/50">
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none"
       >
-        <ContactAvatar contact={contact} className="h-9 w-9 shrink-0 text-xs" />
+        <ContactAvatar contact={contact} className="h-6 w-6 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1 text-sm font-medium">
             <span className="truncate">{fullName(contact)}</span>
-            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-fast group-hover:opacity-100" />
           </span>
           <span className="block truncate text-xs text-muted-foreground">
             {reason ||
@@ -273,14 +230,11 @@ function MatchRow({
         disabled={caughtUp}
         aria-label={`Mark caught up with ${fullName(contact)}`}
         onClick={() => void catchUp()}
-        className={cn(
-          'h-7 shrink-0 gap-1 px-2 text-xs',
-          caughtUp && 'text-emerald-600 dark:text-emerald-400',
-        )}
+        className={cn('shrink-0', caughtUp && 'text-success')}
       >
-        <Check className="h-3.5 w-3.5" />
+        <Check />
         <span className="hidden sm:inline">{caughtUp ? 'Logged' : 'Caught up'}</span>
       </Button>
-    </div>
+    </li>
   )
 }

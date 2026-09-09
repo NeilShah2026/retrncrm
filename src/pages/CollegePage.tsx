@@ -1,13 +1,6 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import {
-  GraduationCap,
-  Briefcase,
-  Users,
-  Plus,
-  Pencil,
-  ArrowRight,
-} from 'lucide-react'
+import { GraduationCap, Briefcase, Users, Plus, Pencil, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
@@ -23,35 +16,14 @@ import type { Contact } from '@/types'
 
 type Role = 'professor' | 'alumni' | 'student'
 
-/** Normalize a school name for loose matching against free-text entries. */
 function normSchool(s?: string): string {
   return (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-const GROUPS: {
-  role: Role
-  label: string
-  icon: typeof Users
-  match: (c: Contact) => boolean
-}[] = [
-  {
-    role: 'professor',
-    label: 'Professors',
-    icon: GraduationCap,
-    match: (c) => c.connectionType === 'professor',
-  },
-  {
-    role: 'alumni',
-    label: 'Alumni',
-    icon: Briefcase,
-    match: (c) => c.connectionType === 'alumni',
-  },
-  {
-    role: 'student',
-    label: 'Students',
-    icon: Users,
-    match: (c) => c.connectionType === 'classmate' || c.connectionType === 'peer',
-  },
+const GROUPS: { role: Role; label: string; singular: string; icon: typeof Users; match: (c: Contact) => boolean }[] = [
+  { role: 'professor', label: 'Professors', singular: 'professor', icon: GraduationCap, match: (c) => c.connectionType === 'professor' },
+  { role: 'alumni', label: 'Alumni', singular: 'alum', icon: Briefcase, match: (c) => c.connectionType === 'alumni' },
+  { role: 'student', label: 'Students', singular: 'student', icon: Users, match: (c) => c.connectionType === 'classmate' || c.connectionType === 'peer' },
 ]
 
 export function CollegePage() {
@@ -68,9 +40,6 @@ export function CollegePage() {
     setAddOpen(true)
   }
 
-  // People in your campus network: an explicit school match, OR — when no
-  // school is saved on the contact — anyone marked with a campus role
-  // (professor / alumni / classmate / peer), assumed to be your college.
   const atCollege = React.useMemo(() => {
     if (!college || !contacts) return []
     const target = normSchool(college)
@@ -82,47 +51,35 @@ export function CollegePage() {
     })
   }, [contacts, college])
 
-  // ---- No college chosen yet ----
   if (!college) {
     return (
       <PageShell
         mobile={{ title: 'College' }}
         header={<PageHeader title="College" description="Your campus network, in one place." />}
       >
-        <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500">
-            <GraduationCap className="h-7 w-7" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold tracking-tight">
-            Choose your college
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Pick your school to start tracking professors, alumni, and students
-            in your campus network. You can change it anytime.
+        <div className="mx-auto max-w-md rounded-lg border border-dashed px-6 py-12 text-center">
+          <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border bg-bg-sunken text-muted-foreground">
+            <GraduationCap className="h-4 w-4" />
+          </span>
+          <h2 className="mt-3 text-base font-semibold">Choose your college</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Professors, alumni and classmates get grouped here. You can change it any time.
           </p>
-          <div className="mt-6 w-full">
-            <CollegePicker
-              onSelect={(c) => void updateCollege(c)}
-              placeholder="Search for your college…"
-            />
+          <div className="mt-5 text-left">
+            <CollegePicker onSelect={(c) => void updateCollege(c)} placeholder="Search for your college" />
           </div>
         </div>
       </PageShell>
     )
   }
 
-  const groupCounts = GROUPS.map((g) => atCollege.filter(g.match).length)
-  const uncategorized = atCollege.filter(
-    (c) => !GROUPS.some((g) => g.match(c)),
-  )
+  const uncategorized = atCollege.filter((c) => !GROUPS.some((g) => g.match(c)))
 
   return (
     <PageShell
       mobile={{
         title: college,
         subtitle: `${atCollege.length} in your campus network`,
-        // Changing school is a rare, deliberate act — on a phone it takes over
-        // the toolbar rather than trying to share the bar with the title.
         toolbar: changing ? (
           <CollegePicker
             value={college}
@@ -134,10 +91,7 @@ export function CollegePage() {
         ) : undefined,
         trailing: (
           <>
-            <BarButton
-              onClick={() => setChanging((v) => !v)}
-              aria-label="Change college"
-            >
+            <BarButton onClick={() => setChanging((v) => !v)} aria-label="Change college">
               <Pencil />
             </BarButton>
             <BarButton onClick={() => openAdd('alumni')} aria-label="Add person">
@@ -159,54 +113,45 @@ export function CollegePage() {
               />
             </div>
           ) : (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setChanging(true)}>
-              <Pencil className="h-3.5 w-3.5" />
+            <Button variant="outline" onClick={() => setChanging(true)}>
+              <Pencil />
               Change
             </Button>
           )}
-          <Button size="sm" className="gap-1.5" onClick={() => openAdd('alumni')}>
-            <Plus className="h-4 w-4" />
+          <Button onClick={() => openAdd('alumni')}>
+            <Plus />
             Add person
           </Button>
         </PageHeader>
       }
     >
-      <div className="space-y-8">
-        {GROUPS.map((group, i) => {
+      <div className="space-y-6">
+        {GROUPS.map((group) => {
           const people = atCollege.filter(group.match)
           return (
             <section key={group.role}>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="mb-2 flex h-7 items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
                   <group.icon className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-semibold">{group.label}</h2>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {groupCounts[i]}
-                  </span>
-                </div>
-                <button
-                  onClick={() => openAdd(group.role)}
-                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Plus className="h-3.5 w-3.5" />
+                  {group.label}
+                  <span className="tnum text-xs font-normal text-muted-foreground">{people.length}</span>
+                </h2>
+                <Button variant="ghost" size="sm" onClick={() => openAdd(group.role)} className="text-muted-foreground">
+                  <Plus />
                   Add
-                </button>
+                </Button>
               </div>
 
               {people.length === 0 ? (
                 <button
                   onClick={() => openAdd(group.role)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed py-6 text-sm text-muted-foreground transition-colors hover:border-solid hover:bg-accent/50"
+                  className="flex h-12 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed text-sm text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add the first {group.label.toLowerCase().replace(/s$/, '')}
+                  <Plus className="h-3.5 w-3.5" />
+                  Add the first {group.singular}
                 </button>
               ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {people.map((c) => (
-                    <PersonRow key={c.id} contact={c} />
-                  ))}
-                </div>
+                <PeopleList people={people} />
               )}
             </section>
           )
@@ -214,55 +159,49 @@ export function CollegePage() {
 
         {uncategorized.length > 0 && (
           <section>
-            <div className="mb-3 flex items-center gap-2">
+            <h2 className="mb-2 flex h-7 items-center gap-2 text-sm font-semibold">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Others at {college}</h2>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {uncategorized.length}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {uncategorized.map((c) => (
-                <PersonRow key={c.id} contact={c} />
-              ))}
-            </div>
+              Others at {college}
+              <span className="tnum text-xs font-normal text-muted-foreground">{uncategorized.length}</span>
+            </h2>
+            <PeopleList people={uncategorized} />
           </section>
         )}
       </div>
 
-      <CollegeQuickAddDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        college={college}
-        initialRole={addRole}
-      />
+      <CollegeQuickAddDialog open={addOpen} onOpenChange={setAddOpen} college={college} initialRole={addRole} />
     </PageShell>
   )
 }
 
+function PeopleList({ people }: { people: Contact[] }) {
+  return (
+    <ul className="overflow-hidden rounded-lg border bg-card sm:grid sm:grid-cols-2">
+      {people.map((c) => (
+        <li key={c.id} className="border-b sm:odd:border-r [&:nth-last-child(-n+1)]:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
+          <PersonRow contact={c} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function PersonRow({ contact }: { contact: Contact }) {
-  const subtitle = [
-    contact.jobTitle,
-    contact.company,
-    contact.major,
-    contact.gradYear && `’${contact.gradYear.slice(-2)}`,
-  ]
+  const subtitle = [contact.jobTitle, contact.company, contact.major, contact.gradYear && `’${contact.gradYear.slice(-2)}`]
     .filter(Boolean)
     .join(' · ')
 
   return (
     <Link
       to={ROUTES.contact(contact.id)}
-      className="group flex items-center gap-3 rounded-xl border bg-card px-3.5 py-3 transition-colors hover:bg-accent"
+      className="group flex h-12 items-center gap-2.5 px-3 transition-colors duration-fast hover:bg-accent/60 focus-visible:bg-accent focus-visible:outline-none"
     >
-      <ContactAvatar contact={contact} className="h-9 w-9" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{fullName(contact)}</p>
-        {subtitle && (
-          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-        )}
-      </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      <ContactAvatar contact={contact} className="h-7 w-7" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm">{fullName(contact)}</span>
+        {subtitle && <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
     </Link>
   )
 }
