@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
-import { Copy, Loader2, Mail, MailWarning, Sparkles } from 'lucide-react'
+import { Copy, Loader2, Mail, MailWarning, PenLine } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -233,7 +233,7 @@ export function ComposeDialog({
                 setMyName(e.target.value)
                 setEdited(false)
               }}
-              placeholder="Jane Doe"
+              placeholder="Recipient’s name"
             />
           </div>
 
@@ -269,14 +269,14 @@ export function ComposeDialog({
                     type="button"
                     onClick={() => void draft()}
                     disabled={drafting || !contact || !template}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-500 disabled:opacity-50 dark:text-indigo-400"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary transition-colors hover:text-foreground disabled:opacity-50"
                   >
                     {drafting ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <Sparkles className="h-3 w-3" />
+                      <PenLine className="h-3 w-3" />
                     )}
-                    {drafting ? 'Writing…' : 'Draft with AI'}
+                    {drafting ? 'Writing…' : 'Draft a version'}
                   </button>
                 )}
               </div>

@@ -1,92 +1,53 @@
-import { motion } from 'framer-motion'
-import { Clock, Sparkles, Users } from 'lucide-react'
-import { MockAvatar, MockSurface, MockTag } from './primitives'
+import { Check, Coffee } from 'lucide-react'
+import { MockAvatar, MockHeader, MockSurface } from './primitives'
 
-const STATS = [
-  { label: 'Contacts', value: '128' },
-  { label: 'To reconnect', value: '6' },
-  { label: 'This month', value: '14' },
+const NEXT_UP = [
+  { name: 'Grace Liu', kind: 'Reconnect', why: '3 months since the info session · quarterly cadence', overdue: true },
+  { name: 'David Osei', kind: 'Prep', why: 'Coffee tomorrow 3:00 · ask about the Vanta founding team' },
+  { name: 'Priya Nair', kind: 'Pipeline', why: 'Figma PM internship closes Friday · she offered a referral' },
 ]
 
-interface Reconnect {
-  initials: string
-  color: React.ComponentProps<typeof MockAvatar>['color']
-  name: string
-  context: string
-  overdue: string
-}
-
-const RECONNECT: Reconnect[] = [
-  { initials: 'GL', color: 'rose', name: 'Grace Liu', context: 'Sequoia · Scout', overdue: '9 mo' },
-  { initials: 'DO', color: 'orange', name: 'David Osei', context: 'Vanta · Founder', overdue: '3 mo' },
-  { initials: 'PN', color: 'fuchsia', name: 'Priya Nair', context: 'Figma · PM', overdue: '6 wk' },
-]
-
+/** The dashboard as it actually looks: metric strip, then a "Next up" list. */
 export function DashboardMockup() {
   return (
-    <MockSurface className="w-full p-5 sm:p-6">
-      {/* stat tiles */}
-      <div className="grid grid-cols-3 gap-3">
-        {STATS.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 + i * 0.08, ease: 'easeOut' }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
-          >
-            <p className="text-2xl font-semibold text-white">{s.value}</p>
-            <p className="mt-0.5 text-[11px] text-white/45">{s.label}</p>
-          </motion.div>
-        ))}
+    <MockSurface className="w-full">
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b px-4 py-2.5">
+        <span className="flex items-baseline gap-1.5">
+          <span className="tnum text-lg font-semibold leading-none">128</span>
+          <span className="text-xs text-muted-foreground">contacts</span>
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="tnum text-lg font-semibold leading-none text-warning">3</span>
+          <span className="text-xs text-muted-foreground">overdue</span>
+        </span>
+        <span className="hidden h-3 w-px bg-border sm:block" />
+        <span className="flex items-baseline gap-1.5">
+          <span className="tnum text-sm font-semibold leading-none">2</span>
+          <span className="text-[11px] text-muted-foreground">meetings this week</span>
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="tnum text-sm font-semibold leading-none">5</span>
+          <span className="text-[11px] text-muted-foreground">open applications</span>
+        </span>
       </div>
 
-      {/* reconnect list */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, delay: 0.75, ease: 'easeOut' }}
-        className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
-      >
-        <div className="mb-3 flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-rose-300" />
-          <span className="text-[12px] font-semibold text-white">
-            Time to reconnect
-          </span>
-        </div>
-        <div className="space-y-2.5">
-          {RECONNECT.map((r, i) => (
-            <motion.div
-              key={r.name}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.45, delay: 0.9 + i * 0.1 }}
-              className="flex items-center gap-3"
-            >
-              <MockAvatar initials={r.initials} color={r.color} size={34} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-medium text-white">{r.name}</p>
-                <p className="truncate text-[10px] text-white/40">{r.context}</p>
-              </div>
-              <MockTag tone="rose">{r.overdue} overdue</MockTag>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* footer row */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 1.3 }}
-        className="mt-4 flex items-center justify-between rounded-xl border border-indigo-400/20 bg-indigo-500/[0.07] px-4 py-3"
-      >
-        <div className="flex items-center gap-2 text-[12px] text-white/70">
-          <Users className="h-3.5 w-3.5 text-indigo-300" />
-          Jordan added 3 people this week
-        </div>
-        <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
-      </motion.div>
+      <MockHeader action="Suggested">Next up</MockHeader>
+      <ul>
+        {NEXT_UP.map((r) => (
+          <li key={r.name} className="flex h-11 items-center gap-2.5 border-b px-4 last:border-b-0">
+            <MockAvatar name={r.name} size={24} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px]">{r.name}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                <span className={r.overdue ? 'text-warning' : 'text-text-secondary'}>{r.kind}</span> · {r.why}
+              </span>
+            </span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground">
+              {r.kind === 'Prep' ? <Coffee className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+            </span>
+          </li>
+        ))}
+      </ul>
     </MockSurface>
   )
 }

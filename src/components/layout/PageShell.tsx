@@ -11,20 +11,16 @@ interface PageShellProps {
   header: React.ReactNode
   /**
    * The phone's navigation bar for this screen. When given, it replaces
-   * `header` below `md` entirely: a desktop page header and an iOS navigation
-   * bar are different objects, and squeezing one into the other is what makes
-   * a phone screen feel like a shrunken website.
+   * `header` below `md` entirely.
    */
   mobile?: MobileChrome
   children: React.ReactNode
-  /** 'default' caps width for reading; 'wide' fills for boards/graphs. */
+  /** 'default' caps width for reading; 'wide' fills for boards/tables. */
   width?: 'default' | 'wide'
   /**
-   * true (default): this component's body div is the scroll container —
-   * fine for pages that are just a stack of cards.
-   * false: the page manages its own inner scroll region (e.g. a table with a
-   * sticky header, or a Kanban board with per-column scrolling) — the body
-   * div just clips and hands full height to its children.
+   * true (default): this component's body div is the scroll container.
+   * false: the page manages its own inner scroll region (a table with a
+   * sticky header, a board with per-column scrolling).
    */
   scrollBody?: boolean
   bodyClassName?: string
@@ -39,14 +35,8 @@ const WIDTH_CLASS = {
 const COLLAPSE_AT = 24
 
 /**
- * Every app page's layout, in two shapes.
- *
- * On a desktop: a header that never moves, and a body beneath it that owns the
- * only scrollbar for that page.
- *
- * On a phone: an iOS navigation bar that never moves, and a body that scrolls
- * the large title away underneath it — at which point the small title fades
- * into the bar. Same skeleton, native manners.
+ * Every app page's layout. Desktop: a pinned header over a scrolling body.
+ * Phone: an iOS navigation bar over a body that scrolls the large title away.
  */
 export function PageShell({
   header,
@@ -58,10 +48,6 @@ export function PageShell({
 }: PageShellProps) {
   const [scrolled, setScrolled] = React.useState(false)
 
-  // The large title can only scroll away when this component owns the
-  // scroller. Pages with their own inner scroll region (a table, a board) keep
-  // a static large title pinned above it instead — the same choice iOS makes
-  // for a screen whose content is a fixed pane.
   const hasTitle = Boolean(mobile?.title)
   const wantsLargeTitle = hasTitle && mobile?.largeTitle !== false
   const inlineLargeTitle = wantsLargeTitle && scrollBody
@@ -80,16 +66,13 @@ export function PageShell({
           chrome={mobile}
           showCompactTitle={hasTitle && (!wantsLargeTitle || scrolled)}
           pinLargeTitle={pinLargeTitle}
-          // A bar with a toolbar or a pinned title is already a solid block,
-          // so it always needs its edge. A bare bar only earns a hairline once
-          // there is content passing beneath it.
           separated={Boolean(mobile.toolbar) || pinLargeTitle || scrolled}
         />
       )}
 
       <div
         className={cn(
-          'shrink-0 border-b px-4 pb-3 pt-5 md:px-8 md:pt-8',
+          'shrink-0 border-b px-4 pb-3 pt-4 md:px-6 md:pt-5',
           mobile && 'hidden md:block',
         )}
       >
@@ -109,9 +92,7 @@ export function PageShell({
       >
         <div
           className={cn(
-            'mx-auto w-full px-4 py-4 md:px-8 md:py-6',
-            // The large title supplies the top spacing on a phone, so the body
-            // shouldn't add its own on top of it.
+            'mx-auto w-full px-4 py-4 md:px-6 md:py-5',
             inlineLargeTitle && 'pt-2',
             WIDTH_CLASS[width],
             !scrollBody && 'flex min-h-0 flex-1 flex-col',

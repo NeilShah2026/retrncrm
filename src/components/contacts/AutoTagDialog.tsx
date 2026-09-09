@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check, Loader2, Sparkles, Tags, X } from 'lucide-react'
+import { Check, Loader2, Tags, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -252,8 +252,8 @@ export function AutoTagDialog({ open, onOpenChange }: Props) {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4.5 w-4.5 text-indigo-500" />
-            Auto-tag your network
+            <Tags className="h-4 w-4 text-muted-foreground" />
+            Suggest tags
           </DialogTitle>
           <DialogDescription>
             {phase === 'review'
@@ -289,13 +289,13 @@ export function AutoTagDialog({ open, onOpenChange }: Props) {
 
         {phase === 'running' && (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             <p className="text-sm">
               Read {progress.done} of {progress.total} people…
             </p>
             <div className="h-1.5 w-56 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-indigo-500 transition-all"
+                className="h-full rounded-full bg-foreground transition-all"
                 style={{
                   width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
                 }}
@@ -381,7 +381,7 @@ export function AutoTagDialog({ open, onOpenChange }: Props) {
                               'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity',
                               on
                                 ? color?.badge ??
-                                    'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
+                                    'bg-secondary text-text-secondary'
                                 : 'border border-dashed text-muted-foreground opacity-60',
                             )}
                           >

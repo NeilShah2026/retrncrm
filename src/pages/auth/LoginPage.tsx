@@ -1,36 +1,27 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, GraduationCap, Mail, ShieldCheck, Users } from 'lucide-react'
+import { GraduationCap, Mail, ShieldCheck } from 'lucide-react'
+import { Logo } from '@/components/layout/AppLayout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useAuth } from '@/auth/AuthProvider'
 import { ROUTES } from '@/lib/routes'
-import { cn } from '@/lib/utils'
 
 type Mode = 'signin' | 'signup'
 type Method = 'password' | 'magic-link'
 
+/** Sign in. The same tokens as the app; nothing on the page but the form. */
 export function LoginPage() {
-  const {
-    user,
-    loading,
-    signInWithPassword,
-    signUpWithPassword,
-    signInWithMagicLink,
-    signInWithGoogle,
-  } = useAuth()
+  const { user, loading, signInWithPassword, signUpWithPassword, signInWithMagicLink, signInWithGoogle } =
+    useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
-  // Where to go after auth. Defaults to the dashboard, but the /add flow
-  // passes ?next=/add#… so a shared-profile scan resumes after sign-in.
-  // Guard against open redirects: only same-origin app paths.
+  // Only same-origin app paths, to avoid an open redirect.
   const rawNext = params.get('next')
-  const next =
-    rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
-      ? rawNext
-      : ROUTES.dashboard
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : ROUTES.dashboard
 
-  // Arriving from a paid plan (Student/Standard) → open in sign-up mode and
-  // surface the Babson offer, since it makes that plan free for them.
   const plan = params.get('plan')
   const fromPaidPlan = plan === 'student' || plan === 'standard'
 
@@ -44,15 +35,12 @@ export function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = React.useState(false)
   const [confirmEmailSent, setConfirmEmailSent] = React.useState(false)
 
-  // Already signed in — no reason to see the login screen.
   if (!loading && user) return <Navigate to={next} replace />
 
   async function handleGoogle() {
     setError(null)
     setGoogleSubmitting(true)
     const { error } = await signInWithGoogle()
-    // On success the browser navigates away to Google immediately, so we
-    // only ever get here to handle a failure (e.g. provider not enabled).
     if (error) {
       setError(error)
       setGoogleSubmitting(false)
@@ -72,14 +60,8 @@ export function LoginPage() {
       }
       if (mode === 'signup') {
         const { error } = await signUpWithPassword(email, password)
-        if (error) {
-          setError(error)
-        } else {
-          // If email confirmation is off, this sign-up already produced a
-          // session and the redirect below will fire on next render via the
-          // `user` check above. If confirmation is required, show the notice.
-          setConfirmEmailSent(true)
-        }
+        if (error) setError(error)
+        else setConfirmEmailSent(true)
       } else {
         const { error } = await signInWithPassword(email, password)
         if (error) setError(error)
@@ -91,44 +73,24 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#08080c] px-4 py-12">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0)',
-          backgroundSize: '28px 28px',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/3 h-[480px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-600/25 blur-[130px]"
-      />
-
-      <div className="relative w-full max-w-sm">
-        <Link to={ROUTES.home} className="mb-8 flex items-center justify-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500 text-white">
-            <Users className="h-3.5 w-3.5" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-white">Retrn</span>
+    <div className="flex min-h-screen flex-col bg-background px-4 py-10">
+      <div className="mx-auto w-full max-w-sm">
+        <Link to={ROUTES.home} className="inline-block rounded-sm">
+          <Logo />
         </Link>
 
         {fromPaidPlan && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-indigo-300/25 bg-gradient-to-r from-indigo-500/12 via-violet-400/10 to-rose-400/10 px-4 py-3 text-sm text-white/85">
-            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-300" />
+          <p className="mt-8 flex items-start gap-2 rounded-lg border bg-bg-sunken/60 px-3 py-2.5 text-sm text-text-secondary">
+            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <span>
-              <span className="font-semibold text-white">Babson student?</span> Sign up
-              with your{' '}
-              <span className="font-semibold text-white">@babson.edu</span> email — or
-              verify it later in Settings — and everything in{' '}
-              {plan === 'student' ? 'Student' : 'Standard'} is{' '}
-              <span className="font-semibold text-white">free</span>, no card.
+              <span className="font-medium text-foreground">Babson student?</span> Sign up with your
+              @babson.edu email, or verify it later in Settings, and everything in{' '}
+              {plan === 'student' ? 'Student' : 'Standard'} is free.
             </span>
-          </div>
+          </p>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur-xl">
+        <div className="mt-8">
           {magicLinkSent ? (
             <EmailNotice
               icon={Mail}
@@ -148,101 +110,73 @@ export function LoginPage() {
             />
           ) : (
             <>
-              <h1 className="font-serif text-2xl font-medium text-white">
-                {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+              <h1 className="text-2xl font-semibold tracking-[-0.02em]">
+                {mode === 'signin' ? 'Sign in to Retrn' : 'Create your account'}
               </h1>
-              <p className="mt-1.5 text-sm text-white/50">
-                {mode === 'signin'
-                  ? 'Sign in to get back to your network.'
-                  : 'Free, forever — takes about ten seconds.'}
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {mode === 'signin' ? 'Back to your network.' : 'Free for up to 30 contacts. Takes about ten seconds.'}
               </p>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="lg"
                 onClick={() => void handleGoogle()}
-                disabled={googleSubmitting}
-                className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.07] disabled:opacity-60"
+                loading={googleSubmitting}
+                className="mt-6 w-full"
               >
-                <GoogleIcon className="h-4 w-4" />
-                {googleSubmitting ? 'Please wait…' : 'Continue with Google'}
-              </button>
+                {!googleSubmitting && <GoogleIcon className="h-4 w-4" />}
+                Continue with Google
+              </Button>
 
               <div className="mt-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-[11px] uppercase tracking-wide text-white/30">
-                  or
-                </span>
-                <div className="h-px flex-1 bg-white/10" />
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="h-px flex-1 bg-border" />
               </div>
 
               <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="email" className="text-xs font-medium text-white/70">
-                    Email
-                  </label>
-                  <input
+                  <Label htmlFor="email">Email</Label>
+                  <Input
                     id="email"
                     type="email"
                     required
                     autoFocus
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@school.edu"
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-white/25"
+                    className="h-9"
                   />
                 </div>
 
                 {method === 'password' && (
                   <div className="space-y-1.5">
-                    <label htmlFor="password" className="text-xs font-medium text-white/70">
-                      Password
-                    </label>
-                    <input
+                    <Label htmlFor="password">Password</Label>
+                    <Input
                       id="password"
                       type="password"
                       required
                       minLength={6}
+                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-white/25"
+                      className="h-9"
                     />
                   </div>
                 )}
 
                 {error && (
-                  <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                  <p role="alert" className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
                     {error}
                   </p>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-transform hover:scale-[1.02] disabled:opacity-60"
-                >
-                  {submitting
-                    ? 'Please wait…'
-                    : method === 'magic-link'
-                      ? 'Send magic link'
-                      : mode === 'signin'
-                        ? 'Sign in'
-                        : 'Create account'}
-                  {!submitting && <ArrowRight className="h-3.5 w-3.5" />}
-                </button>
+                <Button type="submit" size="lg" loading={submitting} className="w-full">
+                  {method === 'magic-link' ? 'Send magic link' : mode === 'signin' ? 'Sign in' : 'Create account'}
+                </Button>
               </form>
-
-              <p className="mt-4 text-center text-[11px] leading-relaxed text-white/35">
-                By continuing, you agree to Retrn's{' '}
-                <Link to={ROUTES.terms} className="text-white/55 hover:text-white/80">
-                  Terms
-                </Link>{' '}
-                and{' '}
-                <Link to={ROUTES.privacy} className="text-white/55 hover:text-white/80">
-                  Privacy Policy
-                </Link>
-                .
-              </p>
 
               <button
                 type="button"
@@ -250,26 +184,24 @@ export function LoginPage() {
                   setMethod((m) => (m === 'password' ? 'magic-link' : 'password'))
                   setError(null)
                 }}
-                className="mt-4 w-full text-center text-xs text-white/45 transition-colors hover:text-white/70"
+                className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
               >
-                {method === 'password'
-                  ? 'Use a magic link instead'
-                  : 'Use a password instead'}
+                {method === 'password' ? 'Use a magic link instead' : 'Use a password instead'}
               </button>
 
-              <div className="mt-6 border-t border-white/10 pt-5 text-center text-xs text-white/45">
+              <p className="mt-6 border-t pt-5 text-center text-xs text-muted-foreground">
                 {mode === 'signin' ? (
                   <>
-                    Don't have an account?{' '}
+                    New here?{' '}
                     <button
                       type="button"
                       onClick={() => {
                         setMode('signup')
                         setError(null)
                       }}
-                      className="font-medium text-white/80 hover:text-white"
+                      className="font-medium text-foreground hover:underline"
                     >
-                      Create one
+                      Create an account
                     </button>
                   </>
                 ) : (
@@ -281,13 +213,25 @@ export function LoginPage() {
                         setMode('signin')
                         setError(null)
                       }}
-                      className="font-medium text-white/80 hover:text-white"
+                      className="font-medium text-foreground hover:underline"
                     >
                       Sign in
                     </button>
                   </>
                 )}
-              </div>
+              </p>
+
+              <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+                By continuing you agree to Retrn’s{' '}
+                <Link to={ROUTES.terms} className="hover:text-foreground hover:underline">
+                  Terms
+                </Link>{' '}
+                and{' '}
+                <Link to={ROUTES.privacy} className="hover:text-foreground hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
             </>
           )}
         </div>
@@ -299,22 +243,10 @@ export function LoginPage() {
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" className={className} aria-hidden>
-      <path
-        fill="#EA4335"
-        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.86.92 7.51 2.56 10.78l7.97-6.19z"
-      />
-      <path
-        fill="#34A853"
-        d="M24 48c6.48 0 11.93-2.13 15.89-5.82l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48z"
-      />
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.94 23.94 0 0 0 0 24c0 3.86.92 7.51 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.82l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48z" />
     </svg>
   )
 }
@@ -331,19 +263,15 @@ function EmailNotice({
   onBack: () => void
 }) {
   return (
-    <div className={cn('flex flex-col items-center py-2 text-center')}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-        <Icon className="h-5 w-5" />
-      </div>
-      <h2 className="mt-4 font-serif text-xl font-medium text-white">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-white/55">{body}</p>
-      <button
-        type="button"
-        onClick={onBack}
-        className="mt-6 text-xs font-medium text-white/60 hover:text-white"
-      >
-        ← Back
-      </button>
+    <div className="rounded-lg border p-6">
+      <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-bg-sunken text-text-secondary">
+        <Icon className="h-4 w-4" />
+      </span>
+      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{title}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+      <Button variant="ghost" size="sm" onClick={onBack} className="mt-5 -ml-2">
+        Back
+      </Button>
     </div>
   )
 }

@@ -2,50 +2,116 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Retrn design tokens — the single source of truth. See DESIGN.md.
+ *
+ * Three layers:
+ *   1. Primitive  — raw HSL values, only referenced here.
+ *   2. Semantic   — what a colour *means* (bg, text, border, brand, status).
+ *   3. Component  — shadcn's names, aliased onto the semantic layer so the
+ *                   Radix primitives keep working without a rewrite.
+ *
+ * Every value is an HSL triple (no `hsl()` wrapper) so Tailwind can add
+ * opacity: `bg-brand/10`, `text-danger/80`.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 72% 51%;
+    /* ---- Semantic: neutrals --------------------------------------- */
+    --bg: 0 0% 100%;
+    --bg-elevated: 0 0% 100%;
+    --bg-sunken: 240 5% 96%;
+    --border: 240 5% 89%;
+    --border-subtle: 240 5% 93%;
+    --border-strong: 240 5% 78%;
+    --text: 240 10% 6%;
+    --text-secondary: 240 5% 32%;
+    --text-muted: 240 4% 42%; /* #66666f on white: 5.6:1, AA at 11px */
+
+    /* ---- Semantic: action ----------------------------------------- */
+    --primary: 240 6% 10%;
+    --primary-hover: 240 6% 18%;
+    --on-primary: 0 0% 98%;
+
+    /* ---- Semantic: the one brand accent --------------------------- */
+    /* Used ONLY for: focus rings, selected nav, links, the "Suggested"
+       badge, the calendar's today marker, ::selection. Never for icons,
+       headers, cards, or "AI" chrome. */
+    --brand: 217 80% 46%;
+    --brand-hover: 217 80% 40%;
+    --on-brand: 0 0% 100%;
+    --brand-soft: 217 80% 46%;
+
+    /* ---- Semantic: status (muted, never neon) --------------------- */
+    --success: 152 55% 32%;
+    --success-soft: 152 50% 94%;
+    --warning: 32 80% 36%;
+    --warning-soft: 38 90% 93%;
+    --danger: 0 65% 45%;
+    --danger-soft: 0 70% 95%;
+    --info: 217 60% 40%;
+    --info-soft: 217 70% 95%;
+
+    /* ---- Shape ---------------------------------------------------- */
+    --radius: 8px; /* card / panel */
+    --radius-control: 6px; /* buttons, inputs, menu items */
+    --radius-modal: 10px;
+
+    /* ---- Motion --------------------------------------------------- */
+    --duration-fast: 120ms;
+    --duration-base: 160ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ---- shadcn aliases (component layer) ------------------------- */
+    --background: var(--bg);
+    --foreground: var(--text);
+    --card: var(--bg-elevated);
+    --card-foreground: var(--text);
+    --popover: var(--bg-elevated);
+    --popover-foreground: var(--text);
+    --primary-foreground: var(--on-primary);
+    --secondary: var(--bg-sunken);
+    --secondary-foreground: var(--text);
+    --muted: var(--bg-sunken);
+    --muted-foreground: var(--text-muted);
+    --accent: var(--bg-sunken);
+    --accent-foreground: var(--text);
+    --destructive: var(--danger);
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.65rem;
+    --input: var(--border);
+    --ring: var(--brand);
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 8% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 45%;
+    --bg: 240 6% 7%;
+    --bg-elevated: 240 6% 9%;
+    --bg-sunken: 240 5% 12%;
+    --border: 240 5% 17%;
+    --border-subtle: 240 5% 13%;
+    --border-strong: 240 5% 28%;
+    --text: 0 0% 96%;
+    --text-secondary: 240 5% 72%;
+    --text-muted: 240 5% 62%; /* on #111: 6.4:1 */
+
+    --primary: 0 0% 96%;
+    --primary-hover: 0 0% 88%;
+    --on-primary: 240 6% 10%;
+
+    --brand: 217 85% 66%;
+    --brand-hover: 217 85% 72%;
+    --on-brand: 240 6% 8%;
+    --brand-soft: 217 85% 66%;
+
+    --success: 152 55% 60%;
+    --success-soft: 152 40% 14%;
+    --warning: 38 85% 62%;
+    --warning-soft: 38 50% 14%;
+    --danger: 0 75% 66%;
+    --danger-soft: 0 40% 15%;
+    --info: 217 80% 70%;
+    --info-soft: 217 40% 15%;
+
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
   }
 }
 
@@ -55,11 +121,36 @@
   }
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1, 'cv11' 1;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Brand-tinted selection, one of the few places the accent is allowed. */
+  ::selection {
+    background: hsl(var(--brand) / 0.22);
+    color: hsl(var(--text));
+  }
+
+  /* One focus story for everything that isn't a Radix primitive with its own
+     ring: a 2px brand ring, offset so it reads on filled controls too. */
+  :where(a, button, [role='button'], summary):focus-visible {
+    outline: 2px solid hsl(var(--brand));
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+
+  /* Counts, dates, deadlines line up. */
+  time,
+  .tnum {
+    font-variant-numeric: tabular-nums;
   }
 
   /* iOS zooms the whole page when a focused field is under 16px, and never
@@ -85,31 +176,38 @@
     }
   }
 
-  /* Rubber-banding should stop at the scroll region you are actually in. On a
-     phone the app is a fixed-height box with its own scrollers, so letting a
-     flick bubble to the document just detaches the chrome from the content. */
+  /* Rubber-banding should stop at the scroll region you are actually in. */
   html,
   body {
     overscroll-behavior: none;
   }
+
+  /* Motion is a courtesy, not a requirement. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-/* Custom scrollbars */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
+    background-color: hsl(var(--border-strong));
     border-radius: 9999px;
   }
-  /* Touch devices overlay their own scroll indicator; a drawn track just
-     eats a column of content. */
   @media (hover: none) {
     .scrollbar-thin {
       scrollbar-width: none;
@@ -119,20 +217,15 @@
     }
   }
 
-  /*
-   * The translucent material iOS uses behind a navigation bar and a tab bar:
-   * the content beneath stays faintly visible and over-saturated rather than
-   * being hidden behind a flat panel. Falls back to an opaque bar wherever
-   * backdrop-filter isn't supported, so text never lands on live content.
-   */
+  /* The translucent material behind a phone's navigation/tab bar. */
   .material-bar {
     background-color: hsl(var(--background));
   }
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     .material-bar {
-      background-color: hsl(var(--background) / 0.72);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
-      backdrop-filter: saturate(180%) blur(20px);
+      background-color: hsl(var(--background) / 0.8);
+      -webkit-backdrop-filter: saturate(160%) blur(16px);
+      backdrop-filter: saturate(160%) blur(16px);
     }
   }
 
@@ -150,7 +243,22 @@
     }
   }
 
-  /* iOS large title: 34pt bold, tightly tracked. */
+  /* Display type: tight tracking on large sizes. */
+  .text-display {
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    font-weight: 600;
+  }
+  /* Small caps labels: a touch looser. */
+  .text-label {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* iOS large title. */
   .text-large-title {
     font-size: 1.9375rem;
     line-height: 2.25rem;
@@ -168,15 +276,14 @@
 
   /* iOS answers a touch by dimming, not by changing colour. */
   .press {
-    transition: opacity 100ms ease-out;
+    transition: opacity var(--duration-fast) var(--ease-out);
   }
   .press:active {
     opacity: 0.4;
   }
 }
 
-/* Assistant chat prose — the same rules as notes, one step up in size, since
-   this is the app talking rather than a field being displayed. */
+/* Assistant answers: product prose, one step up from field text. */
 .prose-chat {
   @apply text-[15px] leading-relaxed text-foreground;
 }
@@ -186,7 +293,7 @@
 .prose-chat ul { @apply list-disc pl-5 my-2 space-y-1; }
 .prose-chat ol { @apply list-decimal pl-5 my-2 space-y-1; }
 .prose-chat a {
-  @apply text-primary underline underline-offset-2 hover:opacity-80;
+  @apply text-brand underline underline-offset-2 hover:text-brand-hover;
 }
 .prose-chat strong { @apply font-semibold; }
 .prose-chat em { @apply italic; }
@@ -194,16 +301,16 @@
   @apply rounded bg-muted px-1 py-0.5 text-[13px] font-mono;
 }
 
-/* The assistant's "thinking" line: a highlight travelling across the text,
-   which reads as work in progress in a way a spinner next to prose does not. */
+/* "Working on it" text: a highlight travelling across the words. Reduced
+   motion turns it into plain muted text. */
 .shimmer {
   background: linear-gradient(
     90deg,
-    hsl(var(--muted-foreground)) 0%,
-    hsl(var(--muted-foreground)) 35%,
-    hsl(var(--foreground)) 50%,
-    hsl(var(--muted-foreground)) 65%,
-    hsl(var(--muted-foreground)) 100%
+    hsl(var(--text-muted)) 0%,
+    hsl(var(--text-muted)) 35%,
+    hsl(var(--text)) 50%,
+    hsl(var(--text-muted)) 65%,
+    hsl(var(--text-muted)) 100%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
@@ -211,17 +318,15 @@
   color: transparent;
   animation: shimmer 2.2s linear infinite;
 }
-
 @keyframes shimmer {
   from { background-position: 150% 0; }
   to { background-position: -50% 0; }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .shimmer {
     animation: none;
     background: none;
-    color: hsl(var(--muted-foreground));
+    color: hsl(var(--text-muted));
   }
 }
 
@@ -229,25 +334,17 @@
 .prose-notes {
   @apply text-sm leading-relaxed text-foreground;
 }
-.prose-notes p {
-  @apply my-2;
-}
+.prose-notes p { @apply my-2; }
 .prose-notes h1,
 .prose-notes h2,
-.prose-notes h3 {
-  @apply font-semibold mt-4 mb-2;
-}
+.prose-notes h3 { @apply font-semibold mt-4 mb-2; }
 .prose-notes h1 { @apply text-lg; }
 .prose-notes h2 { @apply text-base; }
 .prose-notes h3 { @apply text-sm; }
-.prose-notes ul {
-  @apply list-disc pl-5 my-2 space-y-1;
-}
-.prose-notes ol {
-  @apply list-decimal pl-5 my-2 space-y-1;
-}
+.prose-notes ul { @apply list-disc pl-5 my-2 space-y-1; }
+.prose-notes ol { @apply list-decimal pl-5 my-2 space-y-1; }
 .prose-notes a {
-  @apply text-primary underline underline-offset-2 hover:opacity-80;
+  @apply text-brand underline underline-offset-2 hover:text-brand-hover;
 }
 .prose-notes strong { @apply font-semibold; }
 .prose-notes code {

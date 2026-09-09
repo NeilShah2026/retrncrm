@@ -13,7 +13,7 @@ export function ContactAvatar({ contact, className }: Props) {
   return (
     <Avatar className={className}>
       {contact.photo && <AvatarImage src={contact.photo} alt={seed} />}
-      <AvatarFallback className={cn(avatarColor(seed), 'text-[0.8em]')}>
+      <AvatarFallback className={cn(avatarColor(seed), 'text-[0.72em]')}>
         {initials(contact)}
       </AvatarFallback>
     </Avatar>

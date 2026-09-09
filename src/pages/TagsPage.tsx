@@ -1,14 +1,14 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Pencil, Plus, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react'
+import { Check, MoreHorizontal, Plus, Tag as TagIcon, Tags } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
 import { EmptyState } from '@/components/common/EmptyState'
-import { Card, CardContent } from '@/components/ui/card'
+import { NetworkGate } from '@/components/common/NetworkGate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonRow } from '@/components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
 import { useContacts, useTags } from '@/hooks/useData'
@@ -43,8 +50,8 @@ export function TagsPage() {
     return map
   }, [contacts])
 
-  const loading = tags === undefined
   const untagged = (contacts ?? []).filter((c) => c.tagIds.length === 0).length
+  const hasContacts = (contacts?.length ?? 0) > 0
 
   function openNew() {
     setEditing(null)
@@ -59,7 +66,7 @@ export function TagsPage() {
   async function confirmDelete() {
     if (!deleting) return
     await tagRepo.remove(deleting.id)
-    toast.success(`Deleted tag “${deleting.name}”`)
+    toast.success(`Deleted “${deleting.name}”`)
   }
 
   return (
@@ -68,12 +75,9 @@ export function TagsPage() {
         title: 'Tags',
         trailing: (
           <>
-            {(contacts?.length ?? 0) > 0 && (
-              <BarButton
-                onClick={() => setAutoTagOpen(true)}
-                aria-label="Let AI propose tags"
-              >
-                <Sparkles />
+            {hasContacts && (
+              <BarButton onClick={() => setAutoTagOpen(true)} aria-label="Suggest tags">
+                <Tags />
               </BarButton>
             )}
             <BarButton onClick={openNew} aria-label="New tag">
@@ -83,139 +87,123 @@ export function TagsPage() {
         ),
       }}
       header={
-        <PageHeader
-          title="Tags"
-          description="Organize your network with color-coded, reusable tags."
-        >
-          {(contacts?.length ?? 0) > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => setAutoTagOpen(true)}
-              className="gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Auto-tag
+        <PageHeader title="Tags" description="Group people by how you know them.">
+          {hasContacts && (
+            <Button variant="outline" onClick={() => setAutoTagOpen(true)}>
+              <Tags />
+              Suggest tags
             </Button>
           )}
-          <Button onClick={openNew} className="gap-2">
-            <Plus className="h-4 w-4" />
+          <Button onClick={openNew}>
+            <Plus />
             New tag
           </Button>
         </PageHeader>
       }
     >
-      {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : tags.length === 0 ? (
-        <EmptyState
-          icon={TagIcon}
-          title="No tags yet"
-          description="Create tags like “VC”, “mentor”, or “potential client” to group and filter your contacts — or let AI read your contacts and propose the first set."
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              {untagged > 0 && (
-                <Button onClick={() => setAutoTagOpen(true)} className="gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Auto-tag {untagged} {untagged === 1 ? 'person' : 'people'}
-                </Button>
-              )}
-              <Button variant={untagged > 0 ? 'outline' : 'default'} onClick={openNew}>
-                Create your first tag
-              </Button>
-            </div>
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {untagged > 0 && (
-            <button
-              type="button"
-              onClick={() => setAutoTagOpen(true)}
-              className="flex w-full items-center gap-3 rounded-lg border border-dashed border-indigo-400/50 bg-indigo-50/40 p-3 text-left transition-colors hover:bg-indigo-50 dark:bg-indigo-500/5 dark:hover:bg-indigo-500/10"
-            >
-              <Sparkles className="h-4 w-4 shrink-0 text-indigo-500" />
-              <span className="min-w-0 flex-1 text-sm">
-                <span className="font-medium">
-                  {untagged} {untagged === 1 ? 'person has' : 'people have'} no tags
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Read their records and propose tags — you approve them before
-                  anything is saved.
-                </span>
-              </span>
-              <span className="shrink-0 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-                Auto-tag
-              </span>
-            </button>
-          )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {tags.map((tag) => {
-              const c = tagColor(tag.color)
-              const count = counts.get(tag.id) ?? 0
-              return (
-                <Card key={tag.id} className="group">
-                  <CardContent className="flex items-center gap-3 p-4">
-                    <span className={cn('h-3 w-3 rounded-full', c.dot)} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{tag.name}</p>
-                      {count > 0 ? (
-                        <Link
-                          to={ROUTES.contactsSearch(tag.name)}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          {count} {count === 1 ? 'contact' : 'contacts'}
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          No contacts
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => openEdit(tag)}
-                        aria-label={`Edit ${tag.name}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleting(tag)}
-                        aria-label={`Delete ${tag.name}`}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+      <NetworkGate
+        data={tags}
+        table="tags"
+        skeleton={
+          <div className="rounded-lg border" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonRow key={i} />
+            ))}
           </div>
-        </div>
-      )}
+        }
+        empty={
+          <EmptyState
+            variant="first-run"
+            icon={TagIcon}
+            title="No tags yet"
+            description="Tags like “recruiter”, “mentor” or “fintech” make people findable later. Create one, or have the first set proposed from what you’ve written."
+            action={
+              <>
+                {untagged > 0 && (
+                  <Button onClick={() => setAutoTagOpen(true)}>
+                    <Tags />
+                    Suggest tags for {untagged} {untagged === 1 ? 'person' : 'people'}
+                  </Button>
+                )}
+                <Button variant={untagged > 0 ? 'outline' : 'default'} onClick={openNew}>
+                  <Plus />
+                  New tag
+                </Button>
+              </>
+            }
+          />
+        }
+      >
+        {(list) => (
+          <div className="space-y-3">
+            {untagged > 0 && (
+              <button
+                type="button"
+                onClick={() => setAutoTagOpen(true)}
+                className="flex h-11 w-full items-center gap-3 rounded-lg border border-dashed px-3 text-left text-sm transition-colors duration-fast hover:border-border-strong hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <Tags className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">
+                    {untagged} {untagged === 1 ? 'person has' : 'people have'} no tags.
+                  </span>{' '}
+                  <span className="text-muted-foreground">
+                    Propose tags from their records; you approve before anything is saved.
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-medium text-text-secondary">Suggest</span>
+              </button>
+            )}
+
+            <ul className="overflow-hidden rounded-lg border bg-card">
+              {list.map((tag) => {
+                const c = tagColor(tag.color)
+                const count = counts.get(tag.id) ?? 0
+                return (
+                  <li key={tag.id} className="group flex h-10 items-center gap-3 border-b px-3 last:border-b-0 hover:bg-accent/40">
+                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', c.dot)} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{tag.name}</span>
+                    {count > 0 ? (
+                      <Link
+                        to={ROUTES.contactsSearch(tag.name)}
+                        className="tnum text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        {count} {count === 1 ? 'contact' : 'contacts'}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No contacts</span>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${tag.name}`} className="text-muted-foreground">
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(tag)}>Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setDeleting(tag)} className="text-danger focus:text-danger">
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </NetworkGate>
 
       <AutoTagDialog open={autoTagOpen} onOpenChange={setAutoTagOpen} />
 
-      <TagEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        tag={editing}
-        existing={tags ?? []}
-      />
+      <TagEditorDialog open={editorOpen} onOpenChange={setEditorOpen} tag={editing} existing={tags ?? []} />
 
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(o) => !o && setDeleting(null)}
         title={`Delete “${deleting?.name}”?`}
-        description="The tag will be removed from all contacts. The contacts themselves are kept."
+        description="The tag is removed from every contact. The contacts themselves are kept."
         confirmLabel="Delete tag"
         destructive
         onConfirm={confirmDelete}
@@ -249,13 +237,10 @@ function TagEditorDialog({
   async function save() {
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error('Tag name is required.')
+      toast.error('Give the tag a name.')
       return
     }
-    const dup = existing.some(
-      (t) =>
-        t.id !== tag?.id && t.name.toLowerCase() === trimmed.toLowerCase(),
-    )
+    const dup = existing.some((t) => t.id !== tag?.id && t.name.toLowerCase() === trimmed.toLowerCase())
     if (dup) {
       toast.error('A tag with that name already exists.')
       return
@@ -265,7 +250,7 @@ function TagEditorDialog({
       toast.success('Tag updated')
     } else {
       await tagRepo.create({ name: trimmed, color })
-      toast.success(`Created tag “${trimmed}”`)
+      toast.success(`Created “${trimmed}”`)
     }
     onOpenChange(false)
   }
@@ -275,9 +260,7 @@ function TagEditorDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit tag' : 'New tag'}</DialogTitle>
-          <DialogDescription>
-            Name your tag and pick a color to identify it at a glance.
-          </DialogDescription>
+          <DialogDescription>A short name and a colour you’ll recognise in a list.</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -286,37 +269,28 @@ function TagEditorDialog({
           }}
           className="space-y-4"
         >
-          <div className="space-y-1.5">
-            <Input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. potential client"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="recruiter, mentor, fintech…" aria-label="Tag name" />
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Colour">
             {TAG_COLOR_KEYS.map((key) => (
               <button
                 key={key}
                 type="button"
+                role="radio"
+                aria-checked={color === key}
                 onClick={() => setColor(key)}
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110',
+                  'flex h-7 w-7 items-center justify-center rounded-full transition-shadow duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
                   TAG_COLORS[key].dot,
-                  color === key && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
+                  color === key && 'ring-2 ring-foreground ring-offset-2 ring-offset-background',
                 )}
                 aria-label={TAG_COLORS[key].label}
               >
-                {color === key && <Check className="h-4 w-4 text-white" />}
+                {color === key && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
               </button>
             ))}
           </div>
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit">{editing ? 'Save' : 'Create tag'}</Button>
