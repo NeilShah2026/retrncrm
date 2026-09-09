@@ -46,7 +46,7 @@ export function NeedsAttention({ contacts, limit = 6 }: Props) {
   )
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
