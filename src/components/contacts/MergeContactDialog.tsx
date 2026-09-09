@@ -81,7 +81,7 @@ export function MergeContactDialog({ open, onOpenChange, primary }: Props) {
         {dup ? (
           // Confirm step
           <div>
-            <div className="flex items-center justify-center gap-3 rounded-xl border p-4">
+            <div className="flex items-center justify-center gap-3 rounded-lg border p-4">
               <div className="flex flex-col items-center gap-1 text-center">
                 <ContactAvatar contact={dup} className="h-10 w-10 text-sm" />
                 <span className="max-w-[8rem] truncate text-xs text-muted-foreground">
@@ -119,7 +119,7 @@ export function MergeContactDialog({ open, onOpenChange, primary }: Props) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search the duplicate contact…"
-                className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-400"
+                className="h-8 w-full rounded-md border bg-background pl-8 pr-3 text-sm outline-none transition-colors duration-fast hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/25"
               />
             </div>
             <div className="mt-2 max-h-72 space-y-1 overflow-y-auto scrollbar-thin">

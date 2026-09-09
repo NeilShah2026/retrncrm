@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Loader2, Plus, Tags } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTags } from '@/hooks/useData'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
@@ -164,7 +164,7 @@ export function TagSuggestBar({ subject, value, onChange, auto, className }: Pro
               'inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs font-medium transition-opacity disabled:opacity-50',
               color
                 ? `${color.badge} border-transparent hover:opacity-80`
-                : 'border-indigo-400/60 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10',
+                : 'border-border-strong text-text-secondary hover:bg-accent',
             )}
           >
             {applying === s.name ? (
@@ -202,12 +202,12 @@ export function TagSuggestBar({ subject, value, onChange, auto, className }: Pro
           variant="ghost"
           disabled={busy || !hasTaggableDetail(subject)}
           onClick={() => void run()}
-          className="h-6 gap-1 px-2 text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+          className="h-6 gap-1 px-2 text-xs text-muted-foreground"
         >
           {loading ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <Sparkles className="h-3 w-3" />
+            <Tags className="h-3 w-3" />
           )}
           {loading ? 'Reading…' : empty ? 'Suggest again' : 'Suggest tags'}
         </Button>

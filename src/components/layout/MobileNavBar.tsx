@@ -4,13 +4,9 @@ import { ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * What a page wants its phone navigation bar to look like.
- *
- * On a phone this replaces the desktop `header` entirely: there is one bar per
- * screen, it belongs to the screen, and it holds only what that screen needs.
- * Leaving `title` off gives a screen with no title at all — which is what the
- * home tab wants, since "Dashboard" only ever restated the tab you just
- * tapped.
+ * What a page wants its phone navigation bar to look like. On a phone this
+ * replaces the desktop `header` entirely: one bar per screen, holding only
+ * what that screen needs.
  */
 export interface MobileChrome {
   /** The screen's name. Omit for a screen that shouldn't announce itself. */
@@ -23,16 +19,14 @@ export interface MobileChrome {
   trailing?: React.ReactNode
   /** Pinned directly under the bar: a search field, a segmented control. */
   toolbar?: React.ReactNode
-  /**
-   * false keeps the title small and permanent in the bar instead of using the
-   * large title that scrolls away. Default is true whenever `title` is set.
-   */
+  /** false keeps the title small and permanent in the bar. */
   largeTitle?: boolean
 }
 
 /**
- * An iOS bar button item: a tinted glyph with a 44pt touch target, not a
- * filled button. Filled buttons in a navigation bar read as web chrome.
+ * An iOS bar button item: a glyph with a 44pt touch target. Tinted with the
+ * brand accent — the one place on a phone screen the accent appears, since
+ * it is how iOS says "this is tappable".
  */
 export const BarButton = React.forwardRef<
   HTMLButtonElement,
@@ -44,7 +38,7 @@ export const BarButton = React.forwardRef<
     className={cn(
       'press flex h-11 min-w-[2.75rem] items-center justify-center gap-1 px-1 text-[17px]',
       '[&_svg]:h-[22px] [&_svg]:w-[22px] [&_svg]:shrink-0',
-      tinted ? 'text-indigo-500' : 'text-foreground',
+      tinted ? 'text-brand' : 'text-foreground',
       className,
     )}
     {...props}
@@ -52,11 +46,7 @@ export const BarButton = React.forwardRef<
 ))
 BarButton.displayName = 'BarButton'
 
-/**
- * The back affordance: a chevron and where you came from. iOS names the
- * previous screen rather than saying "Back", so you can tell at a glance
- * whether you are one level deep or three.
- */
+/** The back affordance: a chevron and where you came from. */
 export function BackBarButton({ label = 'Back' }: { label?: string }) {
   const navigate = useNavigate()
   return (
@@ -71,12 +61,7 @@ export function BackBarButton({ label = 'Back' }: { label?: string }) {
   )
 }
 
-/**
- * The large title, as it appears in the scrolling content. It lives in the
- * scroll region on purpose: on iOS the large title is content that scrolls
- * away, and the small title in the bar fades in to replace it. Animating a
- * pinned title's height instead produces the jitter that gives web apps away.
- */
+/** The large title, as it appears in the scrolling content. */
 export function MobileLargeTitle({
   title,
   subtitle,
@@ -98,39 +83,26 @@ export function MobileLargeTitle({
 
 interface Props {
   chrome: MobileChrome
-  /** Fade the small title into the bar (the large one has scrolled off). */
   showCompactTitle: boolean
-  /** Pin the large title under the bar, for screens whose body can't scroll. */
   pinLargeTitle: boolean
-  /** Draw the hairline that separates the bar from content beneath it. */
   separated: boolean
 }
 
-/**
- * The phone's navigation bar: 44pt tall, translucent, with the screen's title
- * centred between its bar button items.
- */
-export function MobileNavBar({
-  chrome,
-  showCompactTitle,
-  pinLargeTitle,
-  separated,
-}: Props) {
+/** The phone's navigation bar: 44pt tall, translucent, title centred. */
+export function MobileNavBar({ chrome, showCompactTitle, pinLargeTitle, separated }: Props) {
   return (
     <div
       className={cn(
-        'chrome material-bar sticky top-0 z-30 shrink-0 pt-[env(safe-area-inset-top)] transition-shadow md:hidden',
+        'chrome material-bar sticky top-0 z-30 shrink-0 pt-[env(safe-area-inset-top)] md:hidden',
         separated && 'hairline-b',
       )}
     >
       <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3">
-        <div className="flex items-center justify-start gap-1">
-          {chrome.leading}
-        </div>
+        <div className="flex items-center justify-start gap-1">{chrome.leading}</div>
 
         <div
           className={cn(
-            'min-w-0 px-1 text-center transition-opacity duration-200',
+            'min-w-0 px-1 text-center transition-opacity duration-base',
             showCompactTitle ? 'opacity-100' : 'opacity-0',
           )}
           aria-hidden={!showCompactTitle}
@@ -140,9 +112,7 @@ export function MobileNavBar({
           </p>
         </div>
 
-        <div className="flex items-center justify-end gap-0.5">
-          {chrome.trailing}
-        </div>
+        <div className="flex items-center justify-end gap-0.5">{chrome.trailing}</div>
       </div>
 
       {pinLargeTitle && chrome.title && (

@@ -172,7 +172,7 @@ export function EventFormDialog({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Coffee chat with Priya"
+              placeholder="Coffee chat, call, info session…"
             />
           </div>
 
@@ -215,7 +215,7 @@ export function EventFormDialog({
               type="checkbox"
               checked={allDay}
               onChange={(e) => setAllDay(e.target.checked)}
-              className="accent-indigo-500"
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
             />
             All day
           </label>

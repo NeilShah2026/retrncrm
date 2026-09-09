@@ -78,10 +78,6 @@ export function DashboardPage() {
 
   return (
     <PageShell
-      // The home tab is the one screen with no title. "Dashboard" only ever
-      // named the tab you had just tapped, and a phone has no room to spend on
-      // a word that tells you nothing — so the bar carries the app's mark and
-      // the two things you do standing up, and the content starts at the top.
       mobile={{
         leading: <MobileBrand />,
         trailing: isEmpty ? (
@@ -109,7 +105,7 @@ export function DashboardPage() {
               <Search />
             </BarButton>
             <BarButton onClick={openVoiceCapture} aria-label="Say who you met">
-              <Mic />
+              <PenLine />
             </BarButton>
           </>
         ),
@@ -228,36 +224,101 @@ export function DashboardPage() {
 }
 
 /**
- * The app's mark, sized for a navigation bar. This is the only screen that
- * shows it: on a phone the app's identity lives on the home screen icon, so
- * repeating it on every screen would just be a website's masthead.
+ * The numbers, in one line. Unequal on purpose: contacts and overdue are the
+ * two that change what you do today; the rest are context.
  */
-function MobileBrand() {
+function MetricStrip({ stats }: { stats: Stats }) {
   return (
-    <div className="flex items-center gap-1.5 pl-0.5">
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-indigo-500 text-white">
-        <Users className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-[17px] font-semibold tracking-[-0.02em]">Retrn</span>
-    </div>
+    <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-2 rounded-lg border px-4 py-3">
+      <Metric
+        to={ROUTES.contacts}
+        value={stats.total}
+        label={stats.total === 1 ? 'contact' : 'contacts'}
+        emphasis
+      />
+      <Metric
+        to={ROUTES.contactsOverdue}
+        value={stats.overdueCount}
+        label="overdue"
+        emphasis
+        tone={stats.overdueCount > 0 ? 'warning' : undefined}
+      />
+      <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+      <Metric to={ROUTES.calendar} value={stats.meetingsThisWeek} label="meetings this week" />
+      <Metric to={ROUTES.pipeline} value={stats.openOpportunities} label="open applications" />
+    </dl>
+  )
+}
+
+function Metric({
+  to,
+  value,
+  label,
+  emphasis,
+  tone,
+}: {
+  to: string
+  value: number
+  label: string
+  emphasis?: boolean
+  tone?: 'warning'
+}) {
+  return (
+    <Link
+      to={to}
+      className="group inline-flex items-baseline gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      <dd
+        className={cn(
+          'tnum font-semibold leading-none',
+          emphasis ? 'text-xl' : 'text-base',
+          tone === 'warning' && 'text-warning',
+        )}
+      >
+        {value}
+      </dd>
+      <dt
+        className={cn(
+          'text-muted-foreground group-hover:text-foreground',
+          emphasis ? 'text-sm' : 'text-xs',
+        )}
+      >
+        {label}
+      </dt>
+    </Link>
   )
 }
 
 function DashboardSkeleton() {
   return (
-    <PageShell
-      mobile={{ leading: <MobileBrand /> }}
-      header={<PageHeader title="Dashboard" description="Loading your network…" />}
-    >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
+    <div aria-busy="true" aria-label="Loading your network">
+      <div className="flex h-12 items-center gap-6 rounded-lg border px-4">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-3 w-28" />
       </div>
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Skeleton className="h-72 w-full lg:col-span-2" />
-        <Skeleton className="h-72 w-full" />
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border lg:col-span-2">
+          <div className="h-11 border-b px-4 py-3">
+            <Skeleton className="h-4 w-20" />
+          </div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex h-11 items-center gap-3 border-b px-4 last:border-b-0">
+              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-lg border">
+          <div className="h-11 border-b px-4 py-3">
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
       </div>
-    </PageShell>
+    </div>
   )
 }

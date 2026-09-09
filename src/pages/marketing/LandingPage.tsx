@@ -1,327 +1,174 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowRight, Puzzle, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Puzzle } from 'lucide-react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 import { FeatureSection } from '@/components/marketing/FeatureSection'
-import { OrbitalGraphic } from '@/components/marketing/OrbitalGraphic'
 import { PricingSection } from '@/components/marketing/PricingSection'
-import { SectionDivider } from '@/components/marketing/SectionDivider'
 import { DashboardMockup } from '@/components/marketing/mockups/DashboardMockup'
 import { ContactsMockup } from '@/components/marketing/mockups/ContactsMockup'
 import { PipelineMockup } from '@/components/marketing/mockups/PipelineMockup'
 import { ComposeMockup } from '@/components/marketing/mockups/ComposeMockup'
+import { Button } from '@/components/ui/button'
 import { ROUTES } from '@/lib/routes'
 import { CHROME_STORE_URL } from '@/lib/constants'
 
-const EASE = [0.22, 1, 0.36, 1] as const
-
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: '-80px' },
-  transition: { duration: 0.7, ease: EASE },
-}
+/** Where students actually meet people. Specific beats generic. */
+const MOMENTS = [
+  {
+    n: '01',
+    title: 'The career fair',
+    body: 'Forty conversations, forty business cards, one that matters. Type their name and the booth before you reach the next table.',
+  },
+  {
+    n: '02',
+    title: 'The coffee chat',
+    body: 'Set a cadence — every quarter, say — and Retrn tells you when it has been too long, with a prep brief before you write.',
+  },
+  {
+    n: '03',
+    title: 'The flight home',
+    body: 'Seat 14C turns out to run recruiting at a firm you like. That is a contact, not a story you forget by Thanksgiving.',
+  },
+]
 
 /**
- * Public marketing site. One continuous near-black canvas — every hint of
- * color comes from large, soft, animated gradient glows layered over that
- * single base, so there are no section seams to blend and the whole page
- * reads as one cohesive surface. Product moments are live UI mockups (see
- * components/marketing/mockups), not screenshots, so it feels like the app
- * is actually running. Sign in / Get started both route to /login.
+ * Public marketing site. Same tokens as the app: an off-white canvas,
+ * hairlines, one near-black action colour, no ambient gradients. Product
+ * moments are live mockups built from the app's own primitives, labelled as
+ * examples.
  */
 export function LandingPage() {
   return (
-    <div className="relative overflow-x-clip bg-[#07070b]">
-      {/* Fine dot texture across the whole page, fading out lower down. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0)',
-          backgroundSize: '30px 30px',
-          maskImage:
-            'linear-gradient(180deg, black 0%, black 30%, transparent 70%)',
-        }}
-      />
-
-      {/* Top ambience. Deliberately anchored to the page, not to the hero
-          <section> below — that section clips its own overflow, so a glow
-          parked inside it gets sheared off in a hard line right under the nav.
-          Living here it reaches up behind the bar and through the status-bar
-          safe area, so the color starts at the very top of the screen.
-
-          Two layers: a full-bleed linear wash that guarantees the top edge is
-          tinted at any viewport width (a radial alone leaves dark corners on
-          wide laptops), and the soft indigo bloom over it. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[520px]"
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(79,70,229,0.26) 0%, rgba(79,70,229,0.13) 40%, rgba(79,70,229,0.04) 72%, transparent 100%)',
-        }}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[-260px] z-0 h-[860px] w-[1100px] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-[140px]"
-        animate={{ opacity: [0.65, 1, 0.65] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
+    <div className="bg-background text-foreground">
       <MarketingNav />
 
-      {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden">
-        {/* hero glows (the indigo bloom lives at page level above, so it can
-            bleed up behind the nav instead of being clipped by this section) */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute right-[-8%] top-[24%] h-[420px] w-[420px] rounded-full bg-fuchsia-500/18 blur-[120px]"
-          animate={{ opacity: [0.5, 0.85, 0.5] }}
-          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
-        />
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute left-[-8%] top-[40%] h-[380px] w-[380px] rounded-full bg-sky-500/15 blur-[120px]"
-          animate={{ opacity: [0.45, 0.8, 0.45] }}
-          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-        />
-
-        <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 pb-16 pt-14 text-center sm:px-6 sm:pb-24 sm:pt-24">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-white/70 backdrop-blur-sm"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            Private by default — synced securely to your account
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.08, ease: EASE }}
-            className="mx-auto mt-7 max-w-3xl font-serif text-4xl font-medium leading-[1.05] tracking-tight text-white sm:text-6xl md:text-[4.25rem]"
-          >
-            Never lose track of
-            <br />
-            anyone you meet.
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.18, ease: EASE }}
-            className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-white/55 sm:text-lg"
-          >
-            Retrn is a personal CRM built for students — capture the people you
-            meet at career fairs, coffee chats, and on the way to your gate,
-            then turn those relationships into your next internship or job.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.28, ease: EASE }}
-            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
-          >
-            <Link
-              to={ROUTES.login}
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-all hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)]"
+      {/* ---- Hero: left-weighted copy, product on the right ---- */}
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16 lg:pb-24 lg:pt-20">
+        <div className="max-w-xl">
+          <p className="text-label text-muted-foreground">Personal CRM for students</p>
+          <h1 className="text-display mt-4 text-[2.5rem] sm:text-[3.25rem] lg:text-[3.75rem]">
+            Never lose track of anyone you meet.
+          </h1>
+          <p className="mt-5 max-w-md text-base leading-relaxed text-text-secondary sm:text-lg">
+            Capture the people you meet at career fairs, coffee chats and on the way to
+            your gate. Follow up on time. Turn the relationships into your next
+            internship or job.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Button size="lg" asChild>
+              <Link to={ROUTES.login}>
+                Get Retrn free
+                <ArrowRight />
+              </Link>
+            </Button>
+            <a
+              href="#features"
+              className="text-sm font-medium text-text-secondary underline-offset-4 hover:text-foreground hover:underline"
             >
-              Get Retrn free
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <span className="text-xs text-white/40">
-              Free, forever — takes about ten seconds
-            </span>
-          </motion.div>
-
-          {/* Live dashboard mockup */}
-          <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 1, delay: 0.4, ease: EASE }}
-            className="mx-auto mt-12 w-full max-w-xl sm:mt-16"
-          >
-            <DashboardMockup />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ================= "EVERYWHERE" BEAT ================= */}
-      <section className="relative overflow-hidden py-12 sm:py-20">
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <motion.p
-            {...fadeUp}
-            className="text-xs font-semibold uppercase tracking-wider text-indigo-300"
-          >
-            Capture, everywhere
-          </motion.p>
-          <motion.h2
-            {...fadeUp}
-            className="mt-3 font-serif text-3xl font-medium tracking-tight text-white sm:text-4xl"
-          >
-            People don't wait for LinkedIn.
-          </motion.h2>
-          <motion.p
-            {...fadeUp}
-            className="mx-auto mt-4 max-w-md text-base text-white/55"
-          >
-            You meet them on a bus, at a bar, backstage. Retrn doesn't care
-            where — it just remembers.
-          </motion.p>
-        </div>
-
-        {/* The orbital is a fixed 560px system; scale + clip it so it doesn't
-            leave a huge empty square on small screens. */}
-        <div className="relative mt-2 flex h-[360px] justify-center overflow-hidden sm:mt-6 sm:h-[560px]">
-          <div className="origin-top scale-[0.6] sm:scale-100">
-            <OrbitalGraphic />
+              See how it works
+            </a>
           </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Free for up to 30 contacts. Free for Babson students entirely.
+          </p>
+        </div>
+
+        <div className="relative">
+          <DashboardMockup />
+          <p className="mt-2 text-right text-xs text-muted-foreground">Example data</p>
         </div>
       </section>
 
-      {/* ================= FEATURES ================= */}
-      <section
-        id="features"
-        className="relative mx-auto max-w-6xl space-y-20 px-4 pb-20 pt-2 sm:space-y-36 sm:px-6 sm:pb-36 sm:pt-4"
-      >
-        {/* soft moving accent glows behind the feature stack */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute right-[-10%] top-[6%] h-[440px] w-[440px] rounded-full bg-violet-600/12 blur-[130px]"
-          animate={{ opacity: [0.4, 0.75, 0.4] }}
-          transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute left-[-10%] top-[55%] h-[440px] w-[440px] rounded-full bg-rose-600/12 blur-[130px]"
-          animate={{ opacity: [0.35, 0.7, 0.35] }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-        />
+      {/* ---- Where people actually meet: a numbered editorial list ---- */}
+      <section className="border-y bg-bg-sunken/50">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+          <div className="max-w-xl">
+            <p className="text-label text-muted-foreground">Capture, wherever it happens</p>
+            <h2 className="text-display mt-3 text-3xl sm:text-4xl">People don’t wait for LinkedIn.</h2>
+          </div>
+          <ol className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
+            {MOMENTS.map((m) => (
+              <li key={m.n} className="bg-background p-6">
+                <span className="tnum text-xs font-medium text-muted-foreground">{m.n}</span>
+                <h3 className="mt-3 text-lg font-semibold tracking-[-0.01em]">{m.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{m.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
+      {/* ---- Features: one lead, two supporting ---- */}
+      <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
         <FeatureSection
           index={1}
+          lead
           eyebrow="Capture"
-          title="Add anyone in seconds, from anywhere"
-          description="A name and how you met is enough to save. Paste a LinkedIn profile to auto-fill the rest, tag where you met them, and Retrn takes care of the details — just as fast from your phone as your laptop."
-          accent="indigo"
+          title="Add anyone in one line"
+          description="Type who you met — “Sarah Chen, PM at Fidelity, career fair, follow up in a month” — and Retrn structures it into a contact. Paste a LinkedIn profile to fill the rest. A name and where you met is enough to save."
           visual={<ContactsMockup />}
         />
-        <FeatureSection
-          index={2}
-          eyebrow="Pipeline"
-          title="Turn your network into your next offer"
-          description="Track every internship and job you're chasing on a simple board, and see exactly who in your network can put in a good word — recruiters, referrers, and warm intros, all linked to the opportunity."
-          accent="violet"
-          reverse
-          visual={<PipelineMockup />}
-        />
-        <FeatureSection
-          index={3}
-          eyebrow="Follow through"
-          title="Never show up to a conversation cold"
-          description="Get a quick brief before every coffee chat — talking points, your last conversation, shared history. Reusable outreach templates make the follow-up just as easy."
-          accent="rose"
-          visual={<ComposeMockup />}
-        />
-      </section>
-
-      {/* ================= EXTENSION TEASER ================= */}
-      <section className="relative px-4 pb-20 sm:px-6 sm:pb-28">
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.7, ease: EASE }}
-          className="relative mx-auto flex max-w-3xl flex-col items-center overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-[#100d1c] to-[#0a0812] px-6 py-10 text-center sm:px-10 sm:py-12"
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[100px]"
+        <div className="mt-16 grid grid-cols-1 gap-16 lg:mt-20 lg:grid-cols-2 lg:gap-12">
+          <FeatureSection
+            index={2}
+            eyebrow="Pipeline"
+            title="Turn the network into offers"
+            description="Every internship and job on one board, with the recruiters, referrers and warm intros linked to the opportunity they can help with."
+            visual={<PipelineMockup />}
           />
-          <div className="relative">
-            <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Now on the Chrome Web Store
-            </span>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white">
-              <Puzzle className="h-6 w-6" />
-            </div>
-            <h2 className="font-serif text-2xl font-medium tracking-tight text-white sm:text-3xl">
-              A browser extension for your inbox
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-white/55">
-              Log emails from Gmail and Outlook — and add people from LinkedIn —
-              straight to the right Retrn contact, without leaving the tab.
-            </p>
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <a
-                href={CHROME_STORE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition-all hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)]"
-              >
-                Add to Chrome
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </a>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {['Gmail', 'Outlook', 'LinkedIn'].map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/60"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ================= PRICING ================= */}
-      <SectionDivider />
-      <PricingSection />
-
-      <SectionDivider />
-
-      {/* ================= FINAL CTA ================= */}
-      <section className="relative overflow-hidden py-20 text-center sm:py-32">
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-600/22 blur-[130px]"
-          animate={{ opacity: [0.55, 1, 0.55] }}
-          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <div className="relative mx-auto max-w-2xl px-4 sm:px-6">
-          <motion.h2
-            {...fadeUp}
-            className="font-serif text-3xl font-medium tracking-tight text-white sm:text-5xl"
-          >
-            Start building your network today.
-          </motion.h2>
-          <motion.p {...fadeUp} className="mt-4 text-base text-white/55">
-            It takes ten seconds to add your first contact.
-          </motion.p>
-          <motion.div {...fadeUp}>
-            <Link
-              to={ROUTES.login}
-              className="group mt-9 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)]"
-            >
-              Get Retrn free
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </motion.div>
+          <FeatureSection
+            index={3}
+            eyebrow="Follow through"
+            title="Never show up cold"
+            description="A short brief before each conversation — what you talked about last, what to ask — and outreach templates that fill in from the person’s record."
+            visual={<ComposeMockup />}
+          />
         </div>
       </section>
 
-      <SectionDivider />
+      {/* ---- Extension: a quiet row, not a glowing card ---- */}
+      <section className="border-y">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-12 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex items-start gap-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-bg-sunken text-text-secondary">
+              <Puzzle className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold tracking-[-0.01em]">A browser extension for your inbox</h2>
+              <p className="mt-1 max-w-lg text-sm leading-relaxed text-text-secondary">
+                Log emails from Gmail and Outlook, and add people from LinkedIn, to the right
+                Retrn contact without leaving the tab.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" asChild className="shrink-0">
+            <a href={CHROME_STORE_URL} target="_blank" rel="noreferrer">
+              Add to Chrome
+              <ArrowRight />
+            </a>
+          </Button>
+        </div>
+      </section>
+
+      <PricingSection />
+
+      {/* ---- Final CTA ---- */}
+      <section className="border-t">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:py-20">
+          <div>
+            <h2 className="text-display text-3xl sm:text-4xl">Start with the next person you meet.</h2>
+            <p className="mt-2 text-base text-text-secondary">
+              It takes about ten seconds to add your first contact.
+            </p>
+          </div>
+          <Button size="lg" asChild>
+            <Link to={ROUTES.login}>
+              Get Retrn free
+              <ArrowRight />
+            </Link>
+          </Button>
+        </div>
+      </section>
 
       <MarketingFooter />
     </div>

@@ -121,7 +121,7 @@ export function CollegeQuickAddDialog({
                 className={cn(
                   'flex flex-col items-center gap-1.5 rounded-lg border py-3 text-xs font-medium transition-colors',
                   role === r.key
-                    ? 'border-indigo-400 bg-indigo-500/10 text-foreground'
+                    ? 'border-foreground bg-accent text-foreground'
                     : 'text-muted-foreground hover:bg-accent',
                 )}
               >
@@ -139,7 +139,7 @@ export function CollegeQuickAddDialog({
                 autoFocus
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Jordan"
+                placeholder="First name"
                 required
               />
             </div>
@@ -149,7 +149,7 @@ export function CollegeQuickAddDialog({
                 id="qa-last"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Lee"
+                placeholder="Last name"
               />
             </div>
           </div>
@@ -163,7 +163,7 @@ export function CollegeQuickAddDialog({
                   id="qa-company"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  placeholder="Stripe"
+                  placeholder="Company"
                 />
               </div>
               <div className="space-y-1.5">
@@ -172,7 +172,7 @@ export function CollegeQuickAddDialog({
                   id="qa-title"
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="Software Engineer"
+                  placeholder="Role or title"
                 />
               </div>
             </div>
@@ -185,7 +185,7 @@ export function CollegeQuickAddDialog({
                 id="qa-dept"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Computer Science"
+                placeholder="Department"
               />
             </div>
           )}
@@ -198,7 +198,7 @@ export function CollegeQuickAddDialog({
                   id="qa-major"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="Economics"
+                  placeholder="Major"
                 />
               </div>
               <div className="space-y-1.5">
@@ -207,7 +207,7 @@ export function CollegeQuickAddDialog({
                   id="qa-grad"
                   value={gradYear}
                   onChange={(e) => setGradYear(e.target.value)}
-                  placeholder="2027"
+                  placeholder="YYYY"
                 />
               </div>
             </div>
@@ -220,7 +220,7 @@ export function CollegeQuickAddDialog({
                 id="qa-grad-alum"
                 value={gradYear}
                 onChange={(e) => setGradYear(e.target.value)}
-                placeholder="2021"
+                placeholder="YYYY"
               />
             </div>
           )}
@@ -232,7 +232,7 @@ export function CollegeQuickAddDialog({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="jordan@example.com"
+              placeholder="name@school.edu"
             />
           </div>
 

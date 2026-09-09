@@ -2,24 +2,28 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
+/**
+ * Small label. Status variants are muted tints, never neon. `brand` is
+ * reserved for the "Suggested" / "From note" marker on model output — it is
+ * how the app says "a model wrote this" without a sparkle icon.
+ */
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none',
+  'inline-flex items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 py-px text-xs font-medium leading-4',
   {
     variants: {
       variant: {
         default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        outline: 'text-foreground',
-        destructive:
-          'border-transparent bg-destructive/15 text-destructive dark:text-red-300',
-        success:
-          'border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-        warning:
-          'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
+        secondary: 'border-transparent bg-secondary text-text-secondary',
+        outline: 'border-border text-text-secondary',
+        brand: 'border-transparent bg-brand/10 text-brand',
+        success: 'border-transparent bg-success-soft text-success',
+        warning: 'border-transparent bg-warning-soft text-warning',
+        destructive: 'border-transparent bg-danger-soft text-danger',
+        info: 'border-transparent bg-info-soft text-info',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: 'secondary',
     },
   },
 )
@@ -29,9 +33,20 @@ export interface BadgeProps
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />
+}
+
+/** The one way model output is marked. Text, not iconography. */
+function SuggestedBadge({
+  children = 'Suggested',
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span className={cn(badgeVariants({ variant }), className)} {...props} />
+    <Badge variant="brand" className={className} title="Written by the model from your data" {...props}>
+      {children}
+    </Badge>
   )
 }
 
-export { Badge, badgeVariants }
+export { Badge, SuggestedBadge, badgeVariants }
