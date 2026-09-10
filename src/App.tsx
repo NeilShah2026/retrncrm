@@ -23,6 +23,7 @@ import { AddContactPage } from '@/pages/AddContactPage'
 import { PrivacyPolicyPage } from '@/pages/legal/PrivacyPolicyPage'
 import { TermsPage } from '@/pages/legal/TermsPage'
 import { ROUTES } from '@/lib/routes'
+import { isNative } from '@/lib/platform'
 
 function ThemedToaster() {
   const { resolvedTheme } = useTheme()
@@ -75,7 +76,14 @@ export default function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              <Route path={ROUTES.home} element={<LandingPage />} />
+              {/* The marketing site is a "visit our website" pitch — inside
+                  the native app there's no browser to have arrived from, so
+                  "/" goes straight to the product (RequireAuth sends signed-
+                  out visitors on to /login from there). */}
+              <Route
+                path={ROUTES.home}
+                element={isNative ? <Navigate to={ROUTES.app} replace /> : <LandingPage />}
+              />
               <Route path={ROUTES.login} element={<LoginPage />} />
               <Route path={ROUTES.add} element={<AddContactPage />} />
               <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />

@@ -38,7 +38,14 @@ const buttonVariants = cva(
         sm: 'h-7 px-2.5 text-xs',
         lg: 'h-9 px-4 text-sm',
         icon: 'h-8 w-8',
-        'icon-sm': 'h-7 w-7 [&_svg]:size-3.5',
+        // Visually 28px (matches the density of the row it sits in — a
+        // kebab menu next to a 36-44px list row), but Apple HIG wants a
+        // 44x44pt tap target regardless of glyph size. `relative` plus an
+        // invisible, absolutely-positioned `::before` extends the *hit*
+        // area to 44x44 (28 + 8px on each side) without touching layout or
+        // the visible button box.
+        'icon-sm':
+          "relative h-7 w-7 [&_svg]:size-3.5 before:absolute before:-inset-2 before:content-['']",
       },
     },
     defaultVariants: {

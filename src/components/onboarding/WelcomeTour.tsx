@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/auth/AuthProvider'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -28,7 +29,8 @@ interface Step {
   kind?: 'name'
 }
 
-const STEPS: Step[] = [
+function buildSteps(isMobile: boolean): Step[] {
+  return [
   {
     icon: Hand,
     eyebrow: 'Welcome',
@@ -40,7 +42,9 @@ const STEPS: Step[] = [
     icon: Users,
     eyebrow: 'Capture',
     title: 'Every person you meet, one search away',
-    body: 'Career fairs, coffee chats, a bus ride, a flight. Type one line about who you met and Retrn turns it into a contact. Press N anywhere to add someone.',
+    body: isMobile
+      ? 'Career fairs, coffee chats, a bus ride, a flight. Say or type one line about who you met and Retrn turns it into a contact — tap the + button anywhere to add someone.'
+      : 'Career fairs, coffee chats, a bus ride, a flight. Type one line about who you met and Retrn turns it into a contact. Press N anywhere to add someone.',
   },
   {
     icon: Coffee,
@@ -54,10 +58,13 @@ const STEPS: Step[] = [
     title: 'Track your pipeline, not just your contacts',
     body: 'Log every internship and job on a board, link the people who can help, and send outreach from templates that fill in from their record.',
   },
-]
+  ]
+}
 
 export function WelcomeTour({ open, onOpenChange, onDismiss, onComplete }: Props) {
   const { user, updateName } = useAuth()
+  const isMobile = useIsMobile()
+  const STEPS = React.useMemo(() => buildSteps(isMobile), [isMobile])
   const [step, setStep] = React.useState(0)
   const [name, setName] = React.useState('')
   const last = step === STEPS.length - 1

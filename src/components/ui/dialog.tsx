@@ -105,7 +105,15 @@ const DialogContent = React.forwardRef<
 
         {children}
         {!hideClose && (
-          <DialogPrimitive.Close className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:pointer-events-none">
+          <DialogPrimitive.Close
+            className={cn(
+              // 28px visually (matches the header it sits in), but expanded
+              // to a 44x44pt tap target the same way Button's icon-sm does —
+              // see the comment there.
+              'absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:pointer-events-none',
+              "before:absolute before:-inset-2 before:content-['']",
+            )}
+          >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>

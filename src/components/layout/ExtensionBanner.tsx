@@ -2,17 +2,20 @@ import * as React from 'react'
 import { Puzzle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CHROME_STORE_URL } from '@/lib/constants'
+import { isNative } from '@/lib/platform'
 
 const DISMISS_KEY = 'retrn-ext-banner-dismissed'
 
 /**
  * A small, dismissible prompt to install the browser extension. Sits above
  * the phone's tab bar, bottom-right on a laptop, and stays gone once closed.
+ * Never shown inside the native app — there's no browser there to extend.
  */
 export function ExtensionBanner() {
   const [show, setShow] = React.useState(false)
 
   React.useEffect(() => {
+    if (isNative) return
     try {
       if (localStorage.getItem(DISMISS_KEY)) return
     } catch {

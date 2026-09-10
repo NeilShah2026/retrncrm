@@ -350,7 +350,7 @@ function AnswerProse({ text }: { text: string }) {
         type="button"
         onClick={() => void copy()}
         aria-label="Copy this answer"
-        className="mt-1 flex items-center gap-1 rounded-sm px-1 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity duration-fast hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand group-hover/prose:opacity-100"
+        className="mt-1 flex items-center gap-1 rounded-sm px-1 py-0.5 text-xs text-muted-foreground transition-opacity duration-fast hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand md:opacity-0 md:group-hover/prose:opacity-100"
       >
         {copied ? (
           <>

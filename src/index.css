@@ -166,7 +166,11 @@
 
   /* A tap should never leave a grey flash behind on a custom control, and
      nothing interactive should wait 300ms for a double-tap that will never
-     come. */
+     come. Controls never have text worth selecting, so the iOS
+     long-press callout (Copy / Look Up / Share…) that text would normally
+     get is switched off too — the same tradeoff the `.chrome` utility below
+     already makes for nav/structural elements, just extended to every
+     control everywhere. */
   @media (hover: none) {
     button,
     a,
@@ -174,6 +178,22 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
+    button,
+    [role='button'] {
+      -webkit-touch-callout: none;
+    }
+  }
+
+  /* Native app shell only (the `native` class is set once at boot — see
+     src/lib/nativeBootstrap.ts — only when running under Capacitor, never
+     on web/the installed PWA). A native iOS app doesn't pinch- or
+     double-tap-zoom its own interface the way a browser tab does; disabling
+     it here (rather than via the viewport meta tag, which is shared with
+     the web build) keeps that expectation native-only.
+     `pan-x pan-y` permits scrolling but omits the `pinch-zoom` and
+     `manipulation` keywords that would otherwise re-enable it. */
+  html.native body {
+    touch-action: pan-x pan-y;
   }
 
   /* Rubber-banding should stop at the scroll region you are actually in. */
