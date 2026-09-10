@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/AuthProvider'
 import { readProfile, buildShareUrl } from '@/lib/shareProfile'
+import { apiOrigin } from '@/lib/apiBase'
 import { ROUTES } from '@/lib/routes'
 
 interface Props {
@@ -30,7 +31,7 @@ export function ShareProfileDialog({ open, onOpenChange }: Props) {
   const [copied, setCopied] = React.useState(false)
 
   const profile = readProfile(user)
-  const url = buildShareUrl(profile, window.location.origin)
+  const url = buildShareUrl(profile, apiOrigin())
   const subtitle = [profile.headline, profile.company].filter(Boolean).join(' · ')
 
   async function copyLink() {

@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/auth/AuthProvider'
+import { apiOrigin } from '@/lib/apiBase'
 
 interface Props {
   open: boolean
@@ -54,7 +55,7 @@ export function CalendarSyncDialog({ open, onOpenChange }: Props) {
     if (open) void load()
   }, [open, load])
 
-  const httpsUrl = token ? `${window.location.origin}/api/calendar?token=${token}` : ''
+  const httpsUrl = token ? `${apiOrigin()}/api/calendar?token=${token}` : ''
   const webcalUrl = httpsUrl.replace(/^https?:\/\//, 'webcal://')
 
   async function copy() {

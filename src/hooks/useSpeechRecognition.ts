@@ -1,14 +1,155 @@
 import * as React from 'react'
+import { SpeechRecognition as NativeSpeechRecognition } from '@capacitor-community/speech-recognition'
+import { isNative } from '@/lib/platform'
 
 /**
- * Dictation via the browser's built-in Web Speech API.
+ * Dictation, via whichever engine the platform actually has.
  *
- * This is deliberately *not* a paid transcription service: Chrome, Edge and
- * Safari all ship speech recognition, it costs nothing, needs no key, and no
- * audio ever touches our servers. Browsers without it (Firefox today) fall
- * back to typing — phone keyboards have their own dictation button, which is
- * the same free capability by another route.
+ * On the web this is the browser's built-in Web Speech API — free, no key,
+ * no audio ever touches our servers. That API does not exist inside a
+ * Capacitor WKWebView on iOS at all (it's a Safari-process-only capability),
+ * so native builds instead use `@capacitor-community/speech-recognition`,
+ * which wraps iOS's on-device `SFSpeechRecognizer` — same "nothing leaves
+ * the device" property, different plumbing. Either way this hook exposes the
+ * exact same {supported, listening, transcript, interim, error, start, stop,
+ * reset} shape, so nothing above it (VoiceCaptureDialog, AssistantChat) has
+ * to know which engine is running.
  */
+
+export interface SpeechRecognitionState {
+  /** The platform can transcribe. False → show the typing fallback. */
+  supported: boolean
+  listening: boolean
+  /** Everything recognised so far this session (finalised phrases only). */
+  transcript: string
+  /** The phrase currently being spoken, not yet finalised. */
+  interim: string
+  /** Human-readable problem, e.g. a denied mic permission. */
+  error: string | null
+  start: () => void
+  stop: () => void
+  reset: () => void
+}
+
+export function useSpeechRecognition(): SpeechRecognitionState {
+  // `isNative` is a module-level constant fixed for the app's entire life —
+  // this branch is the same on every render of a given app instance, so it
+  // never actually violates the rules of hooks despite the shape.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return isNative ? useNativeSpeechRecognition() : useWebSpeechRecognition()
+}
+
+// --- Native: @capacitor-community/speech-recognition (iOS SFSpeechRecognizer) ----
+
+function useNativeSpeechRecognition(): SpeechRecognitionState {
+  const [supported, setSupported] = React.useState(false)
+  const [listening, setListening] = React.useState(false)
+  const [transcript, setTranscript] = React.useState('')
+  const [interim, setInterim] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+
+  // Mirrors `interim` synchronously so `finalize()` can read the latest
+  // value without taking a dependency that would re-create `stop`/`start`.
+  const interimRef = React.useRef('')
+  const listeningRef = React.useRef(false)
+
+  React.useEffect(() => {
+    let active = true
+    NativeSpeechRecognition.available()
+      .then(({ available }) => {
+        if (active) setSupported(available)
+      })
+      .catch(() => {
+        if (active) setSupported(false)
+      })
+
+    const partialSub = NativeSpeechRecognition.addListener(
+      'partialResults',
+      (data: { matches?: string[] }) => {
+        const text = data.matches?.[0] ?? ''
+        interimRef.current = text
+        setInterim(text)
+      },
+    )
+    // Safety net alongside `start()`'s own promise resolving (see `begin`
+    // below) — some plugin versions only reliably signal end-of-utterance
+    // one way or the other.
+    const stateSub = NativeSpeechRecognition.addListener(
+      'listeningState',
+      (data: { status: string }) => {
+        if (data.status === 'stopped' && listeningRef.current) finalize()
+      },
+    )
+
+    return () => {
+      active = false
+      void partialSub.then((h) => h.remove())
+      void stateSub.then((h) => h.remove())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Moves whatever's in `interim` into `transcript` and clears it. */
+  const finalize = React.useCallback((finalText?: string) => {
+    listeningRef.current = false
+    setListening(false)
+    const chunk = (finalText ?? interimRef.current).trim()
+    if (chunk) setTranscript((prev) => `${prev} ${chunk}`.trim())
+    interimRef.current = ''
+    setInterim('')
+  }, [])
+
+  const start = React.useCallback(() => {
+    if (listeningRef.current) return
+    setError(null)
+    void (async () => {
+      try {
+        const perm = await NativeSpeechRecognition.requestPermissions()
+        if (perm.speechRecognition !== 'granted') {
+          setError(
+            'Speech recognition access was blocked — allow it for Retrn in Settings to dictate.',
+          )
+          return
+        }
+        listeningRef.current = true
+        setListening(true)
+        interimRef.current = ''
+        setInterim('')
+        // Resolves once the recognizer stops — by our own `stop()` below, or
+        // iOS ending the utterance on its own after a pause.
+        const result = await NativeSpeechRecognition.start({
+          language: navigator.language || 'en-US',
+          partialResults: true,
+          popup: false,
+        })
+        if (listeningRef.current) finalize(result?.matches?.[0])
+      } catch {
+        listeningRef.current = false
+        setListening(false)
+        setError('Dictation stopped unexpectedly.')
+      }
+    })()
+  }, [finalize])
+
+  const stop = React.useCallback(() => {
+    if (!listeningRef.current) return
+    finalize()
+    void NativeSpeechRecognition.stop().catch(() => {
+      // Already stopped.
+    })
+  }, [finalize])
+
+  const reset = React.useCallback(() => {
+    setTranscript('')
+    setInterim('')
+    interimRef.current = ''
+    setError(null)
+  }, [])
+
+  return { supported, listening, transcript, interim, error, start, stop, reset }
+}
+
+// --- Web: the browser's built-in Web Speech API ----------------------------
 
 // The API is still vendor-prefixed and isn't in TypeScript's DOM lib.
 interface SpeechRecognitionAlternativeLike {
@@ -48,21 +189,6 @@ function getCtor(): SpeechRecognitionCtor | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition
 }
 
-export interface SpeechRecognitionState {
-  /** The browser can transcribe. False → show the typing fallback. */
-  supported: boolean
-  listening: boolean
-  /** Everything recognised so far this session (finalised phrases only). */
-  transcript: string
-  /** The phrase currently being spoken, not yet finalised. */
-  interim: string
-  /** Human-readable problem, e.g. a denied mic permission. */
-  error: string | null
-  start: () => void
-  stop: () => void
-  reset: () => void
-}
-
 const ERROR_MESSAGES: Record<string, string> = {
   'not-allowed': 'Microphone access was blocked — allow it in your browser to dictate.',
   'service-not-allowed': 'Microphone access was blocked — allow it in your browser to dictate.',
@@ -70,7 +196,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   network: 'Speech recognition needs a network connection.',
 }
 
-export function useSpeechRecognition(): SpeechRecognitionState {
+function useWebSpeechRecognition(): SpeechRecognitionState {
   const [supported] = React.useState(() => Boolean(getCtor()))
   const [listening, setListening] = React.useState(false)
   const [transcript, setTranscript] = React.useState('')

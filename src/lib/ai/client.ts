@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { apiUrl } from '@/lib/apiBase'
 
 /**
  * The single client-side door to the model.
@@ -69,7 +70,7 @@ export async function askClaude({
 
   let response: Response
   try {
-    response = await fetch('/api/ai', {
+    response = await fetch(apiUrl('/api/ai'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

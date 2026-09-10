@@ -4,6 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
 import { syncAccountEmail } from '@/lib/eduVerification'
 import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
+import { isNative } from '@/lib/platform'
+import {
+  NATIVE_AUTH_REDIRECT_URL,
+  listenForNativeAuthRedirect,
+  openNativeAuthUrl,
+} from '@/lib/nativeAuth'
 
 interface AuthResult {
   error: string | null
@@ -57,15 +63,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (next?.user) void onSignedIn(next.user)
     })
 
+    // Native only: completes Google OAuth / magic-link / signup-confirmation
+    // sign-in when iOS hands the app back its custom-scheme redirect URL.
+    const removeNativeAuthListener = isNative ? listenForNativeAuthRedirect() : undefined
+
     return () => {
       active = false
       listener.subscription.unsubscribe()
+      removeNativeAuthListener?.()
     }
   }, [])
 
   const signUpWithPassword = React.useCallback(
     async (email: string, password: string): Promise<AuthResult> => {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        // Native only — web keeps Supabase's default Site URL. Without this,
+        // confirming on a phone still works (it lands on the web app) but
+        // leaves the user to reopen and sign into the native app by hand.
+        ...(isNative && { options: { emailRedirectTo: NATIVE_AUTH_REDIRECT_URL } }),
+      })
       return { error: error?.message ?? null }
     },
     [],
@@ -83,7 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string): Promise<AuthResult> => {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/app` },
+        options: {
+          emailRedirectTo: isNative
+            ? NATIVE_AUTH_REDIRECT_URL
+            : `${window.location.origin}/app`,
+        },
       })
       return { error: error?.message ?? null }
     },
@@ -91,6 +113,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signInWithGoogle = React.useCallback(async (): Promise<AuthResult> => {
+    if (isNative) {
+      // The WebView can't complete Google's OAuth consent screen (Google
+      // blocks embedded WebViews outright) — open it in the system browser
+      // instead and let `NATIVE_AUTH_REDIRECT_URL` hand control back to us.
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: NATIVE_AUTH_REDIRECT_URL, skipBrowserRedirect: true },
+      })
+      if (error) return { error: error.message }
+      if (data.url) await openNativeAuthUrl(data.url)
+      return { error: null }
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/app` },

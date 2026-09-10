@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { apiUrl } from './apiBase'
 
 /**
  * Babson free access: any student who proves control of a @babson.edu address
@@ -91,7 +92,7 @@ async function callVerifyEndpoint(body: Record<string, unknown>): Promise<Verify
   const token = data.session?.access_token
   if (!token) throw new Error('Sign in first.')
 
-  const res = await fetch('/api/verify-edu', {
+  const res = await fetch(apiUrl('/api/verify-edu'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

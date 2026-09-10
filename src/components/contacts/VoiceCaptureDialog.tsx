@@ -14,6 +14,7 @@ import { SuggestedBadge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { ContactFormDialog } from './ContactFormDialog'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { isNative } from '@/lib/platform'
 import { useContacts, useTags } from '@/hooks/useData'
 import { contactRepo } from '@/services'
 import { captureFields, parseSpokenContact } from '@/lib/voiceParse'
@@ -268,8 +269,11 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
             </div>
             {speech.error && (
               <p className="rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning">
-                {speech.error} If the microphone is blocked, allow it from the address bar. Typing
-                works either way.
+                {speech.error}{' '}
+                {isNative
+                  ? 'Allow it in Settings → Retrn.'
+                  : 'If the microphone is blocked, allow it from the address bar.'}{' '}
+                Typing works either way.
               </p>
             )}
           </div>

@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
+import { isNative } from './platform'
+import { capacitorPreferencesStorage } from './nativeStorage'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -16,7 +18,11 @@ export const supabase = createClient<Database>(url, anonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // The native app completes auth via a custom-scheme redirect handled
+    // by src/lib/nativeAuth.ts, not by Supabase reading `window.location` —
+    // and there is no meaningful URL to detect a session in there anyway.
+    detectSessionInUrl: !isNative,
+    ...(isNative && { storage: capacitorPreferencesStorage }),
   },
 })
 

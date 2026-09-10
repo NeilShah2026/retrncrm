@@ -30,11 +30,13 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- Portrait-only on iPhone, matching public/manifest.webmanifest's
+	     "orientation": "portrait" for the PWA — every mobile layout (the tab
+	     bar, safe-area handling, sheet-style dialogs) is designed and tested
+	     for portrait only. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
@@ -45,5 +47,34 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Custom URL scheme Supabase redirects back to after Google OAuth, a
+	     magic link, or a signup confirmation — see src/lib/nativeAuth.ts. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.neilshah.retrn.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.neilshah.retrn</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Only standard HTTPS/TLS (Supabase, the AI gateway) — no custom
+	     encryption, so this skips App Store Connect's export-compliance
+	     question on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Taking or choosing a contact's photo (ContactFormDialog). -->
+	<key>NSCameraUsageDescription</key>
+	<string>Retrn uses your camera so you can take a photo for someone in your contacts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Retrn uses your photo library so you can choose a photo for someone in your contacts.</string>
+	<!-- Say-who-you-met voice capture and dictation in the assistant
+	     (src/components/contacts/VoiceCaptureDialog.tsx, src/hooks/useSpeechRecognition.ts). -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Retrn uses your microphone so you can add a contact by speaking instead of typing.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Retrn uses speech recognition to turn what you say into a contact, entirely on your device.</string>
 </dict>
 </plist>
