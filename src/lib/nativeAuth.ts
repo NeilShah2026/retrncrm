@@ -1,5 +1,3 @@
-import { App as CapacitorApp } from '@capacitor/app'
-import { Browser } from '@capacitor/browser'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -16,8 +14,14 @@ import { supabase } from '@/lib/supabase'
  */
 export const NATIVE_AUTH_REDIRECT_URL = 'com.neilshah.retrn://login-callback'
 
-/** Opens an auth URL (Google's consent screen, etc.) in the system browser. */
+/**
+ * Opens an auth URL (Google's consent screen, etc.) in the system browser.
+ * `@capacitor/browser` is imported dynamically — this function is only ever
+ * called from AuthProvider's `isNative` branch, but a static import would
+ * still ship the plugin's JS in the shared web bundle otherwise.
+ */
 export async function openNativeAuthUrl(url: string): Promise<void> {
+  const { Browser } = await import('@capacitor/browser')
   await Browser.open({ url })
 }
 
@@ -52,31 +56,42 @@ async function completeSessionFromCallbackUrl(url: string): Promise<void> {
  * session out of it, and `supabase.auth.onAuthStateChange` (already wired
  * in AuthProvider) does the rest — no navigation needed here, since
  * `RequireAuth`/`LoginPage` react to the session becoming non-null on their
- * own. Call once, from AuthProvider; returns a cleanup function.
+ * own. Call once, from AuthProvider (already gated on `isNative`, so the
+ * dynamic `@capacitor/app` import below only ever fires natively); returns
+ * a cleanup function.
  */
 export function listenForNativeAuthRedirect(): () => void {
   let removed = false
   let handle: { remove: () => void } | undefined
 
-  void CapacitorApp.addListener('appUrlOpen', ({ url }) => {
-    if (!url.startsWith(NATIVE_AUTH_REDIRECT_URL)) return
-    void completeSessionFromCallbackUrl(url)
-      .catch((err: unknown) => {
-        console.error('[native auth] failed to complete session from callback URL', err)
-      })
-      .finally(() => {
-        void Browser.close().catch(() => {
-          // Nothing was open (e.g. a magic link opened straight in Mail/Safari
-          // rather than through our Browser.open call) — nothing to close.
+  void import('@capacitor/app').then(({ App: CapacitorApp }) => {
+    void CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      if (!url.startsWith(NATIVE_AUTH_REDIRECT_URL)) return
+      void completeSessionFromCallbackUrl(url)
+        .catch((err: unknown) => {
+          console.error('[native auth] failed to complete session from callback URL', err)
         })
-      })
-  }).then((h) => {
-    if (removed) h.remove()
-    else handle = h
+        .finally(() => {
+          void openBrowserModule().then((Browser) =>
+            Browser?.close().catch(() => {
+              // Nothing was open (e.g. a magic link opened straight in
+              // Mail/Safari rather than through our Browser.open call).
+            }),
+          )
+        })
+    }).then((h) => {
+      if (removed) h.remove()
+      else handle = h
+    })
   })
 
   return () => {
     removed = true
     handle?.remove()
   }
+}
+
+async function openBrowserModule() {
+  const { Browser } = await import('@capacitor/browser')
+  return Browser
 }

@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { StatusBar, Style } from '@capacitor/status-bar'
 import { isNative } from '@/lib/platform'
 
 type Theme = 'light' | 'dark' | 'system'
@@ -39,13 +38,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const resolved = theme === 'system' ? getSystemTheme() : theme
       root.classList.toggle('dark', resolved === 'dark')
       if (isNative) {
-        // A dark background needs light (white) status bar content, and
-        // vice versa — the inverse of the app's own theme name. Fails
-        // silently on the (rare) device/OS combo without a status bar API;
-        // nothing else here depends on it.
-        void StatusBar.setStyle({
-          style: resolved === 'dark' ? Style.Light : Style.Dark,
-        }).catch(() => {})
+        // Dynamically imported: this file is also part of the shared web
+        // bundle, and a static import of the plugin would ship its JS
+        // there even though `isNative` keeps it from ever running on web.
+        void import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
+          // A dark background needs light (white) status bar content, and
+          // vice versa — the inverse of the app's own theme name. Fails
+          // silently on the (rare) device/OS combo without a status bar
+          // API; nothing else here depends on it.
+          void StatusBar.setStyle({
+            style: resolved === 'dark' ? Style.Light : Style.Dark,
+          }).catch(() => {})
+        })
       }
     }
     apply()

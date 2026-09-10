@@ -1,6 +1,14 @@
 import * as React from 'react'
-import { SpeechRecognition as NativeSpeechRecognition } from '@capacitor-community/speech-recognition'
 import { isNative } from '@/lib/platform'
+
+// Loaded lazily (and cached) rather than imported at module top: this file
+// is also reachable from the shared web bundle, and a static import would
+// ship the plugin's native-bridge JS there even though it would never run —
+// `useSpeechRecognition` only ever calls into it when `isNative` is true.
+let speechModule: Promise<typeof import('@capacitor-community/speech-recognition')> | null = null
+function loadNativeSpeechRecognition() {
+  return (speechModule ??= import('@capacitor-community/speech-recognition'))
+}
 
 /**
  * Dictation, via whichever engine the platform actually has.
@@ -55,36 +63,50 @@ function useNativeSpeechRecognition(): SpeechRecognitionState {
 
   React.useEffect(() => {
     let active = true
-    NativeSpeechRecognition.available()
-      .then(({ available }) => {
-        if (active) setSupported(available)
-      })
-      .catch(() => {
-        if (active) setSupported(false)
+    let partialHandle: { remove: () => void } | undefined
+    let stateHandle: { remove: () => void } | undefined
+
+    void loadNativeSpeechRecognition().then(({ SpeechRecognition }) => {
+      if (!active) return
+
+      SpeechRecognition.available()
+        .then(({ available }) => {
+          if (active) setSupported(available)
+        })
+        .catch(() => {
+          if (active) setSupported(false)
+        })
+
+      void SpeechRecognition.addListener(
+        'partialResults',
+        (data: { matches?: string[] }) => {
+          const text = data.matches?.[0] ?? ''
+          interimRef.current = text
+          setInterim(text)
+        },
+      ).then((h) => {
+        if (active) partialHandle = h
+        else void h.remove()
       })
 
-    const partialSub = NativeSpeechRecognition.addListener(
-      'partialResults',
-      (data: { matches?: string[] }) => {
-        const text = data.matches?.[0] ?? ''
-        interimRef.current = text
-        setInterim(text)
-      },
-    )
-    // Safety net alongside `start()`'s own promise resolving (see `begin`
-    // below) — some plugin versions only reliably signal end-of-utterance
-    // one way or the other.
-    const stateSub = NativeSpeechRecognition.addListener(
-      'listeningState',
-      (data: { status: string }) => {
-        if (data.status === 'stopped' && listeningRef.current) finalize()
-      },
-    )
+      // Safety net alongside `start()`'s own promise resolving below — some
+      // plugin versions only reliably signal end-of-utterance one way or
+      // the other.
+      void SpeechRecognition.addListener(
+        'listeningState',
+        (data: { status: string }) => {
+          if (data.status === 'stopped' && listeningRef.current) finalize()
+        },
+      ).then((h) => {
+        if (active) stateHandle = h
+        else void h.remove()
+      })
+    })
 
     return () => {
       active = false
-      void partialSub.then((h) => h.remove())
-      void stateSub.then((h) => h.remove())
+      partialHandle?.remove()
+      stateHandle?.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -104,7 +126,8 @@ function useNativeSpeechRecognition(): SpeechRecognitionState {
     setError(null)
     void (async () => {
       try {
-        const perm = await NativeSpeechRecognition.requestPermissions()
+        const { SpeechRecognition } = await loadNativeSpeechRecognition()
+        const perm = await SpeechRecognition.requestPermissions()
         if (perm.speechRecognition !== 'granted') {
           setError(
             'Speech recognition access was blocked — allow it for Retrn in Settings to dictate.',
@@ -117,7 +140,7 @@ function useNativeSpeechRecognition(): SpeechRecognitionState {
         setInterim('')
         // Resolves once the recognizer stops — by our own `stop()` below, or
         // iOS ending the utterance on its own after a pause.
-        const result = await NativeSpeechRecognition.start({
+        const result = await SpeechRecognition.start({
           language: navigator.language || 'en-US',
           partialResults: true,
           popup: false,
@@ -134,9 +157,11 @@ function useNativeSpeechRecognition(): SpeechRecognitionState {
   const stop = React.useCallback(() => {
     if (!listeningRef.current) return
     finalize()
-    void NativeSpeechRecognition.stop().catch(() => {
-      // Already stopped.
-    })
+    void loadNativeSpeechRecognition().then(({ SpeechRecognition }) =>
+      SpeechRecognition.stop().catch(() => {
+        // Already stopped.
+      }),
+    )
   }, [finalize])
 
   const reset = React.useCallback(() => {
