@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { withCors } from './cors.ts'
+import { withCors } from './cors.js'
 
 /**
  * The one implementation of the AI proxy. `api/ai.ts` is the Vercel edge
