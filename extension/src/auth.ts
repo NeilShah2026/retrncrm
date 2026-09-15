@@ -1,11 +1,11 @@
 import type { Session } from '@supabase/supabase-js'
-import { RETRN_APP_URLS } from './config'
+import { APP_ORIGIN, RETRN_APP_URLS } from './config'
 import { LEGACY_SESSION_KEY, supabase } from './supabase'
 
 /**
  * Signing in to the extension.
  *
- * The extension has its own session, created by a six-digit code sent to the
+ * The extension has its own session, created by a magic link sent to the
  * account's email (or a password, for accounts that have one). Earlier
  * versions copied the session out of an open Retrn tab instead. Supabase
  * rotates refresh tokens and treats a reused one as stolen, so the two copies
@@ -13,9 +13,22 @@ import { LEGACY_SESSION_KEY, supabase } from './supabase'
  * refreshed second was signed out, and sometimes the whole session was
  * revoked, website included. A session of its own can't collide with anything.
  *
- * A code works however the account was created — Google, Apple, magic link or
+ * The link is requested with PKCE. Opening it redirects to the web app with a
+ * `?code=` that only the verifier in the extension's storage can redeem; the
+ * background worker spots that tab and redeems it (`completeMagicLink`). The
+ * web app ignores a code it has no verifier for.
+ *
+ * A link works however the account was created — Google, Apple, magic link or
  * password — because every account has a confirmed email.
  */
+
+/** A magic link the extension is waiting on. */
+export type PendingSignIn = { email: string; sentAt: number }
+
+const PENDING_KEY = 'retrn-extension-pending-sign-in'
+
+/** Supabase's default email link lifetime. After this, a pending link is stale. */
+const LINK_LIFETIME_MS = 60 * 60 * 1000
 
 export async function getSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession()
@@ -42,16 +55,22 @@ export function authMessage(error: unknown): string {
   if (msg.includes('signups not allowed') || msg.includes('user not found')) {
     return 'There’s no Retrn account with that email. Create one at retrncrm.com, then sign in here.'
   }
-  if (msg.includes('token has expired') || (msg.includes('invalid') && msg.includes('token'))) {
-    return 'That code is wrong or has expired. Check the newest email from Retrn, or send a new code.'
+  if (
+    msg.includes('expired') ||
+    msg.includes('flow state') ||
+    msg.includes('code verifier') ||
+    msg.includes('code challenge') ||
+    (msg.includes('invalid') && (msg.includes('token') || msg.includes('link')))
+  ) {
+    return 'That sign-in link has expired or was replaced by a newer one. Open the Retrn extension and send a new link.'
   }
   if (msg.includes('invalid login credentials')) {
-    return 'That email and password don’t match. If you sign in with Google or Apple, use a code instead.'
+    return 'That email and password don’t match. If you sign in with Google or Apple, use an email link instead.'
   }
   if (msg.includes('rate limit') || msg.includes('security purposes')) {
     const seconds = raw.match(/(\d+)\s*seconds?/)?.[1]
     return seconds
-      ? `Too many codes requested. Try again in ${seconds} seconds.`
+      ? `Too many sign-in emails requested. Try again in ${seconds} seconds.`
       : 'Too many attempts. Wait a minute, then try again.'
   }
   if (msg.includes('failed to fetch') || msg.includes('network')) {
@@ -60,23 +79,74 @@ export function authMessage(error: unknown): string {
   return raw || 'Something went wrong. Try again.'
 }
 
-export async function sendCode(email: string): Promise<void> {
+export async function sendMagicLink(email: string): Promise<void> {
+  const address = email.trim().toLowerCase()
   const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    // Sign-in only. Accounts are created on the website, where the terms and
-    // the plan are.
-    options: { shouldCreateUser: false },
+    email: address,
+    options: {
+      // Sign-in only. Accounts are created on the website, where the terms and
+      // the plan are.
+      shouldCreateUser: false,
+      // The same place the website sends its own links, so it's already an
+      // allowed redirect. The code on the end is what the extension redeems.
+      emailRedirectTo: `${APP_ORIGIN}/app`,
+    },
   })
   if (error) throw new Error(authMessage(error))
+  await chrome.storage.local.set({ [PENDING_KEY]: { email: address, sentAt: Date.now() } satisfies PendingSignIn })
 }
 
-export async function verifyCode(email: string, code: string): Promise<void> {
-  const { error } = await supabase.auth.verifyOtp({
-    email: email.trim().toLowerCase(),
-    token: code.replace(/\s/g, ''),
-    type: 'email',
-  })
-  if (error) throw new Error(authMessage(error))
+/** The link the extension is waiting on, if one was sent within the last hour. */
+export async function getPendingSignIn(): Promise<PendingSignIn | null> {
+  const stored = await chrome.storage.local.get(PENDING_KEY)
+  const pending = stored[PENDING_KEY] as PendingSignIn | undefined
+  if (!pending || Date.now() - pending.sentAt > LINK_LIFETIME_MS) return null
+  return pending
+}
+
+export async function clearPendingSignIn(): Promise<void> {
+  await chrome.storage.local.remove(PENDING_KEY)
+}
+
+/**
+ * What a tab's URL means for a pending magic link: the code to redeem, the
+ * error Supabase redirected with, or nothing to do with the extension.
+ */
+export function readMagicLinkRedirect(url: string): { code: string } | { error: string } | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  const origins = RETRN_APP_URLS.map((u) => new URL(u).origin)
+  if (!origins.includes(parsed.origin)) return null
+
+  const code = parsed.searchParams.get('code')
+  if (code) return { code }
+
+  // Supabase puts errors in the query or the fragment depending on the flow.
+  const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''))
+  const error =
+    parsed.searchParams.get('error_description') ??
+    hash.get('error_description') ??
+    parsed.searchParams.get('error_code') ??
+    hash.get('error_code')
+  return error ? { error } : null
+}
+
+/**
+ * Redeems the code from an opened magic link for the extension's session.
+ * Throws with a message worth showing.
+ */
+export async function completeMagicLink(code: string): Promise<void> {
+  try {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) throw new Error(authMessage(error))
+  } finally {
+    // A code is good once, and the verifier is gone either way.
+    await clearPendingSignIn()
+  }
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<void> {
@@ -85,6 +155,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     password,
   })
   if (error) throw new Error(authMessage(error))
+  await clearPendingSignIn()
 }
 
 /**

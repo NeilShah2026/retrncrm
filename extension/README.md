@@ -1,121 +1,103 @@
 # Retrn browser extension
 
 Log emails and add people to your Retrn network without leaving your inbox or
-LinkedIn:
+LinkedIn.
 
-- **Gmail / Outlook** — log the open email to that person's contact. On a thread
-  with several people, pick who it's with. The interaction stores a link back to
-  the email ("Open source ↗" in the contact's timeline).
-- **LinkedIn profile** — add or update a contact from a profile (name, headline,
-  company, profile URL), optionally logging a "Connected on LinkedIn" touch.
-- **LinkedIn DMs** — log a message to the conversation partner's contact.
-- **Smart matching** — matches by email, LinkedIn URL, or name. If you already
-  have the person but never saved their email, logging to them fills it in.
+- **Gmail and Outlook.** Open an email and a **Log to Retrn** button appears
+  next to the subject. It opens a panel over the page that lists everyone on
+  the thread: who's already in Retrn (with their role, when you were last in
+  touch, whether they're past their catch-up goal, tags and recent history),
+  and who's new. Log the email to one person or several at once; new people are
+  added as contacts in the same step, with the company guessed from their
+  address. The button switches to **Logged in Retrn** once a thread is on
+  someone's timeline, and the panel marks who it's already logged to.
+- **LinkedIn.** On a profile, add the person (title and company read from their
+  headline) or fill in the contact you already have. In a conversation, log the
+  message.
+- **Anywhere else**, the toolbar popup searches your contacts.
+- **Undo** on every save, and **Open in Retrn** for every contact.
+- Matches people by email address, then LinkedIn URL, then name. A contact with
+  the same name and no email yet is picked automatically, and logging to them
+  fills in the address instead of creating a second copy. Nothing already on a
+  contact is overwritten.
+- Follows the system's light or dark appearance, in the web app's design.
 
-This is a Manifest V3 extension. The popup is a small vanilla-TS app that talks
-directly to your Supabase project (the same backend as the web app), scoped to
-your account by row-level security.
+Keyboard: **Alt+Shift+R** opens the popup; **Esc** closes the panel.
 
 ## How it works
 
 ```
-Toolbar icon → popup
-  ├─ chrome.scripting.executeScript → reads the open email from the page DOM
-  ├─ @supabase/supabase-js → looks up the contact by email
-  └─ appends an interaction (or creates the contact, then logs)
+content-mail.js   Gmail/Outlook page: reads the open email, adds the button,
+                  frames panel.html over the page
+panel.html        the app, inside that frame (talks to the page over a private
+                  MessageChannel)
+popup.html        the same app, from the toolbar icon
+background.js     "is this thread already logged?" for the button, and
+                  finishing magic-link sign-ins
+signed-in.html    where a magic-link tab ends up
 ```
 
-- **Auth (SSO):** click **Connect with Retrn** and the extension reuses the
-  session you're already signed into on the web app — no second login, and it
-  works no matter how you signed in (Google, magic link, or password). It reads
-  the Supabase session from an open Retrn tab; if none is open, it opens one and
-  asks you to sign in, then reconnect. A **password** fallback is also available.
-  - Works across multiple origins listed in `RETRN_APP_URLS` in `src/config.ts`
-    (production `https://retrncrm.com` / `https://www.retrncrm.com` and local
-    `http://localhost:5173` are included). Each origin must also appear in
-    `host_permissions` in `public/manifest.json`. Add new domains to **both**.
-- **Config:** `src/config.ts` holds the Supabase URL and the **public anon key**
-  — the same publishable key the web app ships, safe to include.
+The UI is Preact (`src/app`). It reads and writes the same `contacts` and
+`tags` tables as the web app, scoped to your account by row-level security,
+and appends interactions exactly the way the web app does.
 
-## Build & load (local testing)
+Page reading lives in `src/extract.ts` — one self-contained function, because
+the popup also hands it to `chrome.scripting.executeScript` as source text.
+
+### Signing in
+
+The extension has **its own session**: enter your email and open the sign-in
+link Retrn emails you, in the same browser (or use a password, if your account
+has one). This works however the account was created — Google, Apple, magic
+link or password.
+
+The link is requested with PKCE and redirects to `https://www.retrncrm.com/app`
+— the same place the website's own links go — with a one-time `?code=` on the
+end. The background worker notices that tab (only while the extension is
+waiting on a link), redeems the code with the verifier kept in the extension's
+storage, and swaps the tab for `signed-in.html`. The website has no verifier
+for that code, so it ignores it and the two sessions stay separate. The
+Supabase **Magic Link** email template needs `{{ .ConfirmationURL }}`, which is
+the default.
+
+Versions before 0.3 copied the website's session instead. Supabase rotates
+refresh tokens and treats a reused one as stolen, so two apps sharing one token
+kept signing each other out — that's why sign-in stopped working. 0.3 discards
+that copied session (without revoking it) and asks you to sign in once.
+"Sign out of the extension" only signs out the extension.
+
+### Config
+
+`src/config.ts` holds the Supabase URL and the public anon key — the same
+publishable values the web app ships — and the web app's origin. Any origin
+the extension reads must also be listed in `host_permissions` in
+`public/manifest.json`.
+
+## Build & load
 
 Prereqs: Node 18+.
 
 ```bash
 cd extension
 npm install
-npm run build        # bundles into extension/dist
+npm run typecheck
+npm run build        # → extension/dist
+npm run zip          # → retrn-extension.zip, for the Chrome Web Store
 ```
 
-Then load it in Chrome:
+Load it in Chrome: `chrome://extensions` → **Developer mode** → **Load
+unpacked** → select `extension/dist`. After changes, `npm run build` (or
+`npm run watch`) and click ↻ on the extension card. Mail tabs that were already
+open get the button without a reload.
 
-1. Go to `chrome://extensions`.
-2. Turn on **Developer mode** (top-right).
-3. Click **Load unpacked** and select the `extension/dist` folder.
-4. Pin the Retrn icon (puzzle-piece menu → pin).
-
-Use it:
-
-1. Make sure you're signed into the Retrn web app in a tab (for one-click SSO).
-2. Open an email in Gmail or Outlook. *(If you installed the extension while a
-   mail tab was already open, refresh that tab once.)*
-3. Click the Retrn toolbar icon.
-4. First time: click **Connect with Retrn** (or use the password fallback). Then
-   confirm the type/date/summary and click **Log**.
-
-Rebuild after code changes with `npm run build` (or `npm run watch` for an
-auto-rebuild; click the ↻ on the extension card in `chrome://extensions` to pick
-up changes).
+Icons are rendered from the web app's brand mark (`public/favicon.svg`) by
+`node scripts/icons.mjs`, which needs Playwright installed.
 
 ## Known limitations
 
-- Page reading (`src/popup.ts` → `extractPageContext`) depends on each site's
-  DOM. **Gmail** is solid; **Outlook** and **LinkedIn** use several fallback
-  strategies (LinkedIn leans on the page title, which is stable) but may still
-  need selector tweaks when those sites change their markup.
-- If a page isn't detected, open the popup there and click **Copy debug info** —
-  it copies a snapshot (URL, title, what selectors matched) you can send so the
-  selectors can be fixed for that layout.
-- The placeholder icons in `public/icons/` are plain squares — replace them with
-  a real logo before publishing.
-
-## Publishing to the Chrome Web Store
-
-1. **Developer account.** Register once at the
-   [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-   ($5 one-time fee).
-2. **Package.** From `extension/`, run:
-   ```bash
-   npm run zip        # builds and writes retrn-extension.zip
-   ```
-3. **Create the item.** In the dashboard → **Add new item** → upload the zip.
-4. **Fill the listing:**
-   - Name, short + detailed description, category (Productivity).
-   - **Icon:** a 128×128 PNG (replace the placeholder first).
-   - **Screenshots:** at least one 1280×800 (or 640×400) — e.g., the popup over
-     a Gmail thread.
-   - **Privacy policy URL:** required because the extension reads email content.
-     Use your live Privacy page: `https://<your-domain>/privacy`.
-   - **Single purpose:** describe it as "log emails to your Retrn contacts."
-   - **Permission justifications:**
-     - `scripting` / `activeTab` / host access to Gmail & Outlook — "to read the
-       sender and subject of the email the user is currently viewing so it can be
-       logged to their contact."
-     - `storage` — "to keep the user signed in."
-     - Supabase host — "to save the interaction to the user's own account."
-   - **Data usage disclosures:** you handle personal data (email addresses,
-     contact info); declare that it is used only to provide the feature and not
-     sold. Google scrutinizes Gmail access, so be accurate and minimal.
-5. **Submit for review.** Reviews typically take a few days to a couple of weeks.
-   You can start **Unlisted** (only people with the link can install) to test
-   with a small group before going Public.
-
-### Before you submit — checklist
-
-- [ ] Replace placeholder icons with a real 16/48/128 logo.
-- [ ] Point the privacy-policy URL at your deployed `/privacy` page.
-- [ ] Confirm `src/config.ts` targets your production Supabase project, set
-      `RETRN_APP_URL` to your deployed app, and add that origin to
-      `host_permissions` in the manifest (for SSO).
-- [ ] Add 1–3 screenshots of the popup in action.
-- [ ] Test the built `dist/` unpacked one more time end-to-end.
+- Gmail's and Outlook's markup changes without notice. Every selector in
+  `src/extract.ts` has fallbacks; if an open email isn't detected, open the
+  popup there and click **Copy page details**, which reports what matched.
+- Outlook shows some recipients by name only, without an address; those people
+  can't be matched or added from that email.
+- Geist is bundled under the SIL Open Font License (`public/fonts/OFL.txt`).

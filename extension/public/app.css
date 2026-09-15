@@ -150,15 +150,28 @@ body.panel {
   overflow: hidden;
 }
 /* The header and footer stay put; only the body between them scrolls. A
-   popup grows with its content up to Chrome's 600px cap; the panel always
+   popup is as tall as its content, up to Chrome's 600px cap; the panel always
    fills its frame. */
 body.popup .frame {
-  min-height: 460px;
   max-height: 600px;
 }
 body.panel #app,
 body.panel .frame {
   height: 100%;
+}
+/* A full tab (signed-in.html). */
+body.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+.page-card {
+  width: 100%;
+  max-width: 380px;
+}
+.page-card .logo {
+  margin-bottom: 20px;
 }
 
 ::selection {
@@ -409,15 +422,6 @@ textarea {
   background-repeat: no-repeat;
   background-position: right 8px center;
 }
-.code-input {
-  height: 44px;
-  font-size: 22px;
-  letter-spacing: 0.3em;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
-
 .field {
   margin-bottom: 12px;
 }

@@ -1,11 +1,12 @@
+import { authMessage, clearPendingSignIn, completeMagicLink, getPendingSignIn, readMagicLinkRedirect } from './auth'
 import { findContactsByEmails, loggedEntry } from './db'
 import { SESSION_KEY, supabase } from './supabase'
 import type { RuntimeMessage, ThreadStatus } from './types'
 
 /**
- * The service worker. Answers "is this email already in Retrn?" for the
- * button in Gmail and Outlook, and keeps those buttons current when the
- * extension signs in or out.
+ * The service worker. Finishes magic-link sign-ins, answers "is this email
+ * already in Retrn?" for the button in Gmail and Outlook, and keeps those
+ * buttons current when the extension signs in or out.
  */
 
 const MAIL_TABS = [
@@ -36,6 +37,40 @@ async function threadStatus(emails: string[], threadKey: string): Promise<Thread
     console.warn('Retrn: status check failed', err)
     return { signedIn: true, known: 0, logged: false }
   }
+}
+
+// A magic link opens a Retrn tab with a one-time code on the end. The popup is
+// long closed by then, so the worker redeems it — but only while the extension
+// is waiting on a link, so the website's own sign-ins are left alone.
+const redeeming = new Set<string>()
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // `url` is only reported for sites in host_permissions, which the Retrn
+  // origins are.
+  if (!changeInfo.url) return
+  const redirect = readMagicLinkRedirect(changeInfo.url)
+  if (!redirect) return
+  void finishSignIn(tabId, redirect)
+})
+
+async function finishSignIn(tabId: number, redirect: { code: string } | { error: string }) {
+  if (!(await getPendingSignIn())) return
+  let error: string | null = null
+  if ('code' in redirect) {
+    if (redeeming.has(redirect.code)) return
+    redeeming.add(redirect.code)
+    try {
+      await completeMagicLink(redirect.code)
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err)
+    }
+  } else {
+    await clearPendingSignIn()
+    error = authMessage(redirect.error)
+  }
+  const page = new URL(chrome.runtime.getURL('signed-in.html'))
+  if (error) page.searchParams.set('error', error)
+  chrome.tabs.update(tabId, { url: page.href }).catch(() => {})
 }
 
 // Signing in or out changes what every open mail tab's button should say.

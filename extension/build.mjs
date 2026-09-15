@@ -27,6 +27,7 @@ const entries = [
   ['src/panel.tsx', 'dist/panel.js'],
   ['src/content-mail.ts', 'dist/content-mail.js'],
   ['src/background.ts', 'dist/background.js'],
+  ['src/signed-in.ts', 'dist/signed-in.js'],
 ]
 
 const contexts = await Promise.all(

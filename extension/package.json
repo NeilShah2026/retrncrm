@@ -1,8 +1,8 @@
 {
   "name": "retrn-extension",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Retrn browser extension — log emails/interactions to a contact's Retrn profile from Gmail & Outlook.",
+  "description": "Retrn browser extension — log Gmail and Outlook emails and LinkedIn contacts to your Retrn network.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

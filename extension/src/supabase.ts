@@ -35,7 +35,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storageKey: SESSION_KEY,
     persistSession: true,
     autoRefreshToken: true,
-    // Nothing redirects back into the extension, so there's no URL to read.
+    // A magic link lands on a Retrn tab, not on an extension page, so there's
+    // no URL here to read; the background worker picks the code up instead
+    // (see completeMagicLink in src/auth.ts).
     detectSessionInUrl: false,
+    // PKCE: the link comes back with a one-time code that only this storage's
+    // code verifier can redeem. The website can't use it, so the extension
+    // ends up with a session of its own.
+    flowType: 'pkce',
   },
 })

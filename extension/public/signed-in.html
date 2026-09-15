@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Retrn</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body class="page">
+    <main class="page-card">
+      <div class="logo">
+        <span class="logo-mark">R</span>
+        <span class="logo-word">Retrn</span>
+      </div>
+      <section id="done">
+        <div class="success-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+        </div>
+        <h1 class="title">The extension is signed in</h1>
+        <p class="lede">Open an email in Gmail or Outlook, or click the Retrn icon in your toolbar. You can close this tab.</p>
+      </section>
+      <section id="failed" hidden>
+        <h1 class="title">Couldn’t sign in</h1>
+        <div class="notice notice-error mt-12" role="alert">
+          <div id="error"></div>
+        </div>
+      </section>
+    </main>
+    <script src="signed-in.js"></script>
+  </body>
+</html>

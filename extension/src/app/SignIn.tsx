@@ -1,24 +1,36 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
-import { sendCode, signInWithPassword, suggestEmail, verifyCode } from '../auth'
+import { useEffect, useState } from 'preact/hooks'
+import { clearPendingSignIn, getPendingSignIn, sendMagicLink, signInWithPassword, suggestEmail } from '../auth'
 import { APP_ORIGIN } from '../config'
 import { ErrorNotice, Frame } from './common'
 import { openUrl, type Host } from './host'
 
-type Step = { kind: 'email' } | { kind: 'code'; email: string } | { kind: 'password' }
+type Step =
+  | { kind: 'loading' }
+  | { kind: 'email' }
+  | { kind: 'sent'; email: string; sentAt: number }
+  | { kind: 'password' }
 
 const RESEND_AFTER_S = 60
 
 /**
- * Signing in with a code emailed to the account address, or a password for
- * accounts that have one. The extension gets a session of its own, so this
+ * Signing in with a magic link emailed to the account address, or a password
+ * for accounts that have one. The extension gets a session of its own, so this
  * never signs anyone out of the website.
  */
 export function SignIn({ host, retired }: { host: Host; retired: boolean }) {
-  const [step, setStep] = useState<Step>({ kind: 'email' })
+  const [step, setStep] = useState<Step>({ kind: 'loading' })
   const [email, setEmail] = useState('')
   const [suggested, setSuggested] = useState(false)
 
   useEffect(() => {
+    // The popup closes as soon as someone switches to their inbox, so a link
+    // sent earlier is remembered and the next open picks up where they left off.
+    void getPendingSignIn().then((pending) => {
+      setStep((current) => {
+        if (current.kind !== 'loading') return current
+        return pending ? { kind: 'sent', email: pending.email, sentAt: pending.sentAt } : { kind: 'email' }
+      })
+    })
     void suggestEmail().then((found) => {
       if (!found) return
       setEmail((current) => current || found)
@@ -26,12 +38,20 @@ export function SignIn({ host, retired }: { host: Host; retired: boolean }) {
     })
   }, [])
 
-  if (step.kind === 'code') {
+  if (step.kind === 'loading') return <Frame host={host}>{null}</Frame>
+
+  if (step.kind === 'sent') {
     return (
-      <CodeStep
+      <LinkSent
         host={host}
         email={step.email}
-        onBack={() => setStep({ kind: 'email' })}
+        sentAt={step.sentAt}
+        onResent={(sentAt) => setStep({ ...step, sentAt })}
+        onBack={() => {
+          void clearPendingSignIn()
+          setEmail(step.email)
+          setStep({ kind: 'email' })
+        }}
       />
     )
   }
@@ -55,14 +75,14 @@ export function SignIn({ host, retired }: { host: Host; retired: boolean }) {
           <PasswordForm
             email={email}
             setEmail={setEmail}
-            onUseCode={() => setStep({ kind: 'email' })}
+            onUseLink={() => setStep({ kind: 'email' })}
           />
         ) : (
           <EmailForm
             email={email}
             setEmail={setEmail}
             suggested={suggested}
-            onSent={(address) => setStep({ kind: 'code', email: address })}
+            onSent={(address) => setStep({ kind: 'sent', email: address, sentAt: Date.now() })}
             onUsePassword={() => setStep({ kind: 'password' })}
           />
         )}
@@ -107,8 +127,8 @@ function EmailForm({
     setBusy(true)
     setError(null)
     try {
-      await sendCode(address)
-      onSent(address)
+      await sendMagicLink(address)
+      onSent(address.toLowerCase())
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setBusy(false)
@@ -136,7 +156,7 @@ function EmailForm({
       </div>
       {error && <div class="field"><ErrorNotice>{error}</ErrorNotice></div>}
       <button class="btn btn-primary btn-block" type="submit" disabled={busy || !email.trim()} aria-busy={busy}>
-        {busy ? 'Sending code…' : 'Email me a sign-in code'}
+        {busy ? 'Sending link…' : 'Email me a sign-in link'}
       </button>
       <button type="button" class="btn btn-ghost btn-block mt-8" onClick={onUsePassword}>
         Use a password instead
@@ -148,11 +168,11 @@ function EmailForm({
 function PasswordForm({
   email,
   setEmail,
-  onUseCode,
+  onUseLink,
 }: {
   email: string
   setEmail: (v: string) => void
-  onUseCode: () => void
+  onUseLink: () => void
 }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -212,50 +232,52 @@ function PasswordForm({
       >
         {busy ? 'Signing in…' : 'Sign in'}
       </button>
-      <button type="button" class="btn btn-ghost btn-block mt-8" onClick={onUseCode}>
-        Email me a code instead
+      <button type="button" class="btn btn-ghost btn-block mt-8" onClick={onUseLink}>
+        Email me a sign-in link instead
       </button>
     </form>
   )
 }
 
-function CodeStep({ host, email, onBack }: { host: Host; email: string; onBack: () => void }) {
-  const [code, setCode] = useState('')
-  const [busy, setBusy] = useState(false)
+function LinkSent({
+  host,
+  email,
+  sentAt,
+  onResent,
+  onBack,
+}: {
+  host: Host
+  email: string
+  sentAt: number
+  onResent: (sentAt: number) => void
+  onBack: () => void
+}) {
+  const [now, setNow] = useState(Date.now())
   const [error, setError] = useState<string | null>(null)
-  const [wait, setWait] = useState(RESEND_AFTER_S)
   const [resent, setResent] = useState(false)
-  const submitted = useRef('')
+  const [busy, setBusy] = useState(false)
+  const wait = Math.max(0, RESEND_AFTER_S - Math.floor((now - sentAt) / 1000))
 
   useEffect(() => {
     if (wait <= 0) return
-    const t = setTimeout(() => setWait((w) => w - 1), 1000)
+    const t = setTimeout(() => setNow(Date.now()), 1000)
     return () => clearTimeout(t)
-  }, [wait])
-
-  async function verify(value: string) {
-    if (busy || submitted.current === value) return
-    submitted.current = value
-    setBusy(true)
-    setError(null)
-    try {
-      await verifyCode(email, value)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      setBusy(false)
-    }
-  }
+  }, [wait, now])
 
   async function resend() {
     setError(null)
     setResent(false)
+    setBusy(true)
     try {
-      await sendCode(email)
-      setWait(RESEND_AFTER_S)
+      await sendMagicLink(email)
+      const at = Date.now()
+      setNow(at)
+      onResent(at)
       setResent(true)
-      submitted.current = ''
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -263,46 +285,12 @@ function CodeStep({ host, email, onBack }: { host: Host; email: string; onBack: 
     <Frame host={host}>
       <h1 class="title">Check your email</h1>
       <p class="lede">
-        Enter the code we sent to <strong>{email}</strong>.
+        We sent a sign-in link to <strong>{email}</strong>. Open it in this browser and the
+        extension signs in on its own.
       </p>
-      <form
-        class="mt-16"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (code.length >= 6) void verify(code)
-        }}
-      >
-        <div class="field">
-          <label class="label" for="code">
-            Sign-in code
-          </label>
-          <input
-            id="code"
-            class="input code-input"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={8}
-            placeholder="000000"
-            value={code}
-            aria-invalid={Boolean(error)}
-            autoFocus
-            onInput={(e) => {
-              const digits = e.currentTarget.value.replace(/\D/g, '').slice(0, 8)
-              setCode(digits)
-              if (error) setError(null)
-              // Codes are six digits unless the project was set up for more;
-              // checking at six covers the usual case without a button press.
-              if (digits.length === 6) void verify(digits)
-            }}
-          />
-        </div>
-        {error && <div class="field"><ErrorNotice>{error}</ErrorNotice></div>}
-        {resent && !error && <p class="small muted field">Sent a new code.</p>}
-        <button class="btn btn-primary btn-block" type="submit" disabled={busy || code.length < 6} aria-busy={busy}>
-          {busy ? 'Checking…' : 'Sign in'}
-        </button>
-      </form>
-      <div class="hstack mt-12 small">
+      {error && <div class="mt-12"><ErrorNotice>{error}</ErrorNotice></div>}
+      {resent && !error && <p class="small muted mt-12">Sent a new link. Use the newest email.</p>}
+      <div class="hstack mt-16 small">
         <button class="link" type="button" onClick={onBack}>
           Use a different email
         </button>
@@ -310,13 +298,13 @@ function CodeStep({ host, email, onBack }: { host: Host; email: string; onBack: 
         {wait > 0 ? (
           <span class="muted tnum">Resend in {wait}s</span>
         ) : (
-          <button class="link" type="button" onClick={() => void resend()}>
-            Send a new code
+          <button class="link" type="button" disabled={busy} onClick={() => void resend()}>
+            {busy ? 'Sending…' : 'Send a new link'}
           </button>
         )}
       </div>
       <p class="small muted mt-16">
-        Can’t find it? Check spam for an email from Retrn. Codes expire after an hour.
+        Can’t find it? Check your spam folder. Links expire after an hour.
       </p>
     </Frame>
   )
