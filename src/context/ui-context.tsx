@@ -2,6 +2,8 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
+import { QuickAddSheet } from '@/components/contacts/QuickAddSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useAuth } from '@/auth/AuthProvider'
@@ -46,6 +48,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tourOpen, setTourOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
+  const isMobile = useIsMobile()
 
   const openNewContact = React.useCallback(() => {
     setEditing(null)
@@ -148,7 +151,13 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         onOpenChange={setFormOpen}
         contact={editing}
       />
-      <VoiceCaptureDialog open={voiceOpen} onOpenChange={setVoiceOpen} />
+      {/* A phone gets the two-field sheet — name, where you met, a small mic.
+          A desktop keeps the one-sentence capture with its review step. */}
+      {isMobile ? (
+        <QuickAddSheet open={voiceOpen} onOpenChange={setVoiceOpen} />
+      ) : (
+        <VoiceCaptureDialog open={voiceOpen} onOpenChange={setVoiceOpen} />
+      )}
       <CommandPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}

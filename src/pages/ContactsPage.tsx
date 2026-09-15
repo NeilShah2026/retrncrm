@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  CircleX,
   ClipboardPaste,
   LayoutGrid,
   List,
@@ -25,6 +26,12 @@ import { ContactCard } from '@/components/contacts/ContactCard'
 import { ContactListRow } from '@/components/contacts/ContactListRow'
 import { InsetGroup } from '@/components/ui/inset-list'
 import { FilterPanel } from '@/components/contacts/FilterPanel'
+import {
+  ActiveFilterChips,
+  DEFAULT_SORT,
+  FilterButton,
+  FilterSheet,
+} from '@/components/contacts/FilterSheet'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
@@ -43,6 +50,7 @@ import {
 } from '@/lib/filters'
 import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { fullName } from '@/lib/format'
+import { dismissKeyboard, dismissKeyboardOnDrag } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
 import { toast } from 'sonner'
@@ -70,8 +78,9 @@ export function ContactsPage() {
     ...EMPTY_FILTERS,
     overdueOnly: searchParams.get('overdue') === '1',
   }))
-  const [sortKey, setSortKey] = React.useState<SortKey>('name')
-  const [sortDir, setSortDir] = React.useState<SortDir>('asc')
+  const [sortKey, setSortKey] = React.useState<SortKey>(DEFAULT_SORT.key)
+  const [sortDir, setSortDir] = React.useState<SortDir>(DEFAULT_SORT.dir)
+  const [filterSheetOpen, setFilterSheetOpen] = React.useState(false)
   const [view, setView] = React.useState<ViewMode>(readView)
   const isMobile = useIsMobile()
   const effectiveView: ViewMode = isMobile ? 'grid' : view
@@ -138,7 +147,53 @@ export function ContactsPage() {
     setFilters(EMPTY_FILTERS)
   }
 
-  /** Search + filters, rendered in exactly one place. */
+  /**
+   * The phone's toolbar, pinned under the navigation bar: the search field
+   * iOS puts at the top of a list with a filter button beside it, and —
+   * only while something is narrowing the list — a row of chips saying what.
+   */
+  function renderMobileToolbar() {
+    return (
+      <div>
+        <div className="flex items-center gap-2">
+          <form
+            role="search"
+            className="relative min-w-0 flex-1"
+            onSubmit={(e) => {
+              e.preventDefault()
+              dismissKeyboard()
+            }}
+          >
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              enterKeyHint="search"
+              value={query}
+              onChange={(e) => updateQuery(e.target.value)}
+              placeholder="Search"
+              aria-label="Search contacts"
+              autoCorrect="off"
+              className="text-ios-body h-9 w-full min-w-0 appearance-none rounded-[10px] bg-bg-sunken pl-8 pr-9 text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => updateQuery('')}
+                className="press absolute right-0 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center text-muted-foreground/70"
+                aria-label="Clear search"
+              >
+                <CircleX className="h-[18px] w-[18px] fill-current stroke-bg-sunken" />
+              </button>
+            )}
+          </form>
+          <FilterButton count={activeFilters} onClick={() => setFilterSheetOpen(true)} />
+        </div>
+        <ActiveFilterChips filters={filters} tags={tags} onChange={setFilters} />
+      </div>
+    )
+  }
+
+  /** Search + filters on a desktop, rendered in exactly one place. */
   function renderToolbar() {
     return (
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -197,7 +252,7 @@ export function ContactsPage() {
       mobile={{
         title: 'Contacts',
         largeTitle: false,
-        toolbar: isMobile ? renderToolbar() : undefined,
+        toolbar: isMobile ? renderMobileToolbar() : undefined,
         trailing: (
           <>
             {totalCount > 0 && (
@@ -308,7 +363,11 @@ export function ContactsPage() {
               </div>
             </div>
           ) : isMobile ? (
-            <div className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+            <div
+              // Dragging the list puts the search keyboard away, as in Contacts.
+              {...dismissKeyboardOnDrag}
+              className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin"
+            >
               <InsetGroup>
                 {visible.map((c, i) => (
                   <ContactListRow
@@ -348,6 +407,23 @@ export function ContactsPage() {
       />
 
       <AutoTagDialog open={autoTagOpen} onOpenChange={setAutoTagOpen} />
+
+      {isMobile && (
+        <FilterSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          contacts={contacts ?? []}
+          tags={tags}
+          filters={filters}
+          onChange={setFilters}
+          sort={{ key: sortKey, dir: sortDir }}
+          onSortChange={(next) => {
+            setSortKey(next.key)
+            setSortDir(next.dir)
+          }}
+          resultCount={visible.length}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleting)}

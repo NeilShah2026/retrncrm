@@ -75,6 +75,19 @@
     --tab-bar-offset: max(calc(env(safe-area-inset-bottom) - 16px), 8px);
     --tab-bar-inset: calc(var(--tab-bar-height) + var(--tab-bar-offset) + 12px);
 
+    /* ---- Keyboard ------------------------------------------------- */
+    /* Written at runtime by src/lib/keyboard.ts (native only): how much of
+       the screen the keyboard covers, and UIKit's duration for getting it
+       there. The curve is UIKit's keyboard curve as a cubic. Anything that
+       has to clear the keyboard animates on these three, never on its own
+       timing, or it drifts against the keyboard as it moves. */
+    --kb-height: 0px;
+    --kb-duration: 0ms;
+    --kb-ease: cubic-bezier(0.38, 0.7, 0.125, 1);
+    /* The home-indicator inset — which the keyboard covers, so it drops
+       out while one is up rather than leaving a gap above it. */
+    --safe-bottom: env(safe-area-inset-bottom);
+
     /* ---- Motion --------------------------------------------------- */
     --duration-fast: 120ms;
     --duration-base: 160ms;
@@ -102,6 +115,10 @@
     --destructive-foreground: 0 0% 98%;
     --input: var(--border);
     --ring: var(--brand);
+  }
+
+  html.keyboard-open {
+    --safe-bottom: 0px;
   }
 
   .dark {
@@ -450,6 +467,123 @@
     -webkit-touch-callout: none;
   }
 
+  /* A list row under a finger: the grey wash UITableView gives a selected
+     cell, arriving instantly and fading out on release. */
+  .press-row {
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 280ms var(--ease-out);
+  }
+  .press-row:active {
+    background-color: hsl(var(--text) / 0.08);
+    transition-duration: 0ms;
+  }
+
+  /* ---- Moving with the keyboard ------------------------------------
+     See src/lib/keyboard.ts. Each rule transitions only the property it
+     moves, on the keyboard's own duration and curve. */
+
+  /* A region that gives up its bottom to the keyboard: the app's content
+     column, a document-scrolling page. */
+  .keyboard-inset {
+    padding-bottom: var(--kb-height);
+    transition: padding-bottom var(--kb-duration) var(--kb-ease);
+  }
+
+  /* Room for the floating tab bar until the keyboard replaces it. The tab
+     bar slides away as the keyboard arrives, so this hands its space over
+     on the same curve and the two read as one motion. */
+  .pb-tab-bar-until-keyboard {
+    padding-bottom: var(--tab-bar-inset);
+    transition: padding-bottom var(--kb-duration) var(--kb-ease);
+  }
+  html.keyboard-open .pb-tab-bar-until-keyboard {
+    padding-bottom: 0px;
+  }
+  @media (min-width: 768px) {
+    .pb-tab-bar-until-keyboard {
+      padding-bottom: 0px;
+    }
+  }
+
+  /* The tab bar steps out of the way while someone is typing, as in
+     Messages. */
+  .hide-for-keyboard {
+    transition:
+      transform var(--kb-duration) var(--kb-ease),
+      opacity var(--duration-base) var(--ease-out);
+  }
+  html.keyboard-open .hide-for-keyboard {
+    transform: translateY(130%);
+    opacity: 0;
+  }
+  html.keyboard-open .hide-for-keyboard,
+  html.keyboard-open .hide-for-keyboard * {
+    pointer-events: none !important;
+  }
+
+  /* The foot of a bottom sheet (ui/dialog.tsx): as tall as the keyboard,
+     so the sheet's content sits above it while its background runs on
+     underneath, the way a native sheet looks with the keyboard up. */
+  .keyboard-spacer {
+    height: var(--kb-height);
+    transition: height var(--kb-duration) var(--kb-ease);
+  }
+
+  /* While a sheet is up, the app behind it stays exactly where it is. The
+     keyboard belongs to the sheet; shrinking the page and sliding the tab bar
+     away underneath the dimmed backdrop read as the whole app lurching. */
+  body:has([role='dialog'][data-state='open']) .keyboard-inset {
+    padding-bottom: 0px;
+    transition: none;
+  }
+  body:has([role='dialog'][data-state='open']) .pb-tab-bar-until-keyboard {
+    padding-bottom: var(--tab-bar-inset);
+    transition: none;
+  }
+  body:has([role='dialog'][data-state='open']) .hide-for-keyboard {
+    transform: none;
+    opacity: 1;
+    transition: none;
+  }
+  .keyboard-max-height {
+    transition: max-height var(--kb-duration) var(--kb-ease);
+  }
+  .keyboard-padding {
+    transition: padding-bottom var(--kb-duration) var(--kb-ease);
+  }
+
+  /* Supporting copy that folds away while the keyboard is up, rather than
+     vanishing in one frame and yanking everything below it upward. */
+  .keyboard-collapse {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition:
+      grid-template-rows var(--kb-duration) var(--kb-ease),
+      opacity var(--duration-base) var(--ease-out);
+  }
+  .keyboard-collapse > * {
+    min-height: 0;
+    overflow: hidden;
+  }
+  @media (max-width: 639px) {
+    html.keyboard-open .keyboard-collapse {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+  }
+
+  /* Invisible; its height is the keyboard's, mid-flight. */
+  .keyboard-probe {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: var(--kb-height);
+    transition: height var(--kb-duration) var(--kb-ease);
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   /* iOS answers a touch by dimming, not by changing colour. */
   .press {
     transition: opacity var(--duration-fast) var(--ease-out);
@@ -469,6 +603,25 @@
   .press-scale:active {
     transform: scale(0.965);
     opacity: 0.9;
+  }
+
+  /* A row of chips that scrolls sideways under a finger, bar-less. */
+  .scroll-x-chips {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-x-chips::-webkit-scrollbar {
+    display: none;
+  }
+  /* WebKit drops a scroller's end padding, so the last chip would sit
+     against the screen edge; a trailing spacer (plus the row's gap) stands
+     in for it. Rows using this set only their start padding. */
+  .scroll-x-chips::after {
+    content: '';
+    flex-shrink: 0;
+    width: 0.5rem;
   }
 
   /* iOS scrolling: momentum, and an edge that stops where the region does. */

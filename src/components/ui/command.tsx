@@ -76,7 +76,10 @@ const CommandList = React.forwardRef<
   <CommandPrimitive.List
     ref={ref}
     className={cn(
-      'scroll-native max-h-[62dvh] overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin sm:max-h-[360px]',
+      'scroll-native overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin sm:max-h-[360px]',
+      // Phone: shortens as the keyboard rises under the sheet, so the last
+      // results stay reachable instead of being clipped off its bottom.
+      'keyboard-max-height max-h-[min(62dvh,calc(100dvh-var(--kb-height)-env(safe-area-inset-top)-7rem))]',
       className,
     )}
     {...props}

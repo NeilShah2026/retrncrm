@@ -2,7 +2,6 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
 import { impactFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +27,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 /** How far the sheet has to travel before letting go dismisses it. */
 const DISMISS_AT = 110
+
 
 /**
  * Swipe-down-to-dismiss for the phone's bottom sheet. The grabber at the top
@@ -121,10 +121,11 @@ const DialogContent = React.forwardRef<
         }}
         className={cn(
           'fixed z-50 flex flex-col bg-background shadow-modal outline-none',
-          // Mobile: a bottom sheet, at the corner radius iOS gives one.
-          // Never reaches under the status bar: with the keyboard up the
-          // viewport is short, and 92% of it still put the sheet's rounded
-          // top behind the clock.
+          // Mobile: a bottom sheet, at the corner radius iOS gives one. It
+          // never leaves the bottom edge: the keyboard rises *over* it, as it
+          // does over a native sheet, and a spacer at its foot (below) grows
+          // on the keyboard's curve to keep the content above it. Never
+          // reaches under the status bar.
           'inset-x-0 bottom-0 max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] w-full rounded-t-[16px]',
           // Desktop: a centred window, 10px radius, hairline + soft shadow.
           'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[92vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-modal',
@@ -160,7 +161,7 @@ const DialogContent = React.forwardRef<
             padded && header.length === 0 && 'pt-5',
             padded &&
               footer.length === 0 &&
-              'pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6',
+              'keyboard-padding pb-[max(1.25rem,var(--safe-bottom))] sm:pb-6',
           )}
         >
           {body}
@@ -170,12 +171,18 @@ const DialogContent = React.forwardRef<
           <div
             className={cn(
               'shrink-0 border-t bg-background',
-              padded && 'px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-6',
+              padded &&
+                'keyboard-padding px-5 pb-[max(1.25rem,var(--safe-bottom))] pt-3 sm:px-6 sm:pb-6',
             )}
           >
             {footer}
           </div>
         )}
+
+        {/* Room for the keyboard, filled with the sheet's own background —
+            so there is never a strip of the dimmed app between the sheet and
+            the keyboard while either is moving. */}
+        <div aria-hidden className="keyboard-spacer shrink-0 sm:hidden" />
 
         {!hideClose && (
           <DialogPrimitive.Close
@@ -241,24 +248,25 @@ DialogTitle.displayName = DialogPrimitive.Title.displayName
 /**
  * The sheet's standing instructions — which stop being worth two lines of a
  * shortened screen the moment someone is typing into the form below them, so
- * on a phone they step aside while the keyboard is up.
+ * on a phone they fold away as the keyboard comes up (`.keyboard-collapse`),
+ * on its curve, instead of disappearing in a single frame.
  */
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => {
-  const keyboardOpen = useKeyboardOpen()
-  const isMobile = useIsMobile()
-  return (
+  const description = (
     <DialogPrimitive.Description
       ref={ref}
-      className={cn(
-        'text-ios-subhead text-muted-foreground sm:text-sm',
-        isMobile && keyboardOpen && 'hidden',
-        className,
-      )}
+      className={cn('text-ios-subhead text-muted-foreground sm:text-sm', className)}
       {...props}
     />
+  )
+  if (className?.includes('sr-only')) return description
+  return (
+    <div className="keyboard-collapse">
+      <div>{description}</div>
+    </div>
   )
 })
 DialogDescription.displayName = DialogPrimitive.Description.displayName

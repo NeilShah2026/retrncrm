@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, SquarePen } from 'lucide-react'
 import { AssistantChat } from '@/components/ai/AssistantChat'
 import { BarButton, MobileNavBar } from '@/components/layout/MobileNavBar'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ export function AssistantPage() {
           largeTitle: false,
           trailing: started ? (
             <BarButton onClick={reset} aria-label="Start a new thread">
-              <RotateCcw />
+              <SquarePen />
             </BarButton>
           ) : undefined,
         }}

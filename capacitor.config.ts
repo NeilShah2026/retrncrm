@@ -28,13 +28,13 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
     },
     Keyboard: {
-      // `native`, not `body`. Resizing the body element does nothing for a
-      // `position: fixed` element — fixed is positioned against the viewport,
-      // so every bottom-anchored sheet, composer and action bar stayed exactly
-      // where it was and the keyboard simply covered it. `native` shrinks the
-      // WebView itself, so the viewport really is smaller and anything pinned
-      // to its bottom edge sits on top of the keyboard.
-      resize: 'native',
+      // `none`: the WebView keeps its size and the page moves itself. Every
+      // resize mode changes the frame in a single step — `native` a full
+      // 200ms after the keyboard has finished arriving — which is what made
+      // the whole screen jump once the keyboard was already up. The page is
+      // told the keyboard's height and UIKit's duration instead (AppDelegate
+      // .swift → src/lib/keyboard.ts) and animates alongside it.
+      resize: 'none',
       style: 'default',
       resizeOnFullScreen: true,
     },

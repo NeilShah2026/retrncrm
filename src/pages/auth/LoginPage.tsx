@@ -91,7 +91,9 @@ export function LoginPage() {
   const busy = submitting || pendingProvider !== null
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background">
+    // `keyboard-inset`: this page scrolls as a document, so the keyboard's
+    // height is added below it to give a lower field somewhere to scroll up to.
+    <div className="keyboard-inset flex min-h-[100dvh] flex-col bg-background">
       <div className="mx-auto flex w-full max-w-[22rem] flex-1 flex-col px-6 pb-[max(env(safe-area-inset-bottom),24px)] pt-[calc(env(safe-area-inset-top)+3.5rem)]">
         {magicLinkSent ? (
           <EmailNotice

@@ -7,8 +7,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillChangeFrame(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
         return true
+    }
+
+    /// Tells the web layer where the keyboard is headed and how long UIKit is
+    /// taking to get it there. The Keyboard plugin only reports a height, so
+    /// anything the page moved in response ran on a guessed duration and
+    /// visibly drifted against the keyboard; with the real one, the layout
+    /// rides up on the same clock (see src/lib/keyboard.ts).
+    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+        guard
+            let window = window,
+            let bridge = (window.rootViewController as? CAPBridgeViewController)?.bridge,
+            let info = notification.userInfo,
+            let endFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        else { return }
+
+        let duration = (info[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0
+        let frame = window.convert(endFrame, from: window.screen.coordinateSpace)
+        let bounds = window.bounds
+        // Only a keyboard docked to the bottom edge covers anything. An
+        // undocked or floating one (iPad) leaves the layout alone.
+        let docked = frame.intersects(bounds) && frame.maxY >= bounds.maxY - 1
+        let height = docked ? max(0, bounds.maxY - frame.minY) : 0
+
+        bridge.triggerWindowJSEvent(
+            eventName: "retrnkeyboard",
+            data: "{ height: \(Int(height.rounded())), duration: \(Int((duration * 1000).rounded())) }"
+        )
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

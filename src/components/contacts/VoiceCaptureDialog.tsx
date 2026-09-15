@@ -248,13 +248,12 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
                 </span>
               )}
             </DialogTitle>
-            {!(isMobile && compact) && (
-              <DialogDescription>
-                {isMobile && speech.supported
-                  ? 'Speak or type. We’ll turn it into a contact you can check before saving.'
-                  : 'Type who you met. We’ll turn it into a contact you can check before saving.'}
-              </DialogDescription>
-            )}
+            {/* Folds away on its own while the keyboard is up. */}
+            <DialogDescription>
+              {isMobile && speech.supported
+                ? 'Speak or type. We’ll turn it into a contact you can check before saving.'
+                : 'Type who you met. We’ll turn it into a contact you can check before saving.'}
+            </DialogDescription>
           </DialogHeader>
 
           {/* On a phone the microphone is the screen, not a button beside a

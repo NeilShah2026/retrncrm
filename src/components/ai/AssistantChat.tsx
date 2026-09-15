@@ -11,10 +11,10 @@ import { askNetwork, startSession } from '@/lib/ai/network'
 import { applyActions } from '@/lib/ai/actions'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { renderMarkdown } from '@/lib/format'
-import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
+import { dismissKeyboard, dismissKeyboardOnDrag } from '@/lib/keyboard'
+import { tapFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { ActionPlan, MatchList } from './AssistantBlocks'
 import type { Contact } from '@/types'
 
@@ -47,11 +47,6 @@ const SUGGESTION_GROUPS = [
   },
 ]
 
-const PLACEHOLDERS = [
-  'Ask about your network, or say what happened',
-  'Met Priya at the AI meetup, PM at Klaviyo',
-  'Who should I reconnect with this week?',
-]
 
 let turnSeq = 0
 function nextTurnId(): string {
@@ -72,15 +67,41 @@ export function AssistantChat() {
   const { turns, setTurns, busy, setBusy, draft, setDraft, session, epoch, pending, handoff } =
     useAssistant()
 
-  const threadEnd = React.useRef<HTMLDivElement>(null)
+  /*
+   * The thread scrolls itself, never via `scrollIntoView`: that scrolls every
+   * ancestor that can scroll — including the app shell's `overflow: hidden`
+   * columns — and on a phone that is the whole screen shifting up and staying
+   * there.
+   */
+  const thread = React.useRef<HTMLDivElement>(null)
+  const atEnd = React.useRef(true)
+  /**
+   * Only a person scrolling can take the thread off its end. The shell
+   * resizing under the keyboard fires scroll events too, read mid-resize,
+   * and trusting those unpinned the thread halfway up.
+   */
+  const touched = React.useRef(false)
   const firstPaint = React.useRef(true)
   React.useEffect(() => {
-    threadEnd.current?.scrollIntoView({
-      block: 'end',
-      behavior: firstPaint.current ? 'auto' : 'smooth',
-    })
+    const el = thread.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: firstPaint.current ? 'auto' : 'smooth' })
+    atEnd.current = true
     firstPaint.current = false
   }, [turns, busy])
+
+  // A thread read from its latest message stays on it while the space above
+  // the composer changes — the box growing a line, the keyboard arriving —
+  // as Messages does, instead of letting the newest reply slide under.
+  React.useEffect(() => {
+    const el = thread.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      if (atEnd.current && el.dataset.keyboardAnchor === 'end') el.scrollTop = el.scrollHeight
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const fuse = React.useMemo(() => buildSearchIndex(contacts, tagMap), [contacts, tagMap])
 
@@ -110,6 +131,9 @@ export function AssistantChat() {
       const trimmed = q.trim()
       if (!trimmed || busy) return
       const startedAt = epoch.current
+      // On a phone the keyboard goes down once something is asked: the reply
+      // is a thing to read and approve, and the thread needs the room.
+      if (isMobile) dismissKeyboard()
       setBusy(true)
       setDraft('')
       try {
@@ -133,7 +157,11 @@ export function AssistantChat() {
           toast.info('AI isn’t set up here. Showing keyword matches.')
         } else {
           console.error(err)
-          toast.error('Couldn’t do that. Showing keyword matches instead.')
+          // The server's reason, not just the fact of failure: "sign in
+          // again" and "the model is down" need different things from you.
+          toast.error('Couldn’t do that. Showing keyword matches instead.', {
+            description: err instanceof Error ? err.message : undefined,
+          })
         }
         session.current = null
         setTurns((t) => [...t, keywordFallback(trimmed)])
@@ -141,7 +169,7 @@ export function AssistantChat() {
         if (epoch.current === startedAt) setBusy(false)
       }
     },
-    [busy, contacts, tagMap, keywordFallback, session, epoch, setBusy, setDraft, setTurns],
+    [busy, contacts, tagMap, keywordFallback, session, epoch, setBusy, setDraft, setTurns, isMobile],
   )
 
   const askRef = React.useRef(ask)
@@ -192,7 +220,32 @@ export function AssistantChat() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+      <div
+        ref={thread}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) {
+            atEnd.current = true
+            touched.current = false
+          } else if (touched.current) {
+            atEnd.current = false
+          }
+        }}
+        onTouchStart={(e) => {
+          touched.current = true
+          // Dragging the thread puts the keyboard away, as in Messages.
+          if (isMobile) dismissKeyboardOnDrag.onTouchStart(e)
+        }}
+        onTouchMove={isMobile ? dismissKeyboardOnDrag.onTouchMove : undefined}
+        onWheel={() => {
+          touched.current = true
+        }}
+        onPointerDown={() => {
+          touched.current = true
+        }}
+        data-keyboard-anchor={started ? 'end' : undefined}
+        className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin"
+      >
         <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-4 md:px-6">
           {!started ? (
             <Opening canAsk={canAsk} contactCount={contacts.length} onPick={(s) => void ask(s)} />
@@ -211,7 +264,6 @@ export function AssistantChat() {
               {busy && <Thinking contactCount={contacts.length} first={turns.length === 0} />}
             </div>
           )}
-          <div ref={threadEnd} />
         </div>
       </div>
 
@@ -243,18 +295,23 @@ function Opening({
   onPick: (s: string) => void
 }) {
   return (
-    <div className="py-6 sm:py-14">
+    <div className="pb-2 pt-4 sm:py-14">
       <h1 className="text-ios-title md:text-xl md:font-semibold md:tracking-[-0.02em]">
         Ask about your network
       </h1>
-      <p className="text-ios-subhead mt-2 max-w-md text-muted-foreground md:text-sm">
-        {canAsk
-          ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you’ve saved. Say what happened and it proposes what to record; you approve before anything is saved.`
-          : 'Add a few people first. There’s nothing to ask about yet.'}
-      </p>
+      {/* Folds away while typing, so the openers below keep the room. */}
+      <div className="keyboard-collapse">
+        <div>
+          <p className="text-ios-subhead mt-2 max-w-md text-muted-foreground md:text-sm">
+            {canAsk
+              ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you’ve saved. Say what happened and it drafts what to record — nothing is saved until you approve it.`
+              : 'Add a few people first. There’s nothing to ask about yet.'}
+          </p>
+        </div>
+      </div>
 
       {canAsk && (
-        <div className="mt-7 grid gap-5 sm:grid-cols-2">
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
           {SUGGESTION_GROUPS.map((group) => (
             <section key={group.label}>
               <h2 className="text-ios-footnote flex items-center gap-1.5 px-4 pb-1.5 font-medium uppercase tracking-[0.05em] text-muted-foreground">
@@ -266,16 +323,20 @@ function Opening({
                   <button
                     key={item}
                     type="button"
-                    onClick={() => onPick(item)}
-                    className="press-row flex w-full items-stretch pl-4 text-left"
+                    onClick={() => {
+                      tapFeedback()
+                      onPick(item)
+                    }}
+                    className="press-row flex w-full items-stretch pl-4 text-left md:hover:bg-accent/60"
                   >
                     <span
                       className={cn(
-                        'text-ios-body flex min-w-0 flex-1 items-center py-3 pr-4',
+                        'text-ios-body flex min-w-0 flex-1 items-center gap-2 py-3 pr-4 md:py-2.5 md:text-sm',
                         i < group.items.length - 1 && 'hairline-b',
                       )}
                     >
-                      {item}
+                      <span className="min-w-0 flex-1">{item}</span>
+                      <ArrowUp className="h-4 w-4 shrink-0 rotate-45 text-muted-foreground/50" />
                     </span>
                   </button>
                 ))}
@@ -308,7 +369,7 @@ function TurnBlock({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-bg-sunken px-3.5 py-2 text-[15px] leading-relaxed">
+        <p className="text-ios-body max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-[6px] bg-bg-sunken px-3.5 py-2 md:rounded-lg md:text-[15px] md:leading-relaxed">
           {question}
         </p>
       </div>
@@ -407,7 +468,14 @@ function Thinking({ contactCount, first }: { contactCount: number; first: boolea
   )
 }
 
-/** The composer: a textarea, a small mic, a send button. Pinned to the bottom. */
+/** The tallest the box grows before it scrolls inside itself. */
+const COMPOSER_MAX_HEIGHT = 160
+
+/**
+ * The composer, pinned to the bottom: a text box with one round action at
+ * its end — the microphone while it's empty, send once there's something to
+ * send, as in Messages.
+ */
 function Composer({
   value,
   onChange,
@@ -434,44 +502,44 @@ function Composer({
   showDisclaimer: boolean
 }) {
   const box = React.useRef<HTMLTextAreaElement>(null)
-  const [placeholder, setPlaceholder] = React.useState(0)
-  const keyboardOpen = useKeyboardOpen()
 
-  React.useEffect(() => {
-    if (value || started) return
-    const timer = setInterval(() => setPlaceholder((i) => (i + 1) % PLACEHOLDERS.length), 4000)
-    return () => clearInterval(timer)
-  }, [value, started])
-
-  React.useEffect(() => {
+  // Grow with the text, one line at a time, up to a cap. Below the cap the
+  // box can't scroll at all — a one-line field that drags sideways or up and
+  // down under a finger is the thing that made this feel broken.
+  React.useLayoutEffect(() => {
     const el = box.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+    const next = Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)
+    el.style.height = `${next}px`
+    el.style.overflowY = el.scrollHeight > COMPOSER_MAX_HEIGHT ? 'auto' : 'hidden'
   }, [value])
 
-  const canSend = Boolean(value.trim()) && !busy && !disabled
+  const hasText = Boolean(value.trim())
+  const canSend = hasText && !busy && !disabled
 
   return (
-    <div
-      className={cn(
-        'shrink-0 border-t bg-background',
-        // The tab bar floats over the bottom of the screen, so without this
-        // the composer sits underneath it and can't be typed into. While the
-        // keyboard is up the tab bar has moved away, so the room isn't
-        // needed — and the composer should sit right on the keyboard.
-        !keyboardOpen && 'pb-[var(--tab-bar-inset)] md:pb-0',
-      )}
-    >
-      <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-3 md:px-6">
+    // Hands the tab bar's room over to the keyboard as it arrives, on the
+    // keyboard's curve, so the box rides up on top of it in one motion.
+    <div className="pb-tab-bar-until-keyboard shrink-0 border-t bg-background">
+      <div className="mx-auto w-full max-w-3xl pb-2 pt-2 md:px-6 md:pb-3 md:pt-3">
         {followUps.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
+          // Phone: one row of capsules that scrolls sideways. Desktop: quiet
+          // links that wrap.
+          <div className="scroll-x-chips mb-2 flex gap-2 pl-4 md:flex-wrap md:gap-x-4 md:gap-y-1 md:pl-0 md:after:hidden">
             {followUps.map((f) => (
               <button
                 key={f}
                 type="button"
-                onClick={() => onFollowUp(f)}
-                className="rounded-sm text-xs text-text-secondary underline-offset-2 transition-colors duration-fast hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                onClick={() => {
+                  tapFeedback()
+                  onFollowUp(f)
+                }}
+                className={cn(
+                  'press text-ios-subhead h-8 shrink-0 whitespace-nowrap rounded-full bg-bg-sunken px-3.5 text-foreground ring-1 ring-inset ring-border/70',
+                  'md:h-auto md:rounded-sm md:bg-transparent md:px-0 md:text-xs md:text-text-secondary md:ring-0 md:underline-offset-2 md:hover:text-foreground md:hover:underline',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                )}
               >
                 {f}
               </button>
@@ -485,9 +553,8 @@ function Composer({
             if (canSend) onSubmit()
           }}
           className={cn(
-            'flex items-end gap-1 rounded-[22px] bg-bg-sunken p-1.5 pl-4 transition-colors duration-fast',
-            'ring-1 ring-inset ring-border/70 focus-within:ring-2 focus-within:ring-brand/40',
-            'md:rounded-lg md:bg-background',
+            'mx-3 flex items-end gap-2 rounded-[20px] bg-bg-sunken py-1 pl-4 pr-1 ring-1 ring-inset ring-border/70 md:mx-0',
+            'md:rounded-lg md:bg-background md:py-1.5 md:pr-1.5 md:transition-shadow md:duration-fast md:focus-within:ring-2 md:focus-within:ring-brand/40',
             disabled && 'opacity-60',
           )}
         >
@@ -503,36 +570,57 @@ function Composer({
               }
             }}
             placeholder={
-              disabled
-                ? 'Add a few people first'
-                : started
-                  ? 'Ask or say something else'
-                  : PLACEHOLDERS[placeholder]
+              disabled ? 'Add people first' : started ? 'Ask a follow-up' : 'Ask anything'
             }
             aria-label="Ask about your network, or say what happened"
             disabled={disabled}
-            className="text-ios-body max-h-[200px] min-h-[34px] w-full resize-none bg-transparent py-1.5 outline-none placeholder:text-muted-foreground/70 md:text-[15px] md:leading-relaxed"
+            autoCapitalize="sentences"
+            className={cn(
+              'text-ios-body block min-h-[34px] w-full min-w-0 resize-none overflow-hidden bg-transparent py-[6px] outline-none placeholder:text-muted-foreground',
+              'md:min-h-[32px] md:py-1 md:text-[15px] md:leading-6',
+            )}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onVoice}
-            aria-label="Say who you met"
-            title="Say who you met"
-            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground md:h-8 md:w-8 md:rounded-md"
-          >
-            <Mic />
-          </Button>
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!canSend}
-            aria-label="Send"
-            className="h-9 w-9 shrink-0 rounded-full md:h-8 md:w-8 md:rounded-md"
-          >
-            <ArrowUp strokeWidth={2.5} />
-          </Button>
+
+          {/* One slot, two actions: they cross-fade in place rather than
+              pushing the text box around as one replaces the other. */}
+          <div className="relative mb-px h-8 w-8 shrink-0">
+            <button
+              type="button"
+              onClick={onVoice}
+              aria-label="Say who you met"
+              title="Say who you met"
+              tabIndex={hasText ? -1 : 0}
+              aria-hidden={hasText}
+              disabled={disabled}
+              className={cn(
+                'absolute inset-0 flex items-center justify-center rounded-full text-muted-foreground',
+                'transition-[opacity,transform] duration-base ease-out',
+                'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                hasText ? 'pointer-events-none scale-75 opacity-0' : 'press scale-100 opacity-100',
+              )}
+            >
+              <Mic className="h-[20px] w-[20px]" />
+            </button>
+            <button
+              type="submit"
+              aria-label="Send"
+              tabIndex={hasText ? 0 : -1}
+              aria-hidden={!hasText}
+              disabled={!canSend}
+              // Keeps the caret in the box on desktop; a tap on the button
+              // shouldn't be what decides whether the keyboard stays.
+              onPointerDown={(e) => e.preventDefault()}
+              className={cn(
+                'absolute inset-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground',
+                'transition-[opacity,transform] duration-base ease-[var(--ease-spring)]',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                'disabled:opacity-40',
+                hasText ? 'press-scale scale-100' : 'pointer-events-none scale-50 !opacity-0',
+              )}
+            >
+              <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2.6} />
+            </button>
+          </div>
         </form>
 
         {showDisclaimer && (

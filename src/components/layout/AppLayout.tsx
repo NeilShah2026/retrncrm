@@ -33,7 +33,6 @@ import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
-import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
 import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
@@ -111,7 +110,6 @@ function TabItem({
  */
 function PhoneTabBar() {
   const { pathname } = useLocation()
-  const keyboardOpen = useKeyboardOpen()
   const activeIndex = TAB_NAV.findIndex((item) =>
     item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`),
   )
@@ -125,9 +123,10 @@ function PhoneTabBar() {
         // screen, but it still clears the indicator itself. The token is
         // shared with `--tab-bar-inset`, the room pages leave below content.
         'pb-[var(--tab-bar-offset)]',
-        'transition-[transform,opacity] duration-base ease-out',
-        // Out of the way while someone is typing, as in Messages.
-        keyboardOpen && 'pointer-events-none translate-y-[130%] opacity-0',
+        // Out of the way while someone is typing, as in Messages — driven by
+        // CSS on the keyboard's own clock, so it leaves as the keyboard
+        // arrives rather than a render later.
+        'hide-for-keyboard',
       )}
     >
       {/* A capsule, per DESIGN.md's `pill: full` — not an arbitrary radius. */}
@@ -289,7 +288,9 @@ export function AppLayout() {
 
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* Gives up its bottom edge to the keyboard as the keyboard rises,
+            so every page shrinks with it instead of being covered. */}
+        <main className="keyboard-inset flex min-h-0 flex-1 flex-col overflow-hidden">
           <Outlet />
         </main>
 

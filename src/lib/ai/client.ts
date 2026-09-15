@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { apiUrl } from '@/lib/apiBase'
+import { postApi } from '@/lib/apiFetch'
 
 /**
  * The single client-side door to the model.
@@ -70,16 +70,13 @@ export async function askClaude({
 
   let response: Response
   try {
-    response = await fetch(apiUrl('/api/ai'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ system, messages, maxTokens }),
-      signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),
-    })
-  } catch {
+    response = await postApi(
+      '/api/ai',
+      { system, messages, maxTokens },
+      { token, signal, timeoutMs: TIMEOUT_MS },
+    )
+  } catch (err) {
+    console.error('AI request failed to send', err)
     throw new AiRequestError('Could not reach the assistant.')
   }
 
