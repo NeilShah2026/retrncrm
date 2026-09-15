@@ -9,17 +9,16 @@ export const SUPABASE_URL = 'https://plkpfojzqsgfqpfeeasf.supabase.co'
 export const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsa3Bmb2p6cXNnZnFwZmVlYXNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NjM3OTAsImV4cCI6MjA5OTAzOTc5MH0.HMWz0qOdQtMIeQgVeqCGEppi5udyQxX9N7GGh6EoZBo'
 
+/** The web app. Links into a contact and "Open Retrn" go here. */
+export const APP_ORIGIN = 'https://www.retrncrm.com'
+
 /**
- * Where the Retrn web app runs. Used by "Connect with Retrn" (SSO): the
- * extension reads your existing signed-in session from a tab on any of these
- * origins, so you don't have to log in twice. The first entry is the one we
- * open if no signed-in tab is found (your production site).
+ * Where a signed-in Retrn tab might be open. Only used to *suggest* the email
+ * to sign in with — the extension never borrows that tab's session.
  *
- * ⚠️ Every origin listed here must ALSO be in `host_permissions` in
+ * ⚠️ Every origin here must also be in `host_permissions` in
  * public/manifest.json, or the extension can't read that tab.
  */
-export const RETRN_APP_URLS = [
-  'https://retrncrm.com',
-  'https://www.retrncrm.com',
-  'http://localhost:5173',
-]
+export const RETRN_APP_URLS = ['https://www.retrncrm.com', 'https://retrncrm.com', 'http://localhost:5173']
+
+export const contactUrl = (id: string) => `${APP_ORIGIN}/app/contacts/${id}`

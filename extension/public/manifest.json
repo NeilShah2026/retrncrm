@@ -1,21 +1,34 @@
 {
   "manifest_version": 3,
   "name": "Retrn — Log emails & contacts to your network",
-  "version": "0.2.0",
-  "description": "Log emails from Gmail/Outlook and add people from LinkedIn to their Retrn contact, in one click.",
+  "short_name": "Retrn",
+  "version": "0.3.0",
+  "description": "Log Gmail and Outlook emails to the people in your Retrn network, and save contacts from LinkedIn.",
+  "minimum_chrome_version": "116",
   "action": {
-    "default_title": "Log this email to Retrn",
+    "default_title": "Retrn",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
   "icons": {
     "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+R" },
+      "description": "Open Retrn"
+    }
   },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
@@ -27,6 +40,32 @@
     "https://outlook.office.com/*",
     "https://outlook.office365.com/*",
     "https://outlook.live.com/*",
+    "https://outlook.cloud.microsoft/*",
     "https://www.linkedin.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.cloud.microsoft/*"
+      ],
+      "js": ["content-mail.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "panel.js", "app.css", "fonts/*"],
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.cloud.microsoft/*"
+      ]
+    }
   ]
 }

@@ -13,6 +13,13 @@ const ASSETS = `${VERSION}-assets`
 /** The document served for every in-app URL; also the offline fallback. */
 const APP_SHELL = '/index.html'
 
+/**
+ * Pages served as prerendered, script-free HTML (scripts/prerender-legal.mjs)
+ * rather than the app shell. Their responses must never be cached as the
+ * shell, or the offline app would open to a policy page with no app in it.
+ */
+const STATIC_PAGES = new Set(['/privacy', '/terms'])
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -66,8 +73,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone()
-          caches.open(SHELL).then((cache) => cache.put(APP_SHELL, copy))
+          if (!STATIC_PAGES.has(url.pathname)) {
+            const copy = response.clone()
+            caches.open(SHELL).then((cache) => cache.put(APP_SHELL, copy))
+          }
           return response
         })
         .catch(() =>

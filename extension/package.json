@@ -7,13 +7,16 @@
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "zip": "node build.mjs && cd dist && zip -r ../retrn-extension.zip . && cd .."
+    "zip": "node build.mjs && cd dist && zip -r ../retrn-extension.zip . && cd ..",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "esbuild": "^0.23.0",
-    "@types/chrome": "^0.0.270"
+    "@types/chrome": "^0.1.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.110.1",
+    "preact": "^10.29.8"
   }
 }

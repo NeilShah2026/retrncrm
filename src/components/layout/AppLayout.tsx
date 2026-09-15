@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from './ThemeToggle'
+import { Logo } from './Logo'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
@@ -37,6 +38,8 @@ import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { displayName, initialFor } from '@/lib/displayName'
+
+export { Logo }
 
 const PRIMARY_NAV = [
   { to: ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -152,17 +155,6 @@ function PhoneTabBar() {
   )
 }
 
-/** The wordmark. A neutral mark — the brand is the type, not a tile. */
-export function Logo({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <span className="text-[13px] font-semibold leading-none">R</span>
-      </span>
-      <span className="text-[15px] font-semibold tracking-[-0.02em]">Retrn</span>
-    </div>
-  )
-}
 
 function AccountMenu() {
   const { user, signOut } = useAuth()

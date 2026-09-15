@@ -75,6 +75,6 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Retrn uses your microphone so you can add a contact by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Retrn uses speech recognition to turn what you say into a contact, entirely on your device.</string>
+	<string>Retrn uses speech recognition to turn what you say into a contact. Retrn receives only the text and never stores your audio.</string>
 </dict>
 </plist>
