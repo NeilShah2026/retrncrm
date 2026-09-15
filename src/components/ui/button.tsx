@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { Loader2 } from 'lucide-react'
+import { tapFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 
 /**
@@ -65,7 +66,17 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    { className, variant, size, asChild = false, loading, children, disabled, ...props },
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading,
+      children,
+      disabled,
+      onClick,
+      ...props
+    },
     ref,
   ) => {
     const Comp = asChild ? Slot : 'button'
@@ -75,6 +86,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
+        // Every button in the app answers a touch physically on a phone, the
+        // way a UIKit control does. No-op on web and on anything without a
+        // Taptic Engine — see src/lib/haptics.ts.
+        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+          tapFeedback()
+          onClick?.(e)
+        }}
         {...props}
       >
         {loading ? (

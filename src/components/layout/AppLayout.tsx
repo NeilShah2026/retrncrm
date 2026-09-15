@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
@@ -28,12 +28,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from './ThemeToggle'
-import { MoreSheet } from './MoreSheet'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
+import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
+import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 import { displayName, initialFor } from '@/lib/displayName'
@@ -46,12 +47,13 @@ const PRIMARY_NAV = [
   { to: ROUTES.assistant, label: 'Assistant', icon: MessageSquare, end: false },
 ]
 
-/** The phone's tab bar: four destinations plus More. */
+/** The phone's tab bar: four destinations plus More, which is a screen too. */
 const TAB_NAV = [
   { to: ROUTES.dashboard, label: 'Home', icon: LayoutDashboard, end: true },
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
   { to: ROUTES.assistant, label: 'Assistant', icon: MessageSquare, end: false },
   { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
+  { to: ROUTES.more, label: 'More', icon: MoreHorizontal, end: false },
 ]
 
 const SECONDARY_NAV = [
@@ -61,10 +63,15 @@ const SECONDARY_NAV = [
   { to: ROUTES.settings, label: 'Settings', icon: Settings, end: false },
 ]
 
-/**
- * One tab. 49pt tall with a 25pt glyph and a 10pt label — UITabBar
- * proportions. Selection is shown by tint and weight, never by a pill.
- */
+// 4px grid (DESIGN.md §4): 12 + 24 glyph + 12 = a 48pt item, inside the
+// bar's own 4px padding = a 56px bar. No caption — the glyph carries it, and
+// each tab keeps an aria-label so it is still named for assistive tech.
+const TAB_ITEM_CLASS =
+  'relative flex flex-1 items-center justify-center rounded-full py-3'
+
+const TAB_SLOTS = TAB_NAV.length
+
+/** One tab. A 23pt glyph over a 10pt label. */
 function TabItem({
   to,
   label,
@@ -80,22 +87,69 @@ function TabItem({
     <NavLink
       to={to}
       end={end}
+      onClick={selectionFeedback}
+      aria-label={label}
       className={({ isActive }) =>
-        cn(
-          'press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px]',
-          isActive ? 'text-brand' : 'text-muted-foreground',
-        )
+        cn(TAB_ITEM_CLASS, isActive ? 'text-brand' : 'press text-muted-foreground')
       }
     >
       {({ isActive }) => (
-        <>
-          <Icon className="h-[25px] w-[25px]" strokeWidth={isActive ? 2.2 : 1.8} />
-          <span className="text-[10px] font-medium leading-none tracking-[-0.01em]">
-            {label}
-          </span>
-        </>
+        <Icon className="relative h-6 w-6" strokeWidth={isActive ? 2.4 : 1.9} />
       )}
     </NavLink>
+  )
+}
+
+/**
+ * The phone's tab bar: a floating glass capsule the content scrolls beneath.
+ * Selection is a single tinted pill that *slides* between slots rather than
+ * appearing under the new one — the one piece of motion that tells you the
+ * bar is one control rather than five buttons standing next to each other.
+ * It is one positioned element and a transform, deliberately: a layout
+ * animation library would have cost more to download than the whole rest of
+ * this bar weighs.
+ */
+function PhoneTabBar() {
+  const { pathname } = useLocation()
+  const keyboardOpen = useKeyboardOpen()
+  const activeIndex = TAB_NAV.findIndex((item) =>
+    item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`),
+  )
+
+  return (
+    <nav
+      className={cn(
+        'chrome pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 md:hidden',
+        // Sits close to the bottom edge, the way iOS 26 floats a tab bar —
+        // the home indicator's full inset would leave it stranded up the
+        // screen, but it still clears the indicator itself. The token is
+        // shared with `--tab-bar-inset`, the room pages leave below content.
+        'pb-[var(--tab-bar-offset)]',
+        'transition-[transform,opacity] duration-base ease-out',
+        // Out of the way while someone is typing, as in Messages.
+        keyboardOpen && 'pointer-events-none translate-y-[130%] opacity-0',
+      )}
+    >
+      {/* A capsule, per DESIGN.md's `pill: full` — not an arbitrary radius. */}
+      <div className="glass glass-floating pointer-events-auto relative flex w-full max-w-[288px] items-stretch rounded-full p-1">
+        <span
+          aria-hidden
+          className={cn(
+            'absolute inset-y-1 left-1 rounded-full bg-brand/10',
+            'transition-[transform,opacity] duration-300 ease-[var(--ease-spring)]',
+            activeIndex < 0 && 'opacity-0',
+          )}
+          style={{
+            width: `calc((100% - 0.5rem) / ${TAB_SLOTS})`,
+            transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
+          }}
+        />
+
+        {TAB_NAV.map((item) => (
+          <TabItem key={item.to} {...item} />
+        ))}
+      </div>
+    </nav>
   )
 }
 
@@ -162,7 +216,6 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
 export function AppLayout() {
   const { openNewContact, openVoiceCapture, openSearch } = useUI()
   const [shareOpen, setShareOpen] = React.useState(false)
-  const [moreOpen, setMoreOpen] = React.useState(false)
 
   useAutoLogMeetings()
 
@@ -240,30 +293,11 @@ export function AppLayout() {
           <Outlet />
         </main>
 
-        {/* Phone tab bar */}
-        <nav className="chrome material-bar hairline-t flex shrink-0 items-stretch pb-[env(safe-area-inset-bottom)] md:hidden">
-          {TAB_NAV.map((item) => (
-            <TabItem key={item.to} {...item} />
-          ))}
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-label="More"
-            className="press flex h-[49px] flex-1 flex-col items-center justify-center gap-[3px] text-muted-foreground"
-          >
-            <MoreHorizontal className="h-[25px] w-[25px]" strokeWidth={1.8} />
-            <span className="text-[10px] font-medium leading-none tracking-[-0.01em]">
-              More
-            </span>
-          </button>
-        </nav>
+        {/* Floats over the content it scrolls above rather than sitting in a
+            strip below it — pages leave room with `pb-tab-bar` (PageShell). */}
+        <PhoneTabBar />
       </div>
 
-      <MoreSheet
-        open={moreOpen}
-        onOpenChange={setMoreOpen}
-        onShareProfile={() => setShareOpen(true)}
-      />
       <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
       <ExtensionBanner />
     </div>

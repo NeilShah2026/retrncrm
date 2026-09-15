@@ -26,12 +26,14 @@ export function ContactListRow({ contact, tagMap, last }: Props) {
     <button
       type="button"
       onClick={() => navigate(ROUTES.contact(contact.id))}
-      className="flex w-full items-center gap-3 pl-3 text-left transition-colors duration-fast active:bg-accent"
+      className="press-row flex w-full items-stretch gap-3 pl-4 text-left"
     >
-      <ContactAvatar contact={contact} className="h-9 w-9 shrink-0" />
+      <span className="flex shrink-0 items-center">
+        <ContactAvatar contact={contact} className="h-9 w-9" />
+      </span>
       <span
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 py-2.5 pr-3',
+          'flex min-w-0 flex-1 items-center gap-2 py-2.5 pr-4',
           !last && 'hairline-b',
         )}
       >
@@ -40,9 +42,7 @@ export function ContactListRow({ contact, tagMap, last }: Props) {
             {status.overdue && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning" aria-label="Overdue" />
             )}
-            <span className="truncate text-[17px] leading-tight tracking-[-0.01em]">
-              {fullName(contact)}
-            </span>
+            <span className="text-ios-body truncate">{fullName(contact)}</span>
           </span>
           <span className="mt-0.5 flex items-center gap-1.5">
             {tags[0] && (
@@ -51,7 +51,7 @@ export function ContactListRow({ contact, tagMap, last }: Props) {
                 aria-hidden
               />
             )}
-            <span className="truncate text-[13px] text-muted-foreground">
+            <span className="text-ios-footnote truncate text-muted-foreground">
               {subtitle ||
                 (contact.lastContactDate
                   ? `Last spoke ${formatRelativeShort(contact.lastContactDate)} ago`
@@ -60,11 +60,11 @@ export function ContactListRow({ contact, tagMap, last }: Props) {
           </span>
         </span>
         {subtitle && contact.lastContactDate && (
-          <time className="tnum shrink-0 text-[13px] text-muted-foreground">
+          <time className="tnum text-ios-footnote shrink-0 text-muted-foreground">
             {formatRelativeShort(contact.lastContactDate)}
           </time>
         )}
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+        <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted-foreground/45" />
       </span>
     </button>
   )

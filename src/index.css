@@ -51,16 +51,38 @@
     --info: 217 60% 40%;
     --info-soft: 217 70% 95%;
 
+    /* ---- Liquid Glass --------------------------------------------- */
+    /* The material iOS floats its chrome on. Three parts make it read as
+       glass rather than as a translucent grey box: a tint the backdrop is
+       seen through, a bright specular rim picking out the lit top edge, and
+       a diffuse shadow separating it from whatever scrolls beneath. */
+    --glass-tint: 0 0% 100%;
+    --glass-tint-opacity: 0.72;
+    --glass-rim: 0 0% 100%;
+    --glass-rim-opacity: 0.7;
+    --glass-shadow: 240 10% 6%;
+    --glass-shadow-opacity: 0.1;
+
     /* ---- Shape ---------------------------------------------------- */
     --radius: 8px; /* card / panel */
     --radius-control: 6px; /* buttons, inputs, menu items */
     --radius-modal: 10px;
+
+    /* The phone's floating tab bar, and therefore how much room every
+       scrolling page has to leave below its last row. Kept in step with the
+       bar's own bottom offset in AppLayout — if one moves, so does this. */
+    --tab-bar-height: 56px;
+    --tab-bar-offset: max(calc(env(safe-area-inset-bottom) - 16px), 8px);
+    --tab-bar-inset: calc(var(--tab-bar-height) + var(--tab-bar-offset) + 12px);
 
     /* ---- Motion --------------------------------------------------- */
     --duration-fast: 120ms;
     --duration-base: 160ms;
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
     --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    /* UIKit's default spring, as a curve: overshoots a little on the way
+       back so a released control settles rather than stops. */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
     /* ---- shadcn aliases (component layer) ------------------------- */
     --background: var(--bg);
@@ -111,6 +133,15 @@
     --info: 217 80% 70%;
     --info-soft: 217 40% 15%;
 
+    /* Dark glass is a dark tint the backdrop shows through, with the rim
+       dropped to a hint — a bright edge on dark chrome reads as plastic. */
+    --glass-tint: 240 6% 11%;
+    --glass-tint-opacity: 0.74;
+    --glass-rim: 0 0% 100%;
+    --glass-rim-opacity: 0.13;
+    --glass-shadow: 0 0% 0%;
+    --glass-shadow-opacity: 0.4;
+
     --destructive-foreground: 0 0% 98%;
   }
 }
@@ -153,15 +184,23 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* iOS zooms the whole page when a focused field is under 16px, and never
-     zooms back out. Every field on a phone gets 16px, whatever its class
-     says; the desktop keeps the smaller type. */
-  @media (max-width: 767px) {
-    input,
-    textarea,
-    select {
-      font-size: 16px;
-    }
+  /* WebKit sizes a date/time field from its own rendered value and ignores
+     `width: 100%`, so on a phone these are the one control that pushes a
+     form wider than the screen. Resetting the appearance makes them size and
+     align like every other field. */
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+  }
+  /* WebKit centres the rendered value inside its own shadow tree, which is
+     why these read as centred next to left-aligned text fields. */
+  input[type='date']::-webkit-date-and-time-value,
+  input[type='time']::-webkit-date-and-time-value,
+  input[type='datetime-local']::-webkit-date-and-time-value {
+    text-align: left;
   }
 
   /* A tap should never leave a grey flash behind on a custom control, and
@@ -195,6 +234,25 @@
   html.native body {
     touch-action: pan-x pan-y;
   }
+
+  /* Inside the native shell the interface is not a website rendered on a
+     phone, it is an iOS app — so it uses the reader's own system font (SF
+     Pro, with its optical sizing and its Dynamic Type metrics) rather than
+     the brand grotesque the marketing site and the web app are set in.
+     Nothing else identifies a wrapped web view faster than typography that
+     is almost, but not quite, the one every other app on the device uses. */
+  html.native,
+  html.native body {
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  }
+
+  /* Selection is deliberately *not* switched off wholesale here. The
+     furniture that shouldn't be selectable already isn't (the `.chrome`
+     utility covers the bars, and the `@media (hover: none)` rule above
+     covers every control) — and the rest of this app is someone's contact
+     details, which they must still be able to long-press and copy the way
+     they can in Contacts.app. */
 
   /* Rubber-banding should stop at the scroll region you are actually in. */
   html,
@@ -249,6 +307,98 @@
     }
   }
 
+  /* ---- Liquid Glass ------------------------------------------------
+     Chrome that content passes *under*, not a panel sitting beside it.
+     Without backdrop-filter support it falls back to an opaque surface,
+     which is the right answer: a flat bar is fine, a transparent one that
+     lets text collide with text is not. */
+  .glass {
+    background-color: hsl(var(--bg-elevated));
+  }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .glass {
+      background-color: hsl(var(--glass-tint) / var(--glass-tint-opacity));
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+    }
+  }
+
+  /* Glass that floats free of any edge — the tab bar, a floating action
+     pill. The rim is what sells it: a half-pixel of lit edge along the top,
+     over a shadow soft enough to read as distance rather than as a border. */
+  .glass-floating {
+    box-shadow:
+      inset 0 0.5px 0 0 hsl(var(--glass-rim) / var(--glass-rim-opacity)),
+      0 1px 2px hsl(var(--glass-shadow) / calc(var(--glass-shadow-opacity) * 0.7)),
+      0 8px 28px hsl(var(--glass-shadow) / var(--glass-shadow-opacity));
+  }
+
+  /* The scroll-edge effect: chrome is invisible while content sits at the
+     top of its scroll region, and materialises once anything passes beneath
+     it. Both directions are animated so the bar fades in rather than
+     snapping the moment a finger moves. */
+  .scroll-edge {
+    transition:
+      background-color var(--duration-base) var(--ease-out),
+      backdrop-filter var(--duration-base) var(--ease-out),
+      -webkit-backdrop-filter var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-out);
+  }
+  .scroll-edge-idle {
+    background-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: transparent;
+  }
+
+  /* ---- iOS type scale ----------------------------------------------
+     SF Pro's own sizes and leading. Using them (rather than a web scale
+     that happens to look close) is what makes a screen read as an iOS
+     screen at a glance. */
+  .text-ios-large-title {
+    font-size: 34px;
+    line-height: 41px;
+    font-weight: 700;
+    letter-spacing: -0.021em;
+  }
+  .text-ios-title {
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 700;
+    letter-spacing: -0.019em;
+  }
+  .text-ios-title3 {
+    font-size: 20px;
+    line-height: 25px;
+    font-weight: 600;
+    letter-spacing: -0.014em;
+  }
+  .text-ios-headline {
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+    letter-spacing: -0.024em;
+  }
+  .text-ios-body {
+    font-size: 17px;
+    line-height: 22px;
+    letter-spacing: -0.024em;
+  }
+  .text-ios-subhead {
+    font-size: 15px;
+    line-height: 20px;
+    letter-spacing: -0.015em;
+  }
+  .text-ios-footnote {
+    font-size: 13px;
+    line-height: 18px;
+    letter-spacing: -0.006em;
+  }
+  .text-ios-caption {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
   /* A hairline: one device pixel, not one CSS pixel. */
   .hairline-t {
     border-top: 1px solid hsl(var(--border));
@@ -257,9 +407,15 @@
     border-bottom: 1px solid hsl(var(--border));
   }
   @media (min-resolution: 2dppx) {
-    .hairline-t,
+    /* Only the side that was asked for. `border-width` sets all four, and
+       Tailwind's preflight already put `border-style: solid` on every
+       element — so the shorthand drew a complete box around every list row
+       instead of a separator under it. */
+    .hairline-t {
+      border-top-width: 0.5px;
+    }
     .hairline-b {
-      border-width: 0.5px;
+      border-bottom-width: 0.5px;
     }
   }
 
@@ -300,6 +456,44 @@
   }
   .press:active {
     opacity: 0.4;
+  }
+
+  /* What a solid control does under a finger: takes the press slightly, then
+     springs back. The scale is small on purpose — past about 4% it reads as a
+     web animation rather than as a physical button. */
+  .press-scale {
+    transition:
+      transform var(--duration-base) var(--ease-spring),
+      opacity var(--duration-fast) var(--ease-out);
+  }
+  .press-scale:active {
+    transform: scale(0.965);
+    opacity: 0.9;
+  }
+
+  /* iOS scrolling: momentum, and an edge that stops where the region does. */
+  .scroll-native {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Room for the floating tab bar to pass over, rather than land on, the
+     last row of a scrolling page. */
+  .pb-tab-bar {
+    padding-bottom: var(--tab-bar-inset);
+  }
+
+  /* iOS never zooms the interface when a field takes focus — but Mobile
+     Safari and the PWA still will, for any field under 16px, and there is
+     no way back out of that zoom. The base-layer rule this replaces lost to
+     every `text-sm` utility on a component; this one is in the same layer as
+     those utilities and outranks them on specificity. */
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select {
+      font-size: 16px;
+    }
   }
 }
 

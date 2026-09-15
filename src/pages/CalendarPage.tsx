@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   addMonths,
+  addWeeks,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -34,12 +35,13 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { EventFormDialog } from '@/components/calendar/EventFormDialog'
 import { CalendarSyncDialog } from '@/components/calendar/CalendarSyncDialog'
 import { useEvents, useOpportunities, useContactMap } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { fullName } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import type { CalendarEvent, Contact, Opportunity } from '@/types'
 
-type View = 'month' | 'agenda'
+type View = 'month' | 'week' | 'agenda'
 
 type Item =
   | { kind: 'event'; date: Date; event: CalendarEvent }
@@ -51,9 +53,11 @@ export function CalendarPage() {
   const contactMap = useContactMap()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  const isMobile = useIsMobile()
+  // A phone gets a week where a desktop gets a month — see WeekView.
   const [view, setView] = React.useState<View>(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-      ? 'agenda'
+      ? 'week'
       : 'month',
   )
   const [showDeadlines, setShowDeadlines] = React.useState(true)
@@ -99,19 +103,23 @@ export function CalendarPage() {
     setFormOpen(true)
   }
 
+  // The calendar view always follows the viewport: a phone gets the week, a
+  // desktop the month. Only the agenda is a real choice, so a stale 'month'
+  // from a wider window can never put the cramped grid back on a phone.
+  const effectiveView: View = view === 'agenda' ? 'agenda' : isMobile ? 'week' : 'month'
   const viewSwitch = (
     <div className="flex h-8 items-center rounded-md border p-0.5" role="group" aria-label="View">
-      {(['month', 'agenda'] as const).map((v) => (
+      {([isMobile ? 'week' : 'month', 'agenda'] as const).map((v) => (
         <button
           key={v}
           onClick={() => setView(v)}
-          aria-pressed={view === v}
+          aria-pressed={effectiveView === v}
           className={cn(
             'flex h-full flex-1 items-center justify-center gap-1.5 rounded-sm px-2.5 text-xs font-medium capitalize transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:flex-none',
-            view === v ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+            effectiveView === v ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {v === 'month' ? <LayoutGrid className="h-3.5 w-3.5" /> : <List className="h-3.5 w-3.5" />}
+          {v === 'agenda' ? <List className="h-3.5 w-3.5" /> : <LayoutGrid className="h-3.5 w-3.5" />}
           {v}
         </button>
       ))}
@@ -123,6 +131,9 @@ export function CalendarPage() {
       width="wide"
       mobile={{
         title: 'Calendar',
+        // Compact title, with the view switch pinned directly beneath it —
+        // a segmented control belongs under the title, not above it.
+        largeTitle: false,
         toolbar: viewSwitch,
         trailing: (
           <>
@@ -150,15 +161,25 @@ export function CalendarPage() {
       }
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        {view === 'month' ? (
+        {effectiveView !== 'agenda' ? (
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon-sm" onClick={() => setCursor((c) => addMonths(c, -1))} aria-label="Previous month">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setCursor((c) => (effectiveView === 'week' ? addWeeks(c, -1) : addMonths(c, -1)))}
+              aria-label={effectiveView === 'week' ? 'Previous week' : 'Previous month'}
+            >
               <ChevronLeft />
             </Button>
             <span className="tnum min-w-[8.5rem] text-center text-sm font-semibold">
               {format(cursor, 'MMMM yyyy')}
             </span>
-            <Button variant="outline" size="icon-sm" onClick={() => setCursor((c) => addMonths(c, 1))} aria-label="Next month">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setCursor((c) => (effectiveView === 'week' ? addWeeks(c, 1) : addMonths(c, 1)))}
+              aria-label={effectiveView === 'week' ? 'Next week' : 'Next month'}
+            >
               <ChevronRight />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setCursor(new Date())} className="ml-1">
@@ -175,7 +196,9 @@ export function CalendarPage() {
         </label>
       </div>
 
-      {view === 'month' ? (
+      {effectiveView === 'week' ? (
+        <WeekView cursor={cursor} items={items} onDayClick={(d) => openNew(format(d, 'yyyy-MM-dd'))} onEventClick={openEdit} />
+      ) : effectiveView === 'month' ? (
         <MonthGrid cursor={cursor} items={items} onDayClick={(d) => openNew(format(d, 'yyyy-MM-dd'))} onEventClick={openEdit} />
       ) : (
         <AgendaList items={items} contactMap={contactMap} onEventClick={openEdit} onNew={() => openNew()} />
@@ -184,6 +207,129 @@ export function CalendarPage() {
       <CalendarSyncDialog open={syncOpen} onOpenChange={setSyncOpen} />
       <EventFormDialog open={formOpen} onOpenChange={setFormOpen} event={editing} defaultDate={defaultDate} />
     </PageShell>
+  )
+}
+
+/**
+ * The phone's calendar. A month grid on a 400pt screen gives each day about
+ * 50pt to hold a date, a time and a title, which is why it reads as squeezed
+ * — so the phone gets a week instead: one strip you can see the whole week
+ * in, and the days themselves listed underneath at a readable size.
+ */
+function WeekView({
+  cursor,
+  items,
+  onDayClick,
+  onEventClick,
+}: {
+  cursor: Date
+  items: Item[]
+  onDayClick: (d: Date) => void
+  onEventClick: (e: CalendarEvent) => void
+}) {
+  const days = React.useMemo(
+    () => eachDayOfInterval({ start: startOfWeek(cursor), end: endOfWeek(cursor) }),
+    [cursor],
+  )
+  const withItems = days
+    .map((day) => ({ day, dayItems: items.filter((i) => isSameDay(i.date, day)) }))
+    .filter(({ dayItems }) => dayItems.length > 0)
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const count = items.filter((i) => isSameDay(i.date, day)).length
+          const today = isToday(day)
+          return (
+            <button
+              key={day.toISOString()}
+              type="button"
+              onClick={() => onDayClick(day)}
+              className="press-scale flex flex-col items-center gap-1 rounded-[12px] py-1.5"
+              aria-label={`${format(day, 'EEEE d MMMM')}, ${count} ${count === 1 ? 'item' : 'items'}`}
+            >
+              <span className="text-ios-caption text-muted-foreground">
+                {format(day, 'EEEEE')}
+              </span>
+              <span
+                className={cn(
+                  'tnum flex h-9 w-9 items-center justify-center rounded-full text-[17px]',
+                  today
+                    ? 'bg-brand font-semibold text-brand-foreground'
+                    : 'text-foreground',
+                )}
+              >
+                {format(day, 'd')}
+              </span>
+              <span
+                className={cn(
+                  'h-1 w-1 rounded-full',
+                  count > 0 ? (today ? 'bg-brand' : 'bg-text-muted') : 'bg-transparent',
+                )}
+                aria-hidden
+              />
+            </button>
+          )
+        })}
+      </div>
+
+      {withItems.length === 0 ? (
+        <p className="text-ios-subhead py-10 text-center text-muted-foreground">
+          Nothing this week. Tap a day to add something.
+        </p>
+      ) : (
+        withItems.map(({ day, dayItems }) => (
+          <section key={day.toISOString()}>
+            <h3 className="text-ios-footnote px-4 pb-1.5 font-medium uppercase tracking-[0.05em] text-muted-foreground">
+              {format(day, 'EEEE d MMM')}
+            </h3>
+            <div className="overflow-hidden rounded-[14px] bg-card ring-1 ring-inset ring-border/70">
+              {dayItems.map((it, i) =>
+                it.kind === 'event' ? (
+                  <button
+                    key={it.event.id}
+                    type="button"
+                    onClick={() => onEventClick(it.event)}
+                    className="press-row flex w-full items-stretch gap-3 pl-4 text-left"
+                  >
+                    <span className="tnum text-ios-footnote flex w-12 shrink-0 items-center text-muted-foreground">
+                      {it.event.allDay ? 'All day' : format(it.date, 'h:mm a')}
+                    </span>
+                    <span
+                      className={cn(
+                        'flex min-w-0 flex-1 items-center py-3 pr-4',
+                        i < dayItems.length - 1 && 'hairline-b',
+                      )}
+                    >
+                      <span className="text-ios-body truncate">{it.event.title}</span>
+                    </span>
+                  </button>
+                ) : (
+                  <Link
+                    key={`d-${it.opp.id}-${i}`}
+                    to={ROUTES.pipeline}
+                    className="press-row flex w-full items-stretch gap-3 pl-4 text-left"
+                  >
+                    <span className="text-ios-footnote flex w-12 shrink-0 items-center text-warning">
+                      Due
+                    </span>
+                    <span
+                      className={cn(
+                        'flex min-w-0 flex-1 items-center py-3 pr-4',
+                        i < dayItems.length - 1 && 'hairline-b',
+                      )}
+                    >
+                      <span className="text-ios-body truncate">{it.opp.company}</span>
+                    </span>
+                  </Link>
+                ),
+              )}
+            </div>
+          </section>
+        ))
+      )}
+    </div>
   )
 }
 

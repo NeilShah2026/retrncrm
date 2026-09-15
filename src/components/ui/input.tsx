@@ -12,7 +12,11 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
       <input
         type={type}
         className={cn(
-          'flex h-8 w-full rounded-md border border-border bg-background px-2.5 py-1 text-sm text-foreground',
+          // `min-w-0` matters on iOS: a date/time input carries a large
+          // intrinsic width there, and inside a grid or flex parent (whose
+          // items default to `min-width: auto`) that width wins and pushes
+          // the whole form wider than the screen.
+          'flex h-8 w-full min-w-0 rounded-md border border-border bg-background px-2.5 py-1 text-sm text-foreground',
           'transition-colors duration-fast ease-out',
           'placeholder:text-muted-foreground/80',
           'hover:border-border-strong',

@@ -27,9 +27,15 @@
     <title>Retrn · Personal CRM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded without blocking first paint. The native app is set in the
+         system face and never needs this at all; on the web the fallback
+         stack renders immediately and Geist swaps in when it arrives, which
+         beats holding the whole screen white on a slow connection. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     <script>
       // Apply theme before first paint to avoid a flash of the wrong theme.

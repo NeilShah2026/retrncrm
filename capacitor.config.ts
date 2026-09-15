@@ -28,12 +28,13 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
     },
     Keyboard: {
-      // Matches the web build's `interactive-widget=resizes-content`: the
-      // layout (100dvh flex columns) already expects the viewport to shrink
-      // when the keyboard opens, so resizing the WebView body keeps that
-      // behavior identical to Mobile Safari instead of floating the keyboard
-      // over fixed-position content.
-      resize: 'body',
+      // `native`, not `body`. Resizing the body element does nothing for a
+      // `position: fixed` element — fixed is positioned against the viewport,
+      // so every bottom-anchored sheet, composer and action bar stayed exactly
+      // where it was and the keyboard simply covered it. `native` shrinks the
+      // WebView itself, so the viewport really is smaller and anything pinned
+      // to its bottom edge sits on top of the keyboard.
+      resize: 'native',
       style: 'default',
       resizeOnFullScreen: true,
     },

@@ -24,6 +24,7 @@ interface AuthContextValue {
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>
   signInWithMagicLink: (email: string) => Promise<AuthResult>
   signInWithGoogle: () => Promise<AuthResult>
+  signInWithApple: () => Promise<AuthResult>
   signOut: () => Promise<void>
   updateName: (name: string) => Promise<AuthResult>
   updateCollege: (college: string) => Promise<AuthResult>
@@ -112,25 +113,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   )
 
-  const signInWithGoogle = React.useCallback(async (): Promise<AuthResult> => {
-    if (isNative) {
-      // The WebView can't complete Google's OAuth consent screen (Google
-      // blocks embedded WebViews outright) — open it in the system browser
-      // instead and let `NATIVE_AUTH_REDIRECT_URL` hand control back to us.
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: NATIVE_AUTH_REDIRECT_URL, skipBrowserRedirect: true },
+  const signInWithProvider = React.useCallback(
+    async (provider: 'google' | 'apple'): Promise<AuthResult> => {
+      if (isNative) {
+        // The WebView can't complete a provider's consent screen (Google
+        // blocks embedded WebViews outright) — open it in the system browser
+        // instead and let `NATIVE_AUTH_REDIRECT_URL` hand control back to us.
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: NATIVE_AUTH_REDIRECT_URL, skipBrowserRedirect: true },
+        })
+        if (error) return { error: error.message }
+        if (data.url) await openNativeAuthUrl(data.url)
+        return { error: null }
+      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/app` },
       })
-      if (error) return { error: error.message }
-      if (data.url) await openNativeAuthUrl(data.url)
-      return { error: null }
-    }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/app` },
-    })
-    return { error: error?.message ?? null }
-  }, [])
+      return { error: error?.message ?? null }
+    },
+    [],
+  )
+
+  const signInWithGoogle = React.useCallback(
+    () => signInWithProvider('google'),
+    [signInWithProvider],
+  )
+
+  const signInWithApple = React.useCallback(
+    () => signInWithProvider('apple'),
+    [signInWithProvider],
+  )
 
   const signOut = React.useCallback(async () => {
     await supabase.auth.signOut()
@@ -170,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithPassword,
       signInWithMagicLink,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       updateName,
       updateCollege,
@@ -183,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithPassword,
       signInWithMagicLink,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       updateName,
       updateCollege,

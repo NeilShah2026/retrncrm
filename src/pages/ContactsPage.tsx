@@ -23,6 +23,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton'
 import { ContactsTable } from '@/components/contacts/ContactsTable'
 import { ContactCard } from '@/components/contacts/ContactCard'
 import { ContactListRow } from '@/components/contacts/ContactListRow'
+import { InsetGroup } from '@/components/ui/inset-list'
 import { FilterPanel } from '@/components/contacts/FilterPanel'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
@@ -307,8 +308,8 @@ export function ContactsPage() {
               </div>
             </div>
           ) : isMobile ? (
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
-              <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+              <InsetGroup>
                 {visible.map((c, i) => (
                   <ContactListRow
                     key={c.id}
@@ -317,8 +318,8 @@ export function ContactsPage() {
                     last={i === visible.length - 1}
                   />
                 ))}
-              </div>
-              <p className="tnum px-1 pb-2 pt-3 text-center text-[13px] text-muted-foreground">
+              </InsetGroup>
+              <p className="tnum text-ios-footnote pb-tab-bar px-1 pt-3 text-center text-muted-foreground">
                 {visible.length} {visible.length === 1 ? 'person' : 'people'}
               </p>
             </div>

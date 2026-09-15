@@ -28,11 +28,13 @@ function CommandDialog({ children, ...props }: React.ComponentProps<typeof Dialo
     <Dialog {...props}>
       <DialogContent
         hideClose
+        padded={false}
+        autoFocusOnOpen
         aria-describedby={undefined}
         className="gap-0 overflow-hidden p-0 sm:top-[14%] sm:max-w-xl sm:translate-y-0 sm:p-0"
       >
         <DialogTitle className="sr-only">Command menu</DialogTitle>
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-label [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4 [&_[cmdk-item]_svg]:text-muted-foreground">
+        <Command className="[&_[cmdk-group-heading]]:text-ios-footnote [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-4 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground sm:[&_[cmdk-group-heading]]:text-label sm:[&_[cmdk-group-heading]]:px-2 sm:[&_[cmdk-group-heading]]:pt-2 sm:[&_[cmdk-group-heading]]:normal-case [&_[cmdk-item]_svg]:h-[18px] [&_[cmdk-item]_svg]:w-[18px] [&_[cmdk-item]_svg]:shrink-0 [&_[cmdk-item]_svg]:text-muted-foreground sm:[&_[cmdk-item]_svg]:h-4 sm:[&_[cmdk-item]_svg]:w-4">
           {children}
         </Command>
       </DialogContent>
@@ -44,12 +46,21 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+  <div
+    className={cn(
+      // Phone: the filled, inset search field iOS uses at the top of a list.
+      'mx-4 mb-1 mt-1 flex items-center gap-2 rounded-[10px] bg-bg-sunken px-3',
+      // Desktop: a flush row with a rule under it, as before.
+      'sm:mx-0 sm:mb-0 sm:mt-0 sm:gap-0 sm:rounded-none sm:border-b sm:bg-transparent',
+    )}
+    cmdk-input-wrapper=""
+  >
+    <Search className="h-4 w-4 shrink-0 text-muted-foreground sm:mr-2" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'flex h-11 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-50',
+        'text-ios-body flex h-11 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-50',
+        'sm:py-3 sm:text-sm',
         className,
       )}
       {...props}
@@ -64,7 +75,10 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('max-h-[360px] overflow-y-auto overflow-x-hidden scrollbar-thin', className)}
+    className={cn(
+      'scroll-native max-h-[62dvh] overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin sm:max-h-[360px]',
+      className,
+    )}
     {...props}
   />
 ))
@@ -90,7 +104,7 @@ const CommandGroup = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Group
     ref={ref}
-    className={cn('overflow-hidden p-1 text-foreground', className)}
+    className={cn('overflow-hidden pb-1 text-foreground sm:p-1', className)}
     {...props}
   />
 ))
@@ -103,7 +117,8 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-sm px-2 text-sm outline-none',
+      'text-ios-body relative flex h-11 cursor-pointer select-none items-center gap-3 rounded-none px-4 outline-none',
+      'sm:h-9 sm:gap-2.5 sm:rounded-sm sm:px-2 sm:text-sm',
       'data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground',
       'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
       className,
@@ -113,11 +128,23 @@ const CommandItem = React.forwardRef<
 ))
 CommandItem.displayName = CommandPrimitive.Item.displayName
 
-/** Right-aligned hint on a row: a shortcut, a count, a category. */
-function CommandShortcut({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
+/**
+ * Right-aligned hint on a row: a date, a count, a category — or, with
+ * `keyboard`, the key that runs it, which is hidden on a touch device where
+ * there is no key to press.
+ */
+function CommandShortcut({
+  className,
+  keyboard,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement> & { keyboard?: boolean }) {
   return (
     <span
-      className={cn('ml-auto text-xs tabular-nums text-muted-foreground', className)}
+      className={cn(
+        'ml-auto shrink-0 text-xs tabular-nums text-muted-foreground',
+        keyboard && 'hidden sm:inline',
+        className,
+      )}
       {...props}
     />
   )

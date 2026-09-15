@@ -1,6 +1,9 @@
 import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
+import { impactFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 
 const Dialog = DialogPrimitive.Root
@@ -69,9 +72,38 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     hideClose?: boolean
+    /** false hands the whole sheet to the caller, unpadded (⌘K). */
+    padded?: boolean
+    /**
+     * Let the first field take focus as the sheet opens. Off by default on a
+     * phone: a keyboard that throws itself up over the sheet before you have
+     * read it is the single worst thing a mobile form does. A search palette
+     * is the exception — that's what it's for.
+     */
+    autoFocusOnOpen?: boolean
   }
->(({ className, children, hideClose, ...props }, ref) => {
+>(({ className, children, hideClose, padded = true, autoFocusOnOpen, ...props }, ref) => {
   const { sheetRef, closeRef, handlers } = useSheetDrag()
+  const isMobile = useIsMobile()
+
+  // A sheet arriving is a physical event on iOS — it gets the same soft
+  // knock UIKit gives a presented view controller.
+  React.useEffect(() => {
+    impactFeedback()
+  }, [])
+
+  /*
+   * A sheet is three regions, not one scrolling block: the title stays
+   * readable, the action stays reachable, and only the form between them
+   * moves. Scrolling all three together is what put the Save button below
+   * the keyboard and made the whole thing feel like a web page.
+   */
+  const parts = React.Children.toArray(children)
+  const isKind = (child: React.ReactNode, kind: React.ElementType) =>
+    React.isValidElement(child) && child.type === kind
+  const header = parts.filter((c) => isKind(c, DialogHeader))
+  const footer = parts.filter((c) => isKind(c, DialogFooter))
+  const body = parts.filter((c) => !isKind(c, DialogHeader) && !isKind(c, DialogFooter))
 
   return (
     <DialogPortal>
@@ -82,14 +114,26 @@ const DialogContent = React.forwardRef<
           if (typeof ref === 'function') ref(node)
           else if (ref) ref.current = node
         }}
+        onOpenAutoFocus={(e) => {
+          if (!isMobile || autoFocusOnOpen) return
+          e.preventDefault()
+          sheetRef.current?.focus()
+        }}
         className={cn(
-          'fixed z-50 grid gap-4 bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-modal',
-          // Mobile: a bottom sheet.
-          'inset-x-0 bottom-0 w-full max-h-[92dvh] overflow-y-auto overscroll-contain scrollbar-thin rounded-t-[12px]',
+          'fixed z-50 flex flex-col bg-background shadow-modal outline-none',
+          // Mobile: a bottom sheet, at the corner radius iOS gives one.
+          // Never reaches under the status bar: with the keyboard up the
+          // viewport is short, and 92% of it still put the sheet's rounded
+          // top behind the clock.
+          'inset-x-0 bottom-0 max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] w-full rounded-t-[16px]',
           // Desktop: a centred window, 10px radius, hairline + soft shadow.
-          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-lg sm:max-h-[92vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-modal sm:p-6',
-          'duration-base ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-          'data-[state=open]:slide-in-from-bottom-6 data-[state=closed]:slide-out-to-bottom-6',
+          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[92vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-modal',
+          'data-[state=open]:animate-in data-[state=closed]:animate-out',
+          // The phone's sheet travels its whole height on UIKit's own curve;
+          // a 24px peek reads as a web popover dropping into place.
+          'duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
+          'data-[state=open]:slide-in-from-bottom-[100%] data-[state=closed]:slide-out-to-bottom-[100%]',
+          'sm:duration-base sm:ease-out sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0',
           'sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:zoom-in-[0.98] sm:data-[state=closed]:zoom-out-[0.98]',
           className,
         )}
@@ -98,19 +142,48 @@ const DialogContent = React.forwardRef<
         <div
           {...handlers}
           aria-hidden
-          className="-mb-1 -mt-2 flex touch-none justify-center pb-1 sm:hidden"
+          className="flex shrink-0 touch-none justify-center pb-1 pt-2 sm:hidden"
         >
-          <span className="h-1 w-9 rounded-full bg-foreground/20" />
+          <span className="h-[5px] w-9 rounded-full bg-foreground/25" />
         </div>
 
-        {children}
+        {header.length > 0 && (
+          <div className={cn('shrink-0', padded && 'px-5 pb-3 pt-2 sm:px-6 sm:pt-5')}>
+            {header}
+          </div>
+        )}
+
+        <div
+          className={cn(
+            'scroll-native min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain scrollbar-thin',
+            padded && 'px-5 sm:px-6',
+            padded && header.length === 0 && 'pt-5',
+            padded &&
+              footer.length === 0 &&
+              'pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6',
+          )}
+        >
+          {body}
+        </div>
+
+        {footer.length > 0 && (
+          <div
+            className={cn(
+              'shrink-0 border-t bg-background',
+              padded && 'px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-6',
+            )}
+          >
+            {footer}
+          </div>
+        )}
+
         {!hideClose && (
           <DialogPrimitive.Close
             className={cn(
               // 28px visually (matches the header it sits in), but expanded
               // to a 44x44pt tap target the same way Button's icon-sm does —
               // see the comment there.
-              'absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:pointer-events-none',
+              'absolute right-3 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:pointer-events-none',
               "before:absolute before:-inset-2 before:content-['']",
             )}
           >
@@ -142,7 +215,10 @@ function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
     <div
       className={cn(
         'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2',
-        '[&>button]:w-full sm:[&>button]:w-auto',
+        // 44pt minimum tap targets, full width, the way iOS stacks the
+        // actions at the bottom of a sheet.
+        '[&>button]:h-11 [&>button]:w-full [&>button]:rounded-[12px]',
+        'sm:[&>button]:h-8 sm:[&>button]:w-auto sm:[&>button]:rounded-md',
         className,
       )}
       {...props}
@@ -156,22 +232,35 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('text-lg font-semibold leading-tight tracking-[-0.01em]', className)}
+    className={cn('text-ios-title3 sm:text-lg sm:font-semibold sm:tracking-[-0.01em]', className)}
     {...props}
   />
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
+/**
+ * The sheet's standing instructions — which stop being worth two lines of a
+ * shortened screen the moment someone is typing into the form below them, so
+ * on a phone they step aside while the keyboard is up.
+ */
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn('text-sm text-muted-foreground', className)}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const keyboardOpen = useKeyboardOpen()
+  const isMobile = useIsMobile()
+  return (
+    <DialogPrimitive.Description
+      ref={ref}
+      className={cn(
+        'text-ios-subhead text-muted-foreground sm:text-sm',
+        isMobile && keyboardOpen && 'hidden',
+        className,
+      )}
+      {...props}
+    />
+  )
+})
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
 export {

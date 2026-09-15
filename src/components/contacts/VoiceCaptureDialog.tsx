@@ -16,6 +16,9 @@ import { ContactFormDialog } from './ContactFormDialog'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { isNative } from '@/lib/platform'
 import { useContacts, useTags } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { impactFeedback, successFeedback } from '@/lib/haptics'
+import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
 import { contactRepo } from '@/services'
 import { captureFields, parseSpokenContact } from '@/lib/voiceParse'
 import type { ParsedCapture } from '@/lib/voiceParse'
@@ -66,12 +69,15 @@ function toDraft(parsed: ParsedCapture, tagIds: string[]): ContactDraft {
 }
 
 /**
- * One-line contact capture. Type (or dictate) who you met and the app
- * structures it into a contact you review before saving. Text is the primary
- * path; the microphone is a secondary control that only listens when tapped.
+ * One-line contact capture. Say (or type) who you met and the app structures
+ * it into a contact you review before saving. On a phone the microphone leads
+ * — that is the gesture the feature is named for — with the text box under it
+ * for correcting what came back; on a desktop the text box leads and dictation
+ * is the secondary control. Either way nothing listens until it is tapped.
  */
 export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
   const speech = useSpeechRecognition()
+  const isMobile = useIsMobile()
   const tags = useTags() ?? []
   const contacts = useContacts() ?? []
 
@@ -86,6 +92,17 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
   const [ai, setAi] = React.useState<{ source: string; refinement: CaptureRefinement } | null>(null)
   const [aiBusy, setAiBusy] = React.useState(false)
   const [aiOff, setAiOff] = React.useState(() => !isAiAvailable())
+  const [addedCount, setAddedCount] = React.useState(0)
+  const boxRef = React.useRef<HTMLTextAreaElement>(null)
+  const keyboardOpen = useKeyboardOpen()
+  const [typing, setTyping] = React.useState(false)
+  /**
+   * The sheet gives the hero over to the form once you're typing in it.
+   * Driven by focus, not just the keyboard event: the box takes focus as the
+   * sheet mounts, which can raise the keyboard before the plugin listener has
+   * even subscribed, so the event alone would be missed on open.
+   */
+  const compact = typing || keyboardOpen
 
   // Dictation feeds the same box the user can type in.
   React.useEffect(() => {
@@ -99,6 +116,7 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
       setEdited(false)
       setDuplicate(null)
       setAi(null)
+      setAddedCount(0)
       autoRan.current = false
       speech.reset()
     } else {
@@ -158,7 +176,17 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
     return ids
   }
 
-  async function save(force = false) {
+  /** Clears everything the next person shouldn't inherit. */
+  function resetForNext() {
+    setText('')
+    setEdited(false)
+    setDuplicate(null)
+    setAi(null)
+    autoRan.current = false
+    speech.reset()
+  }
+
+  async function save(force = false, keepOpen = false) {
     if (!canSave) return
     speech.stop()
     setSaving(true)
@@ -177,9 +205,18 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
       }
       const tagIds = await resolveTags(parsed.tagNames)
       const created = await contactRepo.create(toDraft(parsed, tagIds))
+      successFeedback()
       toast.success(`${fullName(created)} added`)
       onSaved?.(created)
-      onOpenChange(false)
+      if (keepOpen) {
+        // Bulk entry: stay put, cleared and still focused, so the next name
+        // can be typed without a single tap in between.
+        setAddedCount((n) => n + 1)
+        resetForNext()
+        requestAnimationFrame(() => boxRef.current?.focus())
+      } else {
+        onOpenChange(false)
+      }
     } catch (err) {
       console.error(err)
       toast.error('Could not save that contact.')
@@ -201,29 +238,119 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg" autoFocusOnOpen>
           <DialogHeader>
-            <DialogTitle>Say who you met</DialogTitle>
-            <DialogDescription>
-              Type who you met. We’ll turn it into a contact you can check before saving.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              Say who you met
+              {addedCount > 0 && (
+                <span className="text-ios-footnote rounded-full bg-success-soft px-2 py-0.5 font-medium text-success">
+                  {addedCount} added
+                </span>
+              )}
+            </DialogTitle>
+            {!(isMobile && compact) && (
+              <DialogDescription>
+                {isMobile && speech.supported
+                  ? 'Speak or type. We’ll turn it into a contact you can check before saving.'
+                  : 'Type who you met. We’ll turn it into a contact you can check before saving.'}
+              </DialogDescription>
+            )}
           </DialogHeader>
+
+          {/* On a phone the microphone is the screen, not a button beside a
+              box: this is the "say who you met" gesture, and burying it in a
+              small secondary control next to a web textarea is what made it
+              feel like a form with dictation bolted on. */}
+          {isMobile && speech.supported && (
+            <div
+              className={cn(
+                'flex flex-col items-center pb-1 transition-all duration-base',
+                compact ? 'gap-1.5 pt-0' : 'gap-3 pt-2',
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  impactFeedback()
+                  speech.listening ? speech.stop() : speech.start()
+                }}
+                aria-pressed={speech.listening}
+                aria-label={speech.listening ? 'Stop dictating' : 'Start dictating'}
+                className={cn(
+                  'press-scale relative flex items-center justify-center rounded-full',
+                  'transition-all duration-base',
+                  compact ? 'h-12 w-12' : 'h-20 w-20',
+                  speech.listening
+                    ? 'bg-danger text-white'
+                    : 'bg-brand text-brand-foreground',
+                )}
+              >
+                {speech.listening && (
+                  <span
+                    className="absolute inset-0 animate-ping rounded-full bg-danger/30"
+                    aria-hidden
+                  />
+                )}
+                {speech.listening ? (
+                  <Square className={cn('relative fill-current', compact ? 'h-5 w-5' : 'h-7 w-7')} />
+                ) : (
+                  <Mic className={cn('relative', compact ? 'h-6 w-6' : 'h-8 w-8')} />
+                )}
+              </button>
+              <p className="text-ios-footnote text-muted-foreground" aria-live="polite">
+                {speech.listening
+                  ? 'Listening…'
+                  : compact
+                    ? 'Return saves it and clears for the next person'
+                    : 'Tap to speak, or type below'}
+              </p>
+            </div>
+          )}
 
           {/* The text is primary. */}
           <div className="space-y-2">
-            <Textarea
-              autoFocus
-              value={live}
-              onChange={(e) => {
-                setEdited(true)
-                setText(e.target.value)
-              }}
-              placeholder="Name, where you met, anything useful"
-              aria-label="Who you met"
-              className="min-h-[96px] text-sm"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              {speech.supported && (
+            {isMobile ? (
+              <div className="overflow-hidden rounded-[14px] bg-card ring-1 ring-inset ring-border/70">
+                <textarea
+                  ref={boxRef}
+                  autoFocus
+                  value={live}
+                  onChange={(e) => {
+                    setEdited(true)
+                    setText(e.target.value)
+                  }}
+                  onFocus={() => setTyping(true)}
+                  onBlur={() => setTyping(false)}
+                  onKeyDown={(e) => {
+                    // Return saves and keeps the sheet open for the next
+                    // person; Shift+Return is a newline as usual.
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (canSave && !saving) void save(Boolean(existingDup), true)
+                    }
+                  }}
+                  enterKeyHint="done"
+                  placeholder="Name, where you met, anything useful"
+                  aria-label="Who you met"
+                  rows={2}
+                  className="text-ios-body w-full resize-none bg-transparent px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            ) : (
+              <Textarea
+                autoFocus
+                value={live}
+                onChange={(e) => {
+                  setEdited(true)
+                  setText(e.target.value)
+                }}
+                placeholder="Name, where you met, anything useful"
+                aria-label="Who you met"
+                className="min-h-[96px] text-sm"
+              />
+            )}
+            <div className={cn('flex flex-wrap items-center gap-2', isMobile && 'justify-center')}>
+              {speech.supported && !isMobile && (
                 <Button
                   type="button"
                   variant={speech.listening ? 'secondary' : 'outline'}
@@ -244,7 +371,7 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
                   )}
                 </Button>
               )}
-              {speech.listening && (
+              {speech.listening && !isMobile && (
                 <span className="text-xs text-muted-foreground" aria-live="polite">
                   Listening…
                 </span>
@@ -280,8 +407,21 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
 
           {/* What was picked up */}
           {fields.length > 0 && (
-            <div className="overflow-hidden rounded-lg border">
-              <div className="flex h-9 items-center justify-between gap-2 border-b bg-bg-sunken/60 px-3">
+            <div
+              className={cn(
+                'overflow-hidden',
+                isMobile
+                  ? 'rounded-[14px] bg-card ring-1 ring-inset ring-border/70'
+                  : 'rounded-lg border',
+              )}
+            >
+              {!(isMobile && compact) && (
+              <div
+                className={cn(
+                  'flex h-9 items-center justify-between gap-2 px-3',
+                  isMobile ? 'hairline-b' : 'border-b bg-bg-sunken/60',
+                )}
+              >
                 <span className="flex items-center gap-2 text-xs font-medium text-text-secondary">
                   Picked up
                   {refinement && <SuggestedBadge>Checked</SuggestedBadge>}
@@ -301,20 +441,55 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
                   </Button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5 p-3">
-                {fields.map((f) => (
-                  <span
-                    key={`${f.key}-${f.value}`}
-                    className={cn(
-                      'inline-flex h-6 items-center gap-1 rounded-md border bg-background px-2 text-xs',
-                      changedKeys.has(f.key) && 'border-brand/40',
-                    )}
-                  >
-                    <span className="text-muted-foreground">{f.label}</span>
-                    <span className="font-medium">{f.value}</span>
-                  </span>
-                ))}
-              </div>
+              )}
+
+              {isMobile && compact ? (
+                // Mid-entry the point is a glance, not a table: one line you
+                // can check before hitting Return.
+                <p className="text-ios-subhead line-clamp-2 px-4 py-2.5">
+                  {fields.map((f) => f.value).join(' · ')}
+                </p>
+              ) : isMobile ? (
+                <div>
+                  {fields.map((f, i) => (
+                    <div key={`${f.key}-${f.value}`} className="flex w-full items-stretch pl-4">
+                      <span
+                        className={cn(
+                          'flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pr-4',
+                          i < fields.length - 1 && 'hairline-b',
+                        )}
+                      >
+                        <span className="text-ios-subhead shrink-0 text-muted-foreground">
+                          {f.label}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-ios-body min-w-0 truncate text-right',
+                            changedKeys.has(f.key) && 'text-brand',
+                          )}
+                        >
+                          {f.value}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 p-3">
+                  {fields.map((f) => (
+                    <span
+                      key={`${f.key}-${f.value}`}
+                      className={cn(
+                        'inline-flex h-6 items-center gap-1 rounded-md border bg-background px-2 text-xs',
+                        changedKeys.has(f.key) && 'border-brand/40',
+                      )}
+                    >
+                      <span className="text-muted-foreground">{f.label}</span>
+                      <span className="font-medium">{f.value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {changes.length > 0 && (
                 <ul className="space-y-1 border-t px-3 py-2 text-xs text-muted-foreground">

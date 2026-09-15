@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/command'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { useContacts, useTagMap, useTags, useTemplates } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { contactRepo } from '@/services'
 import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { markCaughtUp } from '@/lib/caughtUp'
@@ -58,6 +59,7 @@ type Mode =
 
 const MODE_PLACEHOLDER: Record<Mode['kind'], string> = {
   root: 'Search people, companies, tags — or run an action',
+  // Same field, a phone's worth of room: the long form runs off the screen.
   'caught-up': 'Who did you catch up with?',
   cadence: 'Set a cadence for…',
   'cadence-pick': 'How often?',
@@ -76,6 +78,7 @@ export function CommandPalette({
   onAssistant,
 }: Props) {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const contacts = useContacts()
   const tags = useTags() ?? []
   const templates = useTemplates() ?? []
@@ -151,7 +154,9 @@ export function CommandPalette({
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder={MODE_PLACEHOLDER[mode.kind]}
+        placeholder={
+          isMobile && mode.kind === 'root' ? 'Search or run a command' : MODE_PLACEHOLDER[mode.kind]
+        }
         value={query}
         onValueChange={setQuery}
         onKeyDown={(e) => {
@@ -301,11 +306,11 @@ export function CommandPalette({
             <CommandGroup heading="Actions">
               <CommandItem value="say-who-you-met" onSelect={() => run(onVoiceCapture)}>
                 <PenLine /> Say who you met
-                <CommandShortcut>V</CommandShortcut>
+                <CommandShortcut keyboard>V</CommandShortcut>
               </CommandItem>
               <CommandItem value="new-contact" onSelect={() => run(onNewContact)}>
                 <UserPlus /> New contact
-                <CommandShortcut>N</CommandShortcut>
+                <CommandShortcut keyboard>N</CommandShortcut>
               </CommandItem>
               <CommandItem value="caught-up" onSelect={() => enter({ kind: 'caught-up' })}>
                 <Check /> Caught up with…

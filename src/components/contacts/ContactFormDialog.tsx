@@ -12,6 +12,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -33,11 +34,18 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
+import {
+  InsetGroup,
+  InsetInputRow,
+  InsetSelectRow,
+  InsetTextareaRow,
+} from '@/components/ui/inset-list'
 import { StrengthMeter } from '@/components/common/StrengthMeter'
 import { TagSelect } from './TagSelect'
 import { TagSuggestBar } from './TagSuggestBar'
 import { contactRepo } from '@/services'
 import { useContacts } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
@@ -136,6 +144,9 @@ const NONE_VALUE = '__none__'
 
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024
 
+/** Ties the pinned footer's submit button back to the scrolling form. */
+const FORM_ID = 'contact-form'
+
 export function ContactFormDialog({
   open,
   onOpenChange,
@@ -144,6 +155,7 @@ export function ContactFormDialog({
   onSaved,
 }: Props) {
   const editing = Boolean(contact)
+  const isMobile = useIsMobile()
   const allContacts = useContacts() ?? []
   const [form, setForm] = React.useState<FormState>(() =>
     initialState(contact, prefill),
@@ -332,6 +344,7 @@ export function ContactFormDialog({
         </DialogHeader>
 
         <form
+          id={FORM_ID}
           onSubmit={(e) => {
             e.preventDefault()
             void save()
@@ -341,7 +354,15 @@ export function ContactFormDialog({
           {/* Quick-fill from LinkedIn (paste-to-parse — no scraping) */}
           <Popover open={liOpen} onOpenChange={setLiOpen}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="outline" className="w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  'w-full gap-2',
+                  isMobile &&
+                    'text-ios-body h-11 rounded-[14px] border-0 bg-brand/10 font-medium text-brand',
+                )}
+              >
                 <ClipboardPaste />
                 Paste from LinkedIn
               </Button>
@@ -381,8 +402,8 @@ export function ContactFormDialog({
           </Popover>
 
           {/* Photo + essentials */}
-          <div className="flex gap-4">
-            <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex flex-col items-center gap-2 self-center sm:self-start">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -404,6 +425,14 @@ export function ContactFormDialog({
                   className="text-xs text-muted-foreground hover:text-destructive"
                 >
                   Remove
+                </button>
+              ) : isMobile ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="press text-ios-subhead font-medium text-brand"
+                >
+                  Add Photo
                 </button>
               ) : (
                 <Popover open={photoOpen} onOpenChange={setPhotoOpen}>
@@ -447,7 +476,8 @@ export function ContactFormDialog({
               />
             </div>
 
-            <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+            {!isMobile && (
+            <div className="grid w-full flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="firstName">First name *</Label>
                 <Input
@@ -485,10 +515,85 @@ export function ContactFormDialog({
                   placeholder="Role or title"
                 />
               </div>
-            </div>
+              </div>
+            )}
           </div>
 
+          {/* The phone's form: inset groups whose rows *are* the fields, the
+              way iOS Contacts takes a new card. The desktop keeps its
+              labelled two-column grid above. */}
+          {isMobile && (
+            <div className="space-y-6">
+              <InsetGroup>
+                <InsetInputRow
+                  id="firstName"
+                  value={form.firstName}
+                  onChange={(v) => set('firstName', v)}
+                  placeholder="First name"
+                  autoComplete="given-name"
+                  autoCapitalize="words"
+                />
+                <InsetInputRow
+                  value={form.lastName}
+                  onChange={(v) => set('lastName', v)}
+                  placeholder="Last name"
+                  autoComplete="family-name"
+                  autoCapitalize="words"
+                  last
+                />
+              </InsetGroup>
+
+              <InsetGroup>
+                <InsetInputRow
+                  value={form.company}
+                  onChange={(v) => set('company', v)}
+                  placeholder="Company"
+                  autoCapitalize="words"
+                />
+                <InsetInputRow
+                  value={form.jobTitle}
+                  onChange={(v) => set('jobTitle', v)}
+                  placeholder="Role or title"
+                  autoCapitalize="words"
+                  last
+                />
+              </InsetGroup>
+
+              <InsetGroup>
+                <InsetSelectRow
+                  label="Relationship"
+                  value={form.connectionType}
+                  onChange={(v) => set('connectionType', v as ConnectionType)}
+                  options={CONNECTION_TYPE_KEYS.map((k) => ({
+                    value: k,
+                    label: `${CONNECTION_TYPES[k].emoji} ${CONNECTION_TYPES[k].label}`,
+                  }))}
+                />
+                <InsetSelectRow
+                  label="How you met"
+                  value={form.source}
+                  onChange={(v) => set('source', v as MeetSource)}
+                  options={MEET_SOURCE_KEYS.map((k) => ({
+                    value: k,
+                    label: `${MEET_SOURCES[k].emoji} ${MEET_SOURCES[k].label}`,
+                  }))}
+                  last
+                />
+              </InsetGroup>
+
+              <InsetGroup title="How we met">
+                <InsetTextareaRow
+                  value={form.howWeMet}
+                  onChange={(v) => set('howWeMet', v)}
+                  placeholder="How you met, in a sentence"
+                  last
+                />
+              </InsetGroup>
+            </div>
+          )}
+
           {/* Relationship type + how you met (student-centered) */}
+          {!isMobile && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Relationship</Label>
@@ -533,8 +638,10 @@ export function ContactFormDialog({
               </Select>
             </div>
           </div>
+          )}
 
           {/* How we met — the memorable bit, kept prominent */}
+          {!isMobile && (
           <div className="space-y-1.5">
             <Label htmlFor="howWeMet">How we met</Label>
             <Textarea
@@ -545,6 +652,7 @@ export function ContactFormDialog({
               className="min-h-[60px]"
             />
           </div>
+          )}
 
           {duplicates.length > 0 && (
             <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/40 dark:bg-amber-500/10">
@@ -857,31 +965,26 @@ export function ContactFormDialog({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2 border-t pt-4">
+        </form>
+
+        <DialogFooter>
+          <span className="hidden text-xs text-muted-foreground sm:mr-auto sm:inline">
             {editing ? (
-              <span className="text-xs text-muted-foreground">
-                Editing {fullName(contact!)}
-              </span>
+              `Editing ${fullName(contact!)}`
             ) : (
-              <span className="text-xs text-muted-foreground">
+              <>
                 <Plus className="mr-1 inline h-3 w-3" />
                 Quick add — save now, refine later
-              </span>
+              </>
             )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!canSave || saving}>
-                {saving ? 'Saving…' : editing ? 'Save changes' : 'Add contact'}
-              </Button>
-            </div>
-          </div>
-        </form>
+          </span>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" form={FORM_ID} disabled={!canSave || saving}>
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Add contact'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

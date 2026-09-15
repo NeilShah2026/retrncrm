@@ -16,6 +16,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { PipelinePage } from '@/pages/PipelinePage'
 import { CollegePage } from '@/pages/CollegePage'
 import { CalendarPage } from '@/pages/CalendarPage'
+import { MorePage } from '@/pages/MorePage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -59,6 +60,7 @@ function AppEntry() {
               <Route path="pipeline" element={<PipelinePage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="tags" element={<TagsPage />} />
+              <Route path="more" element={<MorePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
             </Route>

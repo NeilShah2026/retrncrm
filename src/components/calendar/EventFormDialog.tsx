@@ -176,6 +176,8 @@ export function EventFormDialog({
             />
           </div>
 
+          {/* Date takes the row; the two times share the next one, rather
+              than three full-width fields stacked down a phone screen. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="ev-date">Date</Label>
@@ -188,23 +190,25 @@ export function EventFormDialog({
             </div>
             {!allDay && (
               <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ev-start">Start</Label>
-                  <Input
-                    id="ev-start"
-                    type="time"
-                    value={start}
-                    onChange={(e) => setStart(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ev-end">End</Label>
-                  <Input
-                    id="ev-end"
-                    type="time"
-                    value={end}
-                    onChange={(e) => setEnd(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-3 sm:contents">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ev-start">Start</Label>
+                    <Input
+                      id="ev-start"
+                      type="time"
+                      value={start}
+                      onChange={(e) => setStart(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ev-end">End</Label>
+                    <Input
+                      id="ev-end"
+                      type="time"
+                      value={end}
+                      onChange={(e) => setEnd(e.target.value)}
+                    />
+                  </div>
                 </div>
               </>
             )}

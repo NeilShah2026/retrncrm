@@ -13,7 +13,10 @@ import { isNative } from '@/lib/platform'
  * read from `VITE_`-prefixed env because those are baked in at build time
  * per-platform and this same bundle ships to both web and iOS.
  */
-const PRODUCTION_ORIGIN = 'https://retrncrm.com'
+// The canonical host, deliberately: the apex 308-redirects to www, and a
+// CORS preflight that gets a redirect fails outright — the real request is
+// then never sent at all.
+const PRODUCTION_ORIGIN = 'https://www.retrncrm.com'
 
 export function apiUrl(path: `/api/${string}`): string {
   return isNative ? `${PRODUCTION_ORIGIN}${path}` : path

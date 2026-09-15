@@ -42,12 +42,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         // bundle, and a static import of the plugin would ship its JS
         // there even though `isNative` keeps it from ever running on web.
         void import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
-          // A dark background needs light (white) status bar content, and
-          // vice versa — the inverse of the app's own theme name. Fails
-          // silently on the (rare) device/OS combo without a status bar
-          // API; nothing else here depends on it.
+          // The plugin names its styles after the *background* they are for,
+          // not the text they produce: `Style.Dark` is "light text for dark
+          // backgrounds". So a dark theme takes Style.Dark — naming it the
+          // other way round leaves the clock and battery near-black on a
+          // near-black bar. Fails silently on the (rare) device/OS combo
+          // without a status bar API; nothing else here depends on it.
           void StatusBar.setStyle({
-            style: resolved === 'dark' ? Style.Light : Style.Dark,
+            style: resolved === 'dark' ? Style.Dark : Style.Light,
           }).catch(() => {})
         })
       }

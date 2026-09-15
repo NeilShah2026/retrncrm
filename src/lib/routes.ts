@@ -27,5 +27,7 @@ export const ROUTES = {
   /** Opens the templates page with the compose dialog on one template. */
   templateUse: (id: string) => `/app/templates?use=${encodeURIComponent(id)}`,
   tags: '/app/tags',
+  /** Everything that doesn't fit on the phone's tab bar. */
+  more: '/app/more',
   settings: '/app/settings',
 } as const

@@ -11,6 +11,7 @@ import { askNetwork, startSession } from '@/lib/ai/network'
 import { applyActions } from '@/lib/ai/actions'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { renderMarkdown } from '@/lib/format'
+import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -191,7 +192,7 @@ export function AssistantChat() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+      <div className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
         <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-4 md:px-6">
           {!started ? (
             <Opening canAsk={canAsk} contactCount={contacts.length} onPick={(s) => void ask(s)} />
@@ -242,33 +243,44 @@ function Opening({
   onPick: (s: string) => void
 }) {
   return (
-    <div className="py-8 sm:py-14">
-      <h1 className="text-xl font-semibold tracking-[-0.02em]">Ask about your network</h1>
-      <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+    <div className="py-6 sm:py-14">
+      <h1 className="text-ios-title md:text-xl md:font-semibold md:tracking-[-0.02em]">
+        Ask about your network
+      </h1>
+      <p className="text-ios-subhead mt-2 max-w-md text-muted-foreground md:text-sm">
         {canAsk
           ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you’ve saved. Say what happened and it proposes what to record; you approve before anything is saved.`
           : 'Add a few people first. There’s nothing to ask about yet.'}
       </p>
 
       {canAsk && (
-        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        <div className="mt-7 grid gap-5 sm:grid-cols-2">
           {SUGGESTION_GROUPS.map((group) => (
-            <div key={group.label} className="rounded-lg border">
-              <div className="flex h-9 items-center gap-1.5 border-b px-3 text-xs font-medium text-text-secondary">
-                <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
+            <section key={group.label}>
+              <h2 className="text-ios-footnote flex items-center gap-1.5 px-4 pb-1.5 font-medium uppercase tracking-[0.05em] text-muted-foreground">
+                <group.icon className="h-3.5 w-3.5" />
                 {group.label}
+              </h2>
+              <div className="overflow-hidden rounded-[14px] bg-card ring-1 ring-inset ring-border/70">
+                {group.items.map((item, i) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => onPick(item)}
+                    className="press-row flex w-full items-stretch pl-4 text-left"
+                  >
+                    <span
+                      className={cn(
+                        'text-ios-body flex min-w-0 flex-1 items-center py-3 pr-4',
+                        i < group.items.length - 1 && 'hairline-b',
+                      )}
+                    >
+                      {item}
+                    </span>
+                  </button>
+                ))}
               </div>
-              {group.items.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => onPick(item)}
-                  className="flex h-10 w-full items-center border-b px-3 text-left text-sm transition-colors duration-fast last:border-b-0 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+            </section>
           ))}
         </div>
       )}
@@ -423,6 +435,7 @@ function Composer({
 }) {
   const box = React.useRef<HTMLTextAreaElement>(null)
   const [placeholder, setPlaceholder] = React.useState(0)
+  const keyboardOpen = useKeyboardOpen()
 
   React.useEffect(() => {
     if (value || started) return
@@ -440,7 +453,16 @@ function Composer({
   const canSend = Boolean(value.trim()) && !busy && !disabled
 
   return (
-    <div className="shrink-0 border-t bg-background">
+    <div
+      className={cn(
+        'shrink-0 border-t bg-background',
+        // The tab bar floats over the bottom of the screen, so without this
+        // the composer sits underneath it and can't be typed into. While the
+        // keyboard is up the tab bar has moved away, so the room isn't
+        // needed — and the composer should sit right on the keyboard.
+        !keyboardOpen && 'pb-[var(--tab-bar-inset)] md:pb-0',
+      )}
+    >
       <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-3 md:px-6">
         {followUps.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1">
@@ -463,8 +485,9 @@ function Composer({
             if (canSend) onSubmit()
           }}
           className={cn(
-            'flex items-end gap-1 rounded-lg border bg-background p-1.5 pl-3 transition-colors duration-fast',
-            'focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25',
+            'flex items-end gap-1 rounded-[22px] bg-bg-sunken p-1.5 pl-4 transition-colors duration-fast',
+            'ring-1 ring-inset ring-border/70 focus-within:ring-2 focus-within:ring-brand/40',
+            'md:rounded-lg md:bg-background',
             disabled && 'opacity-60',
           )}
         >
@@ -488,7 +511,7 @@ function Composer({
             }
             aria-label="Ask about your network, or say what happened"
             disabled={disabled}
-            className="max-h-[200px] min-h-[32px] w-full resize-none bg-transparent py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/70"
+            className="text-ios-body max-h-[200px] min-h-[34px] w-full resize-none bg-transparent py-1.5 outline-none placeholder:text-muted-foreground/70 md:text-[15px] md:leading-relaxed"
           />
           <Button
             type="button"
@@ -497,18 +520,26 @@ function Composer({
             onClick={onVoice}
             aria-label="Say who you met"
             title="Say who you met"
-            className="shrink-0 text-muted-foreground"
+            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground md:h-8 md:w-8 md:rounded-md"
           >
             <Mic />
           </Button>
-          <Button type="submit" size="icon" disabled={!canSend} aria-label="Send" className="shrink-0">
-            <ArrowUp />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!canSend}
+            aria-label="Send"
+            className="h-9 w-9 shrink-0 rounded-full md:h-8 md:w-8 md:rounded-md"
+          >
+            <ArrowUp strokeWidth={2.5} />
           </Button>
         </form>
 
-        <p className="mt-1.5 h-4 text-xs text-muted-foreground">
-          {showDisclaimer ? 'Answers come from what you’ve written down. Check anything that matters.' : ''}
-        </p>
+        {showDisclaimer && (
+          <p className="text-ios-caption mt-1.5 hidden text-muted-foreground md:block">
+            Answers come from what you’ve written down. Check anything that matters.
+          </p>
+        )}
       </div>
     </div>
   )

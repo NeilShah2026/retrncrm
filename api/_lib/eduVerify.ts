@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { withCors } from './cors.ts'
 
 /**
  * The one implementation of school-email verification. `api/verify-edu.ts` is
@@ -73,7 +74,7 @@ function domainOf(email: string): string {
   return email.slice(email.lastIndexOf('@') + 1).toLowerCase()
 }
 
-export async function handleVerifyEduRequest(req: Request): Promise<Response> {
+async function handle(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)
   }
@@ -210,3 +211,7 @@ export async function handleVerifyEduRequest(req: Request): Promise<Response> {
 
   return json({ verified: true, email, via }, 200)
 }
+
+
+/** The exported entry point: preflight-aware, so the iOS app can call it. */
+export const handleVerifyEduRequest = withCors(handle)

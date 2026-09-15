@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
+import { tapFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 
 /**
@@ -31,12 +32,16 @@ export interface MobileChrome {
 export const BarButton = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { tinted?: boolean }
->(({ className, tinted = true, ...props }, ref) => (
+>(({ className, tinted = true, onClick, ...props }, ref) => (
   <button
     ref={ref}
     type="button"
+    onClick={(e) => {
+      tapFeedback()
+      onClick?.(e)
+    }}
     className={cn(
-      'press flex h-11 min-w-[2.75rem] items-center justify-center gap-1 px-1 text-[17px]',
+      'press text-ios-body flex h-11 min-w-[2.75rem] items-center justify-center gap-1 px-1',
       '[&_svg]:h-[22px] [&_svg]:w-[22px] [&_svg]:shrink-0',
       tinted ? 'text-brand' : 'text-foreground',
       className,
@@ -72,10 +77,10 @@ export function MobileLargeTitle({
   className?: string
 }) {
   return (
-    <div className={cn('pb-1 pt-0.5 md:hidden', className)}>
-      <h1 className="text-large-title">{title}</h1>
+    <div className={cn('pb-1 md:hidden', className)}>
+      <h1 className="text-ios-large-title">{title}</h1>
       {subtitle && (
-        <p className="mt-0.5 text-[15px] text-muted-foreground">{subtitle}</p>
+        <p className="text-ios-subhead mt-1 text-muted-foreground">{subtitle}</p>
       )}
     </div>
   )
@@ -86,18 +91,35 @@ interface Props {
   showCompactTitle: boolean
   pinLargeTitle: boolean
   separated: boolean
+  /**
+   * True while the page it sits over is scrolled to its very top, where an
+   * iOS navigation bar shows no material at all and the content appears to
+   * run to the top of the screen. The glass returns the moment anything
+   * scrolls under it.
+   */
+  transparent?: boolean
+  className?: string
 }
 
-/** The phone's navigation bar: 44pt tall, translucent, title centred. */
-export function MobileNavBar({ chrome, showCompactTitle, pinLargeTitle, separated }: Props) {
+/** The phone's navigation bar: 44pt tall, glass, title centred. */
+export function MobileNavBar({
+  chrome,
+  showCompactTitle,
+  pinLargeTitle,
+  separated,
+  transparent,
+  className,
+}: Props) {
   return (
     <div
       className={cn(
-        'chrome material-bar sticky top-0 z-30 shrink-0 pt-[env(safe-area-inset-top)] md:hidden',
-        separated && 'hairline-b',
+        'chrome glass scroll-edge z-30 shrink-0 border-b border-transparent pt-[env(safe-area-inset-top)] md:hidden',
+        transparent && 'scroll-edge-idle',
+        separated && !transparent && 'border-border',
+        className,
       )}
     >
-      <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3">
+      <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-2">
         <div className="flex items-center justify-start gap-1">{chrome.leading}</div>
 
         <div
@@ -107,9 +129,7 @@ export function MobileNavBar({ chrome, showCompactTitle, pinLargeTitle, separate
           )}
           aria-hidden={!showCompactTitle}
         >
-          <p className="truncate text-[17px] font-semibold tracking-[-0.01em]">
-            {chrome.title}
-          </p>
+          <p className="text-ios-headline truncate">{chrome.title}</p>
         </div>
 
         <div className="flex items-center justify-end gap-0.5">{chrome.trailing}</div>

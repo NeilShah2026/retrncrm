@@ -1,20 +1,31 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { GraduationCap, Mail, ShieldCheck } from 'lucide-react'
-import { Logo } from '@/components/layout/AppLayout'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { GraduationCap, Loader2, Mail, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { errorFeedback, tapFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
+import { cn } from '@/lib/utils'
 
 type Mode = 'signin' | 'signup'
 type Method = 'password' | 'magic-link'
 
-/** Sign in. The same tokens as the app; nothing on the page but the form. */
+/**
+ * An iOS sign-in screen: the app's mark, a title, the two account buttons
+ * Apple expects to see first, then the form. Everything is a 50pt capsule on
+ * a 17pt system face, and nothing takes focus on its own — an app that opens
+ * straight into a keyboard reads as a web page that has taken over the
+ * screen, which is exactly what this isn't.
+ */
 export function LoginPage() {
-  const { user, loading, signInWithPassword, signUpWithPassword, signInWithMagicLink, signInWithGoogle } =
-    useAuth()
+  const {
+    user,
+    loading,
+    signInWithPassword,
+    signUpWithPassword,
+    signInWithMagicLink,
+    signInWithGoogle,
+    signInWithApple,
+  } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
@@ -30,20 +41,25 @@ export function LoginPage() {
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [submitting, setSubmitting] = React.useState(false)
-  const [googleSubmitting, setGoogleSubmitting] = React.useState(false)
+  const [pendingProvider, setPendingProvider] = React.useState<'google' | 'apple' | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [magicLinkSent, setMagicLinkSent] = React.useState(false)
   const [confirmEmailSent, setConfirmEmailSent] = React.useState(false)
 
   if (!loading && user) return <Navigate to={next} replace />
 
-  async function handleGoogle() {
+  function fail(message: string) {
+    errorFeedback()
+    setError(message)
+  }
+
+  async function handleProvider(provider: 'google' | 'apple') {
     setError(null)
-    setGoogleSubmitting(true)
-    const { error } = await signInWithGoogle()
+    setPendingProvider(provider)
+    const { error } = await (provider === 'apple' ? signInWithApple() : signInWithGoogle())
     if (error) {
-      setError(error)
-      setGoogleSubmitting(false)
+      fail(error)
+      setPendingProvider(null)
     }
   }
 
@@ -54,17 +70,17 @@ export function LoginPage() {
     try {
       if (method === 'magic-link') {
         const { error } = await signInWithMagicLink(email)
-        if (error) setError(error)
+        if (error) fail(error)
         else setMagicLinkSent(true)
         return
       }
       if (mode === 'signup') {
         const { error } = await signUpWithPassword(email, password)
-        if (error) setError(error)
+        if (error) fail(error)
         else setConfirmEmailSent(true)
       } else {
         const { error } = await signInWithPassword(email, password)
-        if (error) setError(error)
+        if (error) fail(error)
         else navigate(next)
       }
     } finally {
@@ -72,171 +88,287 @@ export function LoginPage() {
     }
   }
 
+  const busy = submitting || pendingProvider !== null
+
   return (
-    <div className="flex min-h-screen flex-col bg-background px-4 py-10">
-      <div className="mx-auto w-full max-w-sm">
-        <Link to={ROUTES.home} className="inline-block rounded-sm">
-          <Logo />
-        </Link>
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      <div className="mx-auto flex w-full max-w-[22rem] flex-1 flex-col px-6 pb-[max(env(safe-area-inset-bottom),24px)] pt-[calc(env(safe-area-inset-top)+3.5rem)]">
+        {magicLinkSent ? (
+          <EmailNotice
+            icon={Mail}
+            title="Check your email"
+            body={`We sent a sign-in link to ${email}. Open it on this device to continue.`}
+            onBack={() => setMagicLinkSent(false)}
+          />
+        ) : confirmEmailSent ? (
+          <EmailNotice
+            icon={ShieldCheck}
+            title="Almost there"
+            body={`We sent a confirmation link to ${email}. Confirm your address to finish creating your account.`}
+            onBack={() => {
+              setConfirmEmailSent(false)
+              setMode('signin')
+            }}
+          />
+        ) : (
+          <>
+            <AppMark />
 
-        {fromPaidPlan && (
-          <p className="mt-8 flex items-start gap-2 rounded-lg border bg-bg-sunken/60 px-3 py-2.5 text-sm text-text-secondary">
-            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <span>
-              <span className="font-medium text-foreground">Babson student?</span> Sign up with your
-              @babson.edu email, or verify it later in Settings, and everything in{' '}
-              {plan === 'student' ? 'Student' : 'Standard'} is free.
-            </span>
-          </p>
-        )}
+            <h1 className="text-ios-large-title mt-6 text-center">
+              {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+            </h1>
+            <p className="text-ios-subhead mt-2 text-center text-muted-foreground">
+              {mode === 'signin'
+                ? 'Your network, remembered.'
+                : 'Free for up to 30 contacts. Takes about ten seconds.'}
+            </p>
 
-        <div className="mt-8">
-          {magicLinkSent ? (
-            <EmailNotice
-              icon={Mail}
-              title="Check your email"
-              body={`We sent a sign-in link to ${email}. Open it on this device to continue.`}
-              onBack={() => setMagicLinkSent(false)}
-            />
-          ) : confirmEmailSent ? (
-            <EmailNotice
-              icon={ShieldCheck}
-              title="Almost there"
-              body={`We sent a confirmation link to ${email}. Confirm your address to finish creating your account.`}
-              onBack={() => {
-                setConfirmEmailSent(false)
-                setMode('signin')
-              }}
-            />
-          ) : (
-            <>
-              <h1 className="text-2xl font-semibold tracking-[-0.02em]">
-                {mode === 'signin' ? 'Sign in to Retrn' : 'Create your account'}
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                {mode === 'signin' ? 'Back to your network.' : 'Free for up to 30 contacts. Takes about ten seconds.'}
+            {fromPaidPlan && (
+              <p className="text-ios-footnote mt-5 flex items-start gap-2 rounded-[14px] bg-bg-sunken px-3.5 py-3 text-text-secondary">
+                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-semibold text-foreground">Babson student?</span> Sign
+                  up with your @babson.edu email, or verify it later in Settings, and
+                  everything in {plan === 'student' ? 'Student' : 'Standard'} is free.
+                </span>
               </p>
+            )}
 
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={() => void handleGoogle()}
-                loading={googleSubmitting}
-                className="mt-6 w-full"
+            <div className="mt-8 space-y-2.5">
+              <CapsuleButton
+                variant="apple"
+                disabled={busy}
+                loading={pendingProvider === 'apple'}
+                onClick={() => void handleProvider('apple')}
               >
-                {!googleSubmitting && <GoogleIcon className="h-4 w-4" />}
-                Continue with Google
-              </Button>
+                <AppleIcon className="h-[18px] w-[18px]" />
+                Continue with Apple
+              </CapsuleButton>
 
-              <div className="mt-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground">or</span>
-                <div className="h-px flex-1 bg-border" />
+              <CapsuleButton
+                variant="outline"
+                disabled={busy}
+                loading={pendingProvider === 'google'}
+                onClick={() => void handleProvider('google')}
+              >
+                <GoogleIcon className="h-[17px] w-[17px]" />
+                Continue with Google
+              </CapsuleButton>
+            </div>
+
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-ios-footnote text-muted-foreground">or</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              {/* Inset grouped fields: one rounded container, hairline
+                  between rows — the shape iOS uses for every form it owns. */}
+              <div className="overflow-hidden rounded-[14px] bg-bg-sunken">
+                <FormField
+                  type="email"
+                  placeholder="Email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={setEmail}
+                />
+                {method === 'password' && (
+                  <>
+                    <div className="ml-4 h-px bg-border" />
+                    <FormField
+                      type="password"
+                      placeholder="Password"
+                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                      minLength={6}
+                      value={password}
+                      onChange={setPassword}
+                    />
+                  </>
+                )}
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    autoFocus
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@school.edu"
-                    className="h-9"
-                  />
-                </div>
+              {error && (
+                <p
+                  role="alert"
+                  className="text-ios-footnote mt-3 px-1 text-center text-danger"
+                >
+                  {error}
+                </p>
+              )}
 
-                {method === 'password' && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      minLength={6}
-                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                )}
+              <CapsuleButton
+                type="submit"
+                variant="primary"
+                className="mt-4"
+                disabled={busy}
+                loading={submitting}
+              >
+                {method === 'magic-link'
+                  ? 'Send magic link'
+                  : mode === 'signin'
+                    ? 'Sign in'
+                    : 'Create account'}
+              </CapsuleButton>
+            </form>
 
-                {error && (
-                  <p role="alert" className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
-                    {error}
-                  </p>
-                )}
+            <TextButton
+              className="mt-5"
+              onClick={() => {
+                setMethod((m) => (m === 'password' ? 'magic-link' : 'password'))
+                setError(null)
+              }}
+            >
+              {method === 'password' ? 'Use a magic link instead' : 'Use a password instead'}
+            </TextButton>
 
-                <Button type="submit" size="lg" loading={submitting} className="w-full">
-                  {method === 'magic-link' ? 'Send magic link' : mode === 'signin' ? 'Sign in' : 'Create account'}
-                </Button>
-              </form>
+            <div className="flex-1" />
 
+            <p className="text-ios-footnote mt-8 text-center text-muted-foreground">
+              {mode === 'signin' ? 'New here? ' : 'Already have an account? '}
               <button
                 type="button"
                 onClick={() => {
-                  setMethod((m) => (m === 'password' ? 'magic-link' : 'password'))
+                  tapFeedback()
+                  setMode(mode === 'signin' ? 'signup' : 'signin')
                   setError(null)
                 }}
-                className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
+                className="press font-semibold text-brand"
               >
-                {method === 'password' ? 'Use a magic link instead' : 'Use a password instead'}
+                {mode === 'signin' ? 'Create an account' : 'Sign in'}
               </button>
+            </p>
 
-              <p className="mt-6 border-t pt-5 text-center text-xs text-muted-foreground">
-                {mode === 'signin' ? (
-                  <>
-                    New here?{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('signup')
-                        setError(null)
-                      }}
-                      className="font-medium text-foreground hover:underline"
-                    >
-                      Create an account
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('signin')
-                        setError(null)
-                      }}
-                      className="font-medium text-foreground hover:underline"
-                    >
-                      Sign in
-                    </button>
-                  </>
-                )}
-              </p>
-
-              <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
-                By continuing you agree to Retrn’s{' '}
-                <Link to={ROUTES.terms} className="hover:text-foreground hover:underline">
-                  Terms
-                </Link>{' '}
-                and{' '}
-                <Link to={ROUTES.privacy} className="hover:text-foreground hover:underline">
-                  Privacy Policy
-                </Link>
-                .
-              </p>
-            </>
-          )}
-        </div>
+            <p className="text-ios-caption mt-4 text-center leading-relaxed text-muted-foreground">
+              By continuing you agree to Retrn’s{' '}
+              <Link to={ROUTES.terms} className="text-text-secondary underline-offset-2">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link to={ROUTES.privacy} className="text-text-secondary underline-offset-2">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </>
+        )}
       </div>
     </div>
+  )
+}
+
+/** The app's own icon, at the size iOS shows it during onboarding. */
+function AppMark() {
+  return (
+    <div className="flex justify-center">
+      <span className="flex h-[72px] w-[72px] items-center justify-center rounded-[20px] bg-primary text-primary-foreground shadow-[0_8px_24px_hsl(var(--glass-shadow)/0.18)]">
+        <span className="text-[34px] font-semibold leading-none tracking-[-0.02em]">R</span>
+      </span>
+    </div>
+  )
+}
+
+/** A row in an inset grouped form: 50pt, no box of its own. */
+function FormField({
+  value,
+  onChange,
+  type,
+  placeholder,
+  autoComplete,
+  minLength,
+}: {
+  value: string
+  onChange: (value: string) => void
+  type: string
+  placeholder: string
+  autoComplete: string
+  minLength?: number
+}) {
+  return (
+    <input
+      type={type}
+      required
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+      minLength={minLength}
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="text-ios-body h-[50px] w-full bg-transparent px-4 text-foreground outline-none placeholder:text-muted-foreground"
+    />
+  )
+}
+
+const CAPSULE_VARIANT = {
+  apple: 'bg-[#000] text-white dark:bg-white dark:text-black',
+  outline: 'bg-bg-elevated text-foreground ring-1 ring-inset ring-border',
+  primary: 'bg-brand text-brand-foreground',
+} as const
+
+/** A 50pt full-width capsule — the only button shape on this screen. */
+function CapsuleButton({
+  variant,
+  loading,
+  className,
+  children,
+  onClick,
+  type = 'button',
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant: keyof typeof CAPSULE_VARIANT
+  loading?: boolean
+}) {
+  return (
+    <button
+      type={type}
+      onClick={(e) => {
+        tapFeedback()
+        onClick?.(e)
+      }}
+      className={cn(
+        'press-scale text-ios-headline flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px]',
+        'disabled:opacity-45',
+        CAPSULE_VARIANT[variant],
+        className,
+      )}
+      {...props}
+    >
+      {loading ? <Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden /> : children}
+    </button>
+  )
+}
+
+/** A plain tinted text action — iOS's quietest control. */
+function TextButton({
+  className,
+  onClick,
+  children,
+}: {
+  className?: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        tapFeedback()
+        onClick()
+      }}
+      className={cn('press text-ios-subhead w-full text-center text-brand', className)}
+    >
+      {children}
+    </button>
+  )
+}
+
+function AppleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M17.05 12.77c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.71-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.75 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.19-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.5zM14.88 5.2c.61-.74 1.02-1.76.91-2.78-.88.04-1.94.59-2.57 1.32-.56.65-1.05 1.69-.92 2.69.98.08 1.98-.5 2.58-1.23z" />
+    </svg>
   )
 }
 
@@ -263,15 +395,16 @@ function EmailNotice({
   onBack: () => void
 }) {
   return (
-    <div className="rounded-lg border p-6">
-      <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-bg-sunken text-text-secondary">
-        <Icon className="h-4 w-4" />
+    <div className="flex flex-1 flex-col items-center justify-center text-center">
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-sunken text-text-secondary">
+        <Icon className="h-7 w-7" />
       </span>
-      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-      <Button variant="ghost" size="sm" onClick={onBack} className="mt-5 -ml-2">
+      <h2 className="text-ios-title mt-6">{title}</h2>
+      <p className="text-ios-subhead mt-3 text-muted-foreground">{body}</p>
+      <TextButton className="mt-8" onClick={onBack}>
         Back
-      </Button>
+      </TextButton>
+      <div className="flex-1" />
     </div>
   )
 }

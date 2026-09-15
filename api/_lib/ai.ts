@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { withCors } from './cors.ts'
 
 /**
  * The one implementation of the AI proxy. `api/ai.ts` is the Vercel edge
@@ -89,7 +90,7 @@ async function authenticate(
   return data.user.id
 }
 
-export async function handleAiRequest(req: Request): Promise<Response> {
+async function handle(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)
   }
@@ -181,3 +182,7 @@ export async function handleAiRequest(req: Request): Promise<Response> {
     clearTimeout(timer)
   }
 }
+
+
+/** The exported entry point: preflight-aware, so the iOS app can call it. */
+export const handleAiRequest = withCors(handle)
