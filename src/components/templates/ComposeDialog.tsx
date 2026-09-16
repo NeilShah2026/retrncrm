@@ -8,7 +8,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
+import {
+  InsetGroup,
+  InsetInputRow,
+  InsetRow,
+  InsetSelectRow,
+  InsetTextareaRow,
+} from '@/components/ui/inset-list'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -58,6 +68,7 @@ export function ComposeDialog({
   const [body, setBody] = React.useState('')
   const [edited, setEdited] = React.useState(false)
   const [drafting, setDrafting] = React.useState(false)
+  const isMobile = useIsMobile()
   const [aiOff, setAiOff] = React.useState(() => !isAiAvailable())
 
   React.useEffect(() => {
@@ -149,8 +160,127 @@ export function ComposeDialog({
     window.location.href = buildMailto(contact.email, subject, body)
   }
 
+  /**
+   * The phone's version: pick the template and the person as rows, then the
+   * message itself, with the two things you can do with it at the foot.
+   */
+  function renderPhone() {
+    return (
+      <DialogContent tall hideClose padded={false} className="bg-grouped" aria-describedby={undefined}>
+        <DialogHeader>
+          <SheetBar
+            leading={<SheetBarButton close>Cancel</SheetBarButton>}
+            title="Message"
+            trailing={
+              edited ? (
+                <SheetBarButton onClick={reset}>Reset</SheetBarButton>
+              ) : undefined
+            }
+          />
+        </DialogHeader>
+
+        <div className="space-y-6 px-4 pb-8 pt-1">
+          <InsetGroup
+            footer={
+              contact && !contact.email
+                ? `No email on file for ${fullName(contact)} — copy the message instead.`
+                : undefined
+            }
+          >
+            <InsetSelectRow
+              label="Template"
+              allowNone={false}
+              value={selectedTemplateId}
+              onChange={(v) => {
+                setSelectedTemplateId(v)
+                setEdited(false)
+              }}
+              placeholder="Choose a template"
+              options={templates.map((t) => ({
+                value: t.id,
+                label: `${TEMPLATE_CATEGORIES[t.category].emoji} ${t.name}`,
+              }))}
+            />
+            <InsetSelectRow
+              label="To"
+              allowNone={false}
+              value={selectedContactId}
+              onChange={(v) => {
+                setSelectedContactId(v)
+                setEdited(false)
+              }}
+              placeholder="Choose a contact"
+              options={[
+                { value: NONE, label: 'Someone else…' },
+                ...contacts.map((c) => ({
+                  value: c.id,
+                  label: c.company ? `${fullName(c)} · ${c.company}` : fullName(c),
+                })),
+              ]}
+              last={!subject}
+            />
+            {subject !== '' && (
+              <InsetInputRow
+                label="Subject"
+                value={subject}
+                onChange={(v) => {
+                  setSubject(v)
+                  setEdited(true)
+                }}
+                placeholder="Subject"
+                autoCapitalize="sentences"
+                last
+              />
+            )}
+          </InsetGroup>
+
+          <InsetGroup title="Message">
+            <InsetTextareaRow
+              value={body}
+              onChange={(v) => {
+                setBody(v)
+                setEdited(true)
+              }}
+              placeholder="Your message"
+              rows={12}
+              last
+            />
+          </InsetGroup>
+
+          {!aiOff && (
+            <InsetGroup>
+              <InsetRow
+                title={drafting ? 'Writing…' : 'Draft a version'}
+                centered
+                last
+                disabled={drafting || !contact || !template}
+                onClick={() => void draft()}
+              />
+            </InsetGroup>
+          )}
+        </div>
+
+        <DialogFooter className="grid grid-cols-2 gap-2.5 px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
+          <Button
+            variant="outline"
+            className="h-11 rounded-[12px]"
+            onClick={() => void copy(body, 'Message')}
+          >
+            <Copy />
+            Copy
+          </Button>
+          <Button className="text-ios-headline h-11 rounded-[12px]" onClick={openEmail}>
+            <Mail />
+            Email
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {isMobile ? renderPhone() : (
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Compose message</DialogTitle>
@@ -312,6 +442,7 @@ export function ComposeDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      )}
     </Dialog>
   )
 }

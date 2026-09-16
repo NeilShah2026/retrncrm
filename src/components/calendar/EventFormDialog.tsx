@@ -8,7 +8,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
+import {
+  InsetDateRow,
+  InsetGroup,
+  InsetInputRow,
+  InsetRow,
+  InsetTextareaRow,
+  InsetTimeRow,
+  Switch,
+} from '@/components/ui/inset-list'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -98,6 +110,8 @@ export function EventFormDialog({
     setQuery('')
   }, [open, event, defaultDate, defaultContactId])
 
+  const isMobile = useIsMobile()
+
   const selected = contactIds
     .map((id) => contacts.find((c) => c.id === id))
     .filter(Boolean) as NonNullable<(typeof contacts)[number]>[]
@@ -153,8 +167,131 @@ export function EventFormDialog({
     }
   }
 
+  /** The phone's version: an iOS event form — grouped rows, native pickers. */
+  function renderPhone() {
+    return (
+      <DialogContent tall hideClose padded={false} className="bg-grouped" aria-describedby={undefined}>
+        <DialogHeader>
+          <SheetBar
+            leading={<SheetBarButton close>Cancel</SheetBarButton>}
+            title={editing ? 'Edit Meeting' : 'New Meeting'}
+            trailing={
+              <SheetBarButton strong disabled={saving || !title.trim()} onClick={() => void save()}>
+                {editing ? 'Done' : 'Add'}
+              </SheetBarButton>
+            }
+          />
+        </DialogHeader>
+
+        <div className="space-y-6 px-4 pb-8 pt-1">
+          <InsetGroup>
+            <InsetInputRow
+              value={title}
+              onChange={setTitle}
+              placeholder="Coffee chat, call, info session…"
+              autoCapitalize="sentences"
+              enterKeyHint="done"
+            />
+            <InsetInputRow
+              value={location}
+              onChange={setLocation}
+              placeholder="Location or link"
+              autoCapitalize="sentences"
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup>
+            <InsetRow
+              title="All day"
+              role="switch"
+              checked={allDay}
+              chevron={false}
+              accessory={<Switch checked={allDay} />}
+              onClick={() => setAllDay(!allDay)}
+            />
+            <InsetDateRow
+              label="Date"
+              value={date}
+              onChange={(v) => setDate(v ?? date)}
+              last={allDay}
+            />
+            {!allDay && (
+              <>
+                <InsetTimeRow label="Starts" value={start} onChange={setStart} />
+                <InsetTimeRow label="Ends" value={end} onChange={setEnd} last />
+              </>
+            )}
+          </InsetGroup>
+
+          <InsetGroup
+            title="People"
+            footer="Whoever you add sees this meeting on their profile."
+          >
+            {selected.map((c) => (
+              <InsetRow
+                key={c.id}
+                leading={<ContactAvatar contact={c} className="h-7 w-7 text-[11px]" />}
+                title={fullName(c)}
+                chevron={false}
+                accessory={
+                  <span className="text-ios-subhead text-brand">Remove</span>
+                }
+                onClick={() => setContactIds((ids) => ids.filter((id) => id !== c.id))}
+              />
+            ))}
+            <InsetInputRow
+              value={query}
+              onChange={setQuery}
+              placeholder="Search contacts to add…"
+              last={results.length === 0}
+            />
+            {results.map((c, i) => (
+              <InsetRow
+                key={c.id}
+                leading={<ContactAvatar contact={c} className="h-7 w-7 text-[11px]" />}
+                title={c.company ? `${fullName(c)} · ${c.company}` : fullName(c)}
+                chevron={false}
+                accessory={<span className="text-ios-subhead text-brand">Add</span>}
+                last={i === results.length - 1}
+                onClick={() => {
+                  setContactIds((ids) => [...ids, c.id])
+                  setQuery('')
+                }}
+              />
+            ))}
+          </InsetGroup>
+
+          <InsetGroup title="Notes">
+            <InsetTextareaRow
+              value={description}
+              onChange={setDescription}
+              placeholder="Agenda, what to ask about…"
+              rows={3}
+              last
+            />
+          </InsetGroup>
+
+          {editing && (
+            <InsetGroup>
+              <InsetRow
+                title="Delete Meeting"
+                destructive
+                centered
+                last
+                disabled={saving}
+                onClick={() => void remove()}
+              />
+            </InsetGroup>
+          )}
+        </div>
+      </DialogContent>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {isMobile ? renderPhone() : (
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit meeting' : 'Schedule a meeting'}</DialogTitle>
@@ -316,6 +453,7 @@ export function EventFormDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      )}
     </Dialog>
   )
 }

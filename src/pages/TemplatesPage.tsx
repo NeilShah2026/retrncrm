@@ -19,7 +19,9 @@ import {
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TemplateFormDialog } from '@/components/templates/TemplateFormDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
+import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
 import { useTemplates } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { templateRepo } from '@/services'
 import { TEMPLATE_CATEGORIES } from '@/lib/constants'
 import type { OutreachTemplate } from '@/types'
@@ -27,6 +29,7 @@ import { toast } from 'sonner'
 
 export function TemplatesPage() {
   const templates = useTemplates()
+  const isMobile = useIsMobile()
   const [searchParams, setSearchParams] = useSearchParams()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<OutreachTemplate | null>(null)
@@ -70,6 +73,7 @@ export function TemplatesPage() {
           </BarButton>
         ),
       }}
+      bodyClassName={isMobile ? 'bg-grouped' : undefined}
       header={
         <PageHeader
           title="Templates"
@@ -107,7 +111,52 @@ export function TemplatesPage() {
           />
         }
       >
-        {(list) => (
+        {(list) =>
+          isMobile ? (
+            // A phone gets one tappable row per template: the row uses it,
+            // and the trailing button is the only other thing it can do.
+            <InsetGroup footer="Tap a template to use it. Placeholders fill from the contact you pick.">
+              {list.map((t, i) => (
+                <InsetRow
+                  key={t.id}
+                  title={t.name}
+                  subtitle={[
+                    TEMPLATE_CATEGORIES[t.category].label,
+                    t.subject || t.body.replace(/\s+/g, ' ').slice(0, 60),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  chevron={false}
+                  accessory={
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`Actions for ${t.name}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="press -mr-1 flex h-11 w-9 items-center justify-center text-muted-foreground/70"
+                        >
+                          <MoreHorizontal className="h-[18px] w-[18px]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(t)}>Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleting(t)}
+                          className="text-danger focus:text-danger"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  }
+                  last={i === list.length - 1}
+                  onClick={() => setComposeTemplateId(t.id)}
+                />
+              ))}
+            </InsetGroup>
+          ) : (
           <ul className="overflow-hidden rounded-lg border bg-card">
             {list.map((t) => {
               const cat = TEMPLATE_CATEGORIES[t.category]
@@ -157,7 +206,8 @@ export function TemplatesPage() {
               )
             })}
           </ul>
-        )}
+          )
+        }
       </NetworkGate>
 
       <TemplateFormDialog open={formOpen} onOpenChange={setFormOpen} template={editing} />

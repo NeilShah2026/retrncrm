@@ -278,24 +278,59 @@ export function InsetDateRow({
   )
 }
 
-/** A multi-line row: the same shape, sized for a sentence. */
-export function InsetTextareaRow({
+/**
+ * A time as a row, the same trick as the date row: iOS's own wheel opens
+ * over it. `value` is 24-hour `HH:mm`; the row shows it the way the phone
+ * writes time.
+ */
+export function InsetTimeRow({
+  label,
   value,
   onChange,
-  placeholder,
-  rows = 2,
   last,
 }: {
+  label: string
   value: string
   onChange: (value: string) => void
-  placeholder: string
-  rows?: number
   last?: boolean
 }) {
+  const [h, m] = value.split(':').map(Number)
+  const shown = Number.isFinite(h)
+    ? `${((h + 11) % 12) + 1}:${String(m ?? 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+    : 'Set a time'
+  return (
+    <div className="relative flex w-full items-stretch pl-4">
+      <RowBody last={last} className="justify-between">
+        <span className="text-ios-body shrink-0">{label}</span>
+        <span className="text-ios-body tnum text-muted-foreground">{shown}</span>
+      </RowBody>
+      <input
+        type="time"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 h-full w-full opacity-0"
+      />
+    </div>
+  )
+}
+
+/** A multi-line row: the same shape, sized for a sentence. */
+export const InsetTextareaRow = React.forwardRef<
+  HTMLTextAreaElement,
+  {
+    value: string
+    onChange: (value: string) => void
+    placeholder: string
+    rows?: number
+    last?: boolean
+  }
+>(({ value, onChange, placeholder, rows = 2, last }, ref) => {
   return (
     <div className="flex w-full items-stretch pl-4">
       <span className={cn('flex min-w-0 flex-1 py-[11px] pr-4', !last && 'hairline-b')}>
         <textarea
+          ref={ref}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
@@ -306,7 +341,8 @@ export function InsetTextareaRow({
       </span>
     </div>
   )
-}
+})
+InsetTextareaRow.displayName = 'InsetTextareaRow'
 
 /** A row that's on or off: a trailing checkmark, as in a Settings picker. */
 export function InsetCheckRow({

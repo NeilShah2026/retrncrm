@@ -247,8 +247,12 @@ export function ContactsPage() {
 
   return (
     <PageShell
-      scrollBody={false}
+      // The phone's list is ordinary page content, so it scrolls under the
+      // navigation bar and runs to the bottom edge of the screen — the table
+      // and the card grid keep their own inner scroll regions.
+      scrollBody={isMobile}
       width="wide"
+      bodyClassName={isMobile ? 'bg-grouped' : undefined}
       mobile={{
         title: 'Contacts',
         largeTitle: false,
@@ -363,12 +367,9 @@ export function ContactsPage() {
               </div>
             </div>
           ) : isMobile ? (
-            <div
-              // Dragging the list puts the search keyboard away, as in Contacts.
-              {...dismissKeyboardOnDrag}
-              className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin"
-            >
-              <InsetGroup outlined>
+            // Dragging the list puts the search keyboard away, as in Contacts.
+            <div {...dismissKeyboardOnDrag}>
+              <InsetGroup>
                 {visible.map((c, i) => (
                   <ContactListRow
                     key={c.id}
@@ -378,7 +379,7 @@ export function ContactsPage() {
                   />
                 ))}
               </InsetGroup>
-              <p className="tnum text-ios-footnote pb-tab-bar px-1 pt-3 text-center text-muted-foreground">
+              <p className="tnum text-ios-footnote px-1 pt-3 text-center text-muted-foreground">
                 {visible.length} {visible.length === 1 ? 'person' : 'people'}
               </p>
             </div>

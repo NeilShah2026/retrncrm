@@ -6,7 +6,21 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
+import {
+  InsetDateRow,
+  InsetGroup,
+  InsetInputRow,
+  InsetRow,
+  InsetSelectRow,
+  InsetTextareaRow,
+} from '@/components/ui/inset-list'
+import { ContactAvatar } from '@/components/common/ContactAvatar'
+import { useContacts } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { fullName } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -89,6 +103,9 @@ export function OpportunityFormDialog({
     initialState(opportunity, defaultStage),
   )
   const [saving, setSaving] = React.useState(false)
+  const [contactQuery, setContactQuery] = React.useState('')
+  const isMobile = useIsMobile()
+  const allContacts = useContacts() ?? []
 
   React.useEffect(() => {
     if (open) setForm(initialState(opportunity, defaultStage))
@@ -135,8 +152,176 @@ export function OpportunityFormDialog({
     }
   }
 
+  /** The phone's version: grouped rows and the system pickers. */
+  function renderPhone() {
+    const linked = form.contactIds
+      .map((id) => allContacts.find((c) => c.id === id))
+      .filter(Boolean) as NonNullable<(typeof allContacts)[number]>[]
+    const matches = (() => {
+      const q = contactQuery.trim().toLowerCase()
+      if (!q) return []
+      return allContacts
+        .filter((c) => !form.contactIds.includes(c.id))
+        .filter((c) => `${fullName(c)} ${c.company ?? ''}`.toLowerCase().includes(q))
+        .slice(0, 5)
+    })()
+
+    return (
+      <DialogContent tall hideClose padded={false} className="bg-grouped" aria-describedby={undefined}>
+        <DialogHeader>
+          <SheetBar
+            leading={<SheetBarButton close>Cancel</SheetBarButton>}
+            title={editing ? 'Edit Opportunity' : 'New Opportunity'}
+            trailing={
+              <SheetBarButton
+                strong
+                disabled={saving || !form.company.trim()}
+                onClick={() => void save()}
+              >
+                {editing ? 'Done' : 'Add'}
+              </SheetBarButton>
+            }
+          />
+        </DialogHeader>
+
+        <div className="space-y-6 px-4 pb-8 pt-1">
+          <InsetGroup>
+            <InsetInputRow
+              value={form.company}
+              onChange={(v) => set('company', v)}
+              placeholder="Company"
+              autoCapitalize="words"
+            />
+            <InsetInputRow
+              value={form.role}
+              onChange={(v) => set('role', v)}
+              placeholder="Role, e.g. Summer analyst"
+              autoCapitalize="words"
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup>
+            <InsetSelectRow
+              label="Type"
+              allowNone={false}
+              value={form.type}
+              onChange={(v) => set('type', (v || 'internship') as OpportunityType)}
+              options={OPPORTUNITY_TYPE_KEYS.map((k) => ({ value: k, label: OPPORTUNITY_TYPES[k] }))}
+            />
+            <InsetSelectRow
+              label="Stage"
+              allowNone={false}
+              value={form.stage}
+              onChange={(v) => set('stage', (v || 'researching') as OpportunityStage)}
+              options={OPPORTUNITY_STAGE_KEYS.map((k) => ({
+                value: k,
+                label: OPPORTUNITY_STAGES[k].label,
+              }))}
+              last={form.stage !== 'closed'}
+            />
+            {form.stage === 'closed' && (
+              <InsetSelectRow
+                label="Outcome"
+                value={form.outcome}
+                onChange={(v) => set('outcome', v as OpportunityOutcome | '')}
+                options={OPPORTUNITY_OUTCOME_KEYS.map((k) => ({
+                  value: k,
+                  label: OPPORTUNITY_OUTCOMES[k].label,
+                }))}
+                last
+              />
+            )}
+          </InsetGroup>
+
+          <InsetGroup title="Dates">
+            <InsetDateRow
+              label="Deadline"
+              value={form.deadline || undefined}
+              onChange={(v) => set('deadline', v ?? '')}
+            />
+            <InsetDateRow
+              label="Applied on"
+              value={form.appliedDate || undefined}
+              onChange={(v) => set('appliedDate', v ?? '')}
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup title="Where and what">
+            <InsetInputRow
+              label="Location"
+              value={form.location}
+              onChange={(v) => set('location', v)}
+              placeholder="City or remote"
+              autoCapitalize="words"
+            />
+            <InsetInputRow
+              label="Link"
+              value={form.link}
+              onChange={(v) => set('link', v)}
+              placeholder="Posting link"
+              type="url"
+              inputMode="url"
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup title="People" footer="Whoever can help — a recruiter, a referrer.">
+            {linked.map((c) => (
+              <InsetRow
+                key={c.id}
+                leading={<ContactAvatar contact={c} className="h-7 w-7 text-[11px]" />}
+                title={fullName(c)}
+                chevron={false}
+                accessory={<span className="text-ios-subhead text-brand">Remove</span>}
+                onClick={() =>
+                  set(
+                    'contactIds',
+                    form.contactIds.filter((id) => id !== c.id),
+                  )
+                }
+              />
+            ))}
+            <InsetInputRow
+              value={contactQuery}
+              onChange={setContactQuery}
+              placeholder="Search contacts to link…"
+              last={matches.length === 0}
+            />
+            {matches.map((c, i) => (
+              <InsetRow
+                key={c.id}
+                leading={<ContactAvatar contact={c} className="h-7 w-7 text-[11px]" />}
+                title={c.company ? `${fullName(c)} · ${c.company}` : fullName(c)}
+                chevron={false}
+                accessory={<span className="text-ios-subhead text-brand">Add</span>}
+                last={i === matches.length - 1}
+                onClick={() => {
+                  set('contactIds', [...form.contactIds, c.id])
+                  setContactQuery('')
+                }}
+              />
+            ))}
+          </InsetGroup>
+
+          <InsetGroup title="Notes">
+            <InsetTextareaRow
+              value={form.notes}
+              onChange={(v) => set('notes', v)}
+              placeholder="Anything worth remembering about this one"
+              rows={3}
+              last
+            />
+          </InsetGroup>
+        </div>
+      </DialogContent>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {isMobile ? renderPhone() : (
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
@@ -317,6 +502,7 @@ export function OpportunityFormDialog({
           </div>
         </form>
       </DialogContent>
+      )}
     </Dialog>
   )
 }

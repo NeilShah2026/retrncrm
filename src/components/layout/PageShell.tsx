@@ -129,6 +129,10 @@ export function PageShell({
             // The tab bar floats over this column on a phone; without this
             // the last row of every page sits under it.
             scrollBody && 'pb-tab-bar md:pb-5',
+            // A page running its own scroll regions pads inside them instead:
+            // any padding here would leave a dead strip along the bottom of
+            // the screen that reads as the content stopping short.
+            !scrollBody && 'pb-0',
             WIDTH_CLASS[width],
             !scrollBody && 'flex min-h-0 flex-1 flex-col',
           )}

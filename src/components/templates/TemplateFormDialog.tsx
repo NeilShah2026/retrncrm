@@ -7,7 +7,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
+import {
+  InsetGroup,
+  InsetInputRow,
+  InsetSelectRow,
+  InsetTextareaRow,
+} from '@/components/ui/inset-list'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -37,6 +46,7 @@ export function TemplateFormDialog({ open, onOpenChange, template }: Props) {
   const [subject, setSubject] = React.useState('')
   const [body, setBody] = React.useState('')
   const [saving, setSaving] = React.useState(false)
+  const isMobile = useIsMobile()
   const bodyRef = React.useRef<HTMLTextAreaElement>(null)
 
   React.useEffect(() => {
@@ -97,8 +107,88 @@ export function TemplateFormDialog({ open, onOpenChange, template }: Props) {
     }
   }
 
+  /** The phone's version: grouped rows, with the placeholders under the body. */
+  function renderPhone() {
+    return (
+      <DialogContent tall hideClose padded={false} className="bg-grouped" aria-describedby={undefined}>
+        <DialogHeader>
+          <SheetBar
+            leading={<SheetBarButton close>Cancel</SheetBarButton>}
+            title={editing ? 'Edit Template' : 'New Template'}
+            trailing={
+              <SheetBarButton strong disabled={saving || !name.trim()} onClick={() => void save()}>
+                {editing ? 'Done' : 'Add'}
+              </SheetBarButton>
+            }
+          />
+        </DialogHeader>
+
+        <div className="space-y-6 px-4 pb-8 pt-1">
+          <InsetGroup>
+            <InsetInputRow
+              value={name}
+              onChange={setName}
+              placeholder="Name, e.g. Coffee chat request"
+              autoCapitalize="sentences"
+            />
+            <InsetSelectRow
+              label="Category"
+              allowNone={false}
+              value={category}
+              onChange={(v) => setCategory((v || 'other') as TemplateCategory)}
+              options={TEMPLATE_CATEGORY_KEYS.map((k) => ({
+                value: k,
+                label: `${TEMPLATE_CATEGORIES[k].emoji} ${TEMPLATE_CATEGORIES[k].label}`,
+              }))}
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup title="Subject" footer="Optional — used when the message becomes an email.">
+            <InsetInputRow
+              value={subject}
+              onChange={setSubject}
+              placeholder="Quick chat about {{company}}?"
+              autoCapitalize="sentences"
+              last
+            />
+          </InsetGroup>
+
+          <InsetGroup
+            title="Message"
+            footer={
+              <span className="flex flex-wrap gap-1.5 pt-1">
+                {TEMPLATE_PLACEHOLDERS.map((p) => (
+                  <button
+                    key={p.token}
+                    type="button"
+                    onClick={() => insertPlaceholder(p.token)}
+                    aria-label={`Insert ${p.label}`}
+                    className="press-scale rounded-full bg-grouped-cell px-2.5 py-1 font-mono text-[11px] text-text-secondary ring-1 ring-inset ring-border/70"
+                  >
+                    {p.token}
+                  </button>
+                ))}
+              </span>
+            }
+          >
+            <InsetTextareaRow
+              ref={bodyRef}
+              value={body}
+              onChange={setBody}
+              placeholder="Hi {{firstName}}, …"
+              rows={10}
+              last
+            />
+          </InsetGroup>
+        </div>
+      </DialogContent>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {isMobile ? renderPhone() : (
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit template' : 'New template'}</DialogTitle>
@@ -197,6 +287,7 @@ export function TemplateFormDialog({ open, onOpenChange, template }: Props) {
           </DialogFooter>
         </form>
       </DialogContent>
+      )}
     </Dialog>
   )
 }

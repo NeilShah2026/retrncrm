@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Check, MoreHorizontal, Plus, Tag as TagIcon, Tags } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -26,7 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { AutoTagDialog } from '@/components/contacts/AutoTagDialog'
+import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
 import { useContacts, useTags } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { tagRepo } from '@/services'
 import { TAG_COLORS, TAG_COLOR_KEYS, tagColor } from '@/lib/constants'
 import { cn } from '@/lib/utils'
@@ -35,6 +37,8 @@ import type { Tag } from '@/types'
 import { toast } from 'sonner'
 
 export function TagsPage() {
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const tags = useTags()
   const contacts = useContacts()
   const [editorOpen, setEditorOpen] = React.useState(false)
@@ -86,6 +90,7 @@ export function TagsPage() {
           </>
         ),
       }}
+      bodyClassName={isMobile ? 'bg-grouped' : undefined}
       header={
         <PageHeader title="Tags" description="Group people by how you know them.">
           {hasContacts && (
@@ -136,7 +141,18 @@ export function TagsPage() {
       >
         {(list) => (
           <div className="space-y-3">
-            {untagged > 0 && (
+            {untagged > 0 && isMobile && (
+              <InsetGroup>
+                <InsetRow
+                  leading={<Tags className="h-[18px] w-[18px] text-muted-foreground" />}
+                  title={`Suggest tags for ${untagged} ${untagged === 1 ? 'person' : 'people'}`}
+                  subtitle="Proposed from their records; you approve each one"
+                  last
+                  onClick={() => setAutoTagOpen(true)}
+                />
+              </InsetGroup>
+            )}
+            {untagged > 0 && !isMobile && (
               <button
                 type="button"
                 onClick={() => setAutoTagOpen(true)}
@@ -155,6 +171,62 @@ export function TagsPage() {
               </button>
             )}
 
+            {isMobile ? (
+              <InsetGroup footer="Tap a tag to see everyone in it.">
+                {list.map((tag, i) => {
+                  const c = tagColor(tag.color)
+                  const count = counts.get(tag.id) ?? 0
+                  return (
+                    <InsetRow
+                      key={tag.id}
+                      // The tile carries the tag's colour: at 2.5mm a dot is
+                      // the one thing on the row you can't actually see.
+                      leading={
+                        <span
+                          className={cn(
+                            'flex h-[29px] w-[29px] items-center justify-center rounded-[7px] text-white',
+                            c.dot,
+                          )}
+                          aria-hidden
+                        >
+                          <TagIcon className="h-[17px] w-[17px]" strokeWidth={2.1} />
+                        </span>
+                      }
+                      title={tag.name}
+                      subtitle={count === 0 ? 'No contacts yet' : undefined}
+                      detail={count > 0 ? `${count}` : undefined}
+                      chevron={false}
+                      accessory={
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Actions for ${tag.name}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="press -mr-1 flex h-11 w-9 items-center justify-center text-muted-foreground/70"
+                            >
+                              <MoreHorizontal className="h-[18px] w-[18px]" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(tag)}>Edit</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleting(tag)}
+                              className="text-danger focus:text-danger"
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      }
+                      last={i === list.length - 1}
+                      onClick={() => count > 0 && navigate(ROUTES.contactsSearch(tag.name))}
+                    />
+                  )
+                })}
+              </InsetGroup>
+            ) : (
             <ul className="overflow-hidden rounded-lg border bg-card">
               {list.map((tag) => {
                 const c = tagColor(tag.color)
@@ -191,6 +263,7 @@ export function TagsPage() {
                 )
               })}
             </ul>
+            )}
           </div>
         )}
       </NetworkGate>

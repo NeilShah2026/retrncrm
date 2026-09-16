@@ -694,6 +694,37 @@
     pointer-events: none;
   }
 
+  /* A new message arriving: it rises the last few pixels rather than
+     appearing, which is what makes a thread feel like it is being written
+     rather than re-rendered. */
+  .turn-in {
+    animation: turn-in 340ms var(--ease-out) backwards;
+  }
+  @keyframes turn-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  /* The assistant is composing: three dots breathing, as every messaging app
+     signals the same thing. */
+  .typing-dot {
+    animation: typing 1.2s ease-in-out infinite;
+  }
+  @keyframes typing {
+    0%,
+    60%,
+    100% {
+      opacity: 0.25;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+  }
+
   /* iOS answers a touch by dimming, not by changing colour. */
   .press {
     transition: opacity var(--duration-fast) var(--ease-out);

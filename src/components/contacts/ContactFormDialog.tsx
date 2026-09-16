@@ -77,11 +77,26 @@ import type {
 } from '@/types'
 import { cn } from '@/lib/utils'
 
+/** A field the sheet can be opened straight onto. */
+export type ContactField =
+  | 'firstName'
+  | 'company'
+  | 'email'
+  | 'phone'
+  | 'linkedinUrl'
+  | 'howWeMet'
+  | 'notes'
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** Present → edit mode. */
   contact?: Contact | null
+  /**
+   * Open with this field focused and its section already expanded — what
+   * "Add email" on a contact's page opens.
+   */
+  focusField?: ContactField
   /** Pre-filled fields for a new contact (e.g. handed over from voice capture). */
   prefill?: Partial<Contact>
   onSaved?: (contact: Contact) => void
@@ -162,6 +177,7 @@ export function ContactFormDialog({
   open,
   onOpenChange,
   contact,
+  focusField,
   prefill,
   onSaved,
 }: Props) {
@@ -183,6 +199,20 @@ export function ContactFormDialog({
   const lastNameRef = React.useRef<HTMLInputElement>(null)
   const companyRef = React.useRef<HTMLInputElement>(null)
   const jobTitleRef = React.useRef<HTMLInputElement>(null)
+  const emailRef = React.useRef<HTMLInputElement>(null)
+  const phoneRef = React.useRef<HTMLInputElement>(null)
+  const linkedinRef = React.useRef<HTMLInputElement>(null)
+  const howWeMetRef = React.useRef<HTMLTextAreaElement>(null)
+  const notesRef = React.useRef<HTMLTextAreaElement>(null)
+  const fieldRefs: Record<ContactField, React.RefObject<HTMLElement | null>> = {
+    firstName: firstNameRef,
+    company: companyRef,
+    email: emailRef,
+    phone: phoneRef,
+    linkedinUrl: linkedinRef,
+    howWeMet: howWeMetRef,
+    notes: notesRef,
+  }
   // What the duplicate notice last said, so it can ease shut still saying it.
   const shownDuplicates = React.useRef<Contact[]>([])
   if (duplicates.length > 0) shownDuplicates.current = duplicates
@@ -230,12 +260,29 @@ export function ContactFormDialog({
       setForm(initialState(contact, prefill))
       // A prefill has already filled fields that live below the fold — open
       // the extra section so nothing arrives hidden.
-      setExpanded(Boolean(contact) || Boolean(prefill))
+      setExpanded(Boolean(contact) || Boolean(prefill) || Boolean(focusField))
       setDuplicates([])
       setLiOpen(false)
       setLiText('')
     }
-  }, [open, contact, prefill])
+  }, [open, contact, prefill, focusField])
+
+  /*
+   * Opened onto a particular field ("Add email" on someone's page): wait for
+   * the sheet to arrive, bring the row into view, then put the cursor in it.
+   * Focusing any earlier fights the sheet's own entrance.
+   */
+  React.useEffect(() => {
+    if (!open || !focusField || !isMobile) return
+    const timer = window.setTimeout(() => {
+      const field = fieldRefs[focusField]?.current
+      if (!field) return
+      field.scrollIntoView({ block: 'center' })
+      field.focus({ preventScroll: true })
+    }, 380)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, focusField, isMobile])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -532,6 +579,7 @@ export function ContactFormDialog({
 
           <InsetGroup title="The story">
             <InsetTextareaRow
+              ref={howWeMetRef}
               value={form.howWeMet}
               onChange={(v) => set('howWeMet', v)}
               placeholder="How you met, in a sentence"
@@ -644,6 +692,7 @@ export function ContactFormDialog({
 
               <InsetGroup title="Contact info">
                 <InsetInputRow
+                  ref={emailRef}
                   label="Email"
                   type="email"
                   inputMode="email"
@@ -652,6 +701,7 @@ export function ContactFormDialog({
                   placeholder="name@school.edu"
                 />
                 <InsetInputRow
+                  ref={phoneRef}
                   label="Phone"
                   type="tel"
                   inputMode="tel"
@@ -660,6 +710,7 @@ export function ContactFormDialog({
                   placeholder="Phone"
                 />
                 <InsetInputRow
+                  ref={linkedinRef}
                   label="LinkedIn"
                   type="url"
                   inputMode="url"
@@ -779,6 +830,7 @@ export function ContactFormDialog({
 
               <InsetGroup title="Notes">
                 <InsetTextareaRow
+                  ref={notesRef}
                   value={form.notes}
                   onChange={(v) => set('notes', v)}
                   placeholder="Anything worth remembering"

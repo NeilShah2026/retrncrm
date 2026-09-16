@@ -11,14 +11,22 @@ interface Props {
   active?: boolean
 }
 
-/** A tag: dot + name on a muted tint. Tags are one of the few true pills. */
+/**
+ * A tag: its name on its own tint. Tags are one of the few true pills.
+ *
+ * No dot inside the capsule — the capsule is already the colour, and the two
+ * together read as a bullet point stuck to a badge. Bigger on a phone, where
+ * an 11px pill next to 17px text looks like a mistake; the desktop's dense
+ * tables keep the small one.
+ */
 export function TagBadge({ tag, onRemove, onClick, className, active }: Props) {
   const c = tagColor(tag.color)
   const interactive = Boolean(onClick)
   return (
     <span
       className={cn(
-        'inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-xs font-medium leading-none',
+        'inline-flex items-center gap-1 rounded-full font-medium leading-none',
+        'h-6 px-2.5 text-[13px] sm:h-5 sm:px-1.5 sm:text-xs',
         c.badge,
         interactive &&
           'cursor-pointer transition-opacity duration-fast hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
@@ -36,7 +44,6 @@ export function TagBadge({ tag, onRemove, onClick, className, active }: Props) {
       tabIndex={interactive ? 0 : undefined}
       aria-pressed={interactive ? active : undefined}
     >
-      <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
       {tag.name}
       {onRemove && (
         <button

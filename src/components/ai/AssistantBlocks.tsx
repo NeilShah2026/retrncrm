@@ -56,8 +56,8 @@ export function ActionPlan({
   if (outcomes) {
     const saved = outcomes.filter((o) => o.status === 'done').length
     return (
-      <div className="overflow-hidden rounded-[14px] border md:rounded-lg">
-        <div className="flex h-10 items-center gap-2 border-b bg-success-soft/60 px-3.5 md:h-9 md:px-3">
+      <div className="overflow-hidden rounded-[16px] bg-grouped-cell ring-1 ring-inset ring-border/60">
+        <div className="flex h-11 items-center gap-2 border-b bg-success-soft/60 px-4">
           <CheckCircle2 className="h-4 w-4 text-success md:h-3.5 md:w-3.5" />
           <span className="text-ios-footnote font-medium text-success md:text-xs">
             {saved === outcomes.length
@@ -102,8 +102,8 @@ export function ActionPlan({
 
   const count = chosen.filter(Boolean).length
   return (
-    <div className="overflow-hidden rounded-[14px] border md:rounded-lg">
-      <div className="flex h-10 items-center justify-between gap-2 border-b bg-bg-sunken/60 px-3.5 md:h-9 md:px-3">
+    <div className="overflow-hidden rounded-[16px] bg-grouped-cell ring-1 ring-inset ring-border/60">
+      <div className="flex h-11 items-center justify-between gap-2 border-b px-4">
         <span className="text-ios-footnote flex items-center gap-2 font-medium text-text-secondary md:text-xs">
           About to save
           <SuggestedBadge />
@@ -153,7 +153,7 @@ export function ActionPlan({
         })}
       </ul>
 
-      <div className="flex justify-end border-t p-2.5 md:p-2">
+      <div className="flex justify-end border-t p-3 md:p-2">
         <Button
           size="sm"
           onClick={onRun}
@@ -181,8 +181,9 @@ export function MatchList({
   onOpen: (contact: Contact) => void
 }) {
   return (
-    <div className="overflow-hidden rounded-[14px] border md:rounded-lg">
-      <div className="text-ios-footnote flex h-10 items-center border-b bg-bg-sunken/60 px-3.5 font-medium text-text-secondary md:h-9 md:px-3 md:text-xs">
+    // No card of its own: this sits inside the answer's card, under the prose.
+    <div className="border-t">
+      <div className="text-ios-footnote px-4 pb-1 pt-2.5 uppercase tracking-[0.04em] text-muted-foreground">
         {matches.length} {matches.length === 1 ? 'person' : 'people'}
       </div>
       <ul>
@@ -215,19 +216,19 @@ function MatchRow({
   }
 
   return (
-    <li className="group flex items-center gap-3 border-b pl-3.5 pr-3 last:border-b-0 md:px-3 md:hover:bg-accent/50">
+    <li className="group flex items-stretch gap-3 pl-4 last:[&>span]:border-b-0 md:hover:bg-accent/40">
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none md:min-h-11"
+        className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none"
       >
-        <ContactAvatar contact={contact} className="h-8 w-8 shrink-0 md:h-6 md:w-6" />
+        <ContactAvatar contact={contact} className="h-9 w-9 shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="text-ios-subhead flex items-center gap-1 font-medium md:text-sm">
+          <span className="text-ios-body flex items-center gap-1 md:text-[15px]">
             <span className="truncate">{fullName(contact)}</span>
-            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-fast group-hover:opacity-100" />
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
           </span>
-          <span className="text-ios-footnote block truncate text-muted-foreground md:text-xs">
+          <span className="text-ios-footnote block line-clamp-2 text-muted-foreground">
             {reason ||
               [contact.jobTitle, contact.company].filter(Boolean).join(' · ') ||
               'In your contacts'}
@@ -235,20 +236,20 @@ function MatchRow({
         </span>
       </button>
 
-      <Button
-        variant={caughtUp ? 'ghost' : 'outline'}
-        size="sm"
-        disabled={caughtUp}
-        aria-label={`Mark caught up with ${fullName(contact)}`}
-        onClick={() => void catchUp()}
-        className={cn(
-          'h-8 w-8 shrink-0 rounded-full p-0 sm:w-auto sm:rounded-md sm:px-2.5 md:h-7',
-          caughtUp && 'text-success',
-        )}
-      >
-        <Check />
-        <span className="hidden sm:inline">{caughtUp ? 'Logged' : 'Caught up'}</span>
-      </Button>
+      <span className="hairline-b flex items-center pr-2">
+        <button
+          type="button"
+          disabled={caughtUp}
+          aria-label={`Mark caught up with ${fullName(contact)}`}
+          onClick={() => void catchUp()}
+          className={cn(
+            'press flex h-11 w-11 items-center justify-center rounded-full',
+            caughtUp ? 'text-success' : 'text-muted-foreground/70',
+          )}
+        >
+          <Check className="h-[18px] w-[18px]" strokeWidth={2.4} />
+        </button>
+      </span>
     </li>
   )
 }

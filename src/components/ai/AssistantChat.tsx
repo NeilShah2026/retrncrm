@@ -1,22 +1,35 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowUp, Check, Copy, Mic, NotebookPen, Search } from 'lucide-react'
+import {
+  ArrowUp,
+  ArrowUpRight,
+  Building2,
+  Check,
+  CircleUserRound,
+  Clock,
+  Copy,
+  Mic,
+  PenLine,
+  Search,
+  Tag as TagIcon,
+} from 'lucide-react'
 import { useAssistant, type AssistantTurn } from '@/context/assistant-context'
 import { useUI } from '@/context/ui-context'
 import { useContacts, useTagMap, useTags } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { buildSearchIndex, searchContacts } from '@/lib/search'
+import { getReconnectStatus } from '@/lib/reconnect'
 import { askNetwork, startSession } from '@/lib/ai/network'
 import { applyActions } from '@/lib/ai/actions'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
-import { renderMarkdown } from '@/lib/format'
+import { fullName, renderMarkdown } from '@/lib/format'
 import { dismissKeyboard, dismissKeyboardOnDrag } from '@/lib/keyboard'
 import { tapFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
 import { ActionPlan, MatchList } from './AssistantBlocks'
-import type { Contact } from '@/types'
+import type { Contact, Tag } from '@/types'
 
 /**
  * The assistant, as a thread. Asking and telling share one box: "Who do I
@@ -26,27 +39,87 @@ import type { Contact } from '@/types'
  * becomes the fuzzy search it was built on.
  */
 
-const SUGGESTION_GROUPS = [
-  {
-    label: 'Ask about your network',
-    icon: Search,
-    items: [
-      'Who do I know in fintech?',
-      'Who should I reconnect with this week?',
-      'Who could introduce me to a recruiter?',
-    ],
-  },
-  {
-    label: 'Say what happened',
-    icon: NotebookPen,
-    items: [
-      'Met Priya at the AI meetup, PM at Klaviyo',
-      'Coffee with Sarah next Tuesday at 3',
-      'Spoke to Marcus today',
-    ],
-  },
-]
+/**
+ * What to offer before anything has been asked.
+ *
+ * Built from the roster in front of us, never a canned list: the old one
+ * suggested "Met Priya at the AI meetup" to people who have never met a
+ * Priya, which reads as a screenshot rather than an assistant. Everything
+ * here names someone real, and only appears when it has something to name.
+ */
+interface Starter {
+  icon: typeof Search
+  text: string
+  detail?: string
+}
 
+function useStarters(contacts: Contact[], tags: Tag[]): { ask: Starter[]; record: Starter[] } {
+  return React.useMemo(() => {
+    const ask: Starter[] = []
+    const record: Starter[] = []
+    if (contacts.length === 0) return { ask, record }
+
+    const overdue = contacts.filter((c) => getReconnectStatus(c).overdue)
+    if (overdue.length > 0) {
+      ask.push({
+        icon: Clock,
+        text: 'Who should I reconnect with?',
+        detail: `${overdue.length} ${overdue.length === 1 ? 'person is' : 'people are'} past their catch-up goal`,
+      })
+    }
+
+    const byCompany = new Map<string, number>()
+    for (const c of contacts) {
+      if (c.company) byCompany.set(c.company, (byCompany.get(c.company) ?? 0) + 1)
+    }
+    const topCompany = [...byCompany.entries()].sort((a, b) => b[1] - a[1])[0]
+    if (topCompany) {
+      ask.push({
+        icon: Building2,
+        text: `Who do I know at ${topCompany[0]}?`,
+        detail: `${topCompany[1]} ${topCompany[1] === 1 ? 'person' : 'people'}`,
+      })
+    }
+
+    const byTag = tags
+      .map((t) => ({ tag: t, n: contacts.filter((c) => c.tagIds.includes(t.id)).length }))
+      .sort((a, b) => b.n - a.n)[0]
+    if (byTag && byTag.n > 1) {
+      ask.push({
+        icon: TagIcon,
+        text: `Who's tagged ${byTag.tag.name}?`,
+        detail: `${byTag.n} people`,
+      })
+    }
+
+    const newest = [...contacts]
+      .filter((c) => c.dateMet)
+      .sort((a, b) => (b.dateMet ?? '').localeCompare(a.dateMet ?? ''))[0]
+    if (newest) {
+      ask.push({
+        icon: CircleUserRound,
+        text: `What should I ask ${newest.firstName} next time?`,
+        detail: [newest.jobTitle, newest.company].filter(Boolean).join(' · ') || undefined,
+      })
+      record.push({
+        icon: PenLine,
+        text: `Spoke to ${fullName(newest)} today`,
+        detail: 'Logs a catch-up on their timeline',
+      })
+    }
+
+    const withGoal = contacts.find((c) => c.contactFrequencyGoal !== 'none' && c.id !== newest?.id)
+    if (withGoal) {
+      record.push({
+        icon: PenLine,
+        text: `Coffee with ${withGoal.firstName} next Tuesday at 3`,
+        detail: 'Schedules it and links them',
+      })
+    }
+
+    return { ask: ask.slice(0, 4), record: record.slice(0, 2) }
+  }, [contacts, tags])
+}
 
 let turnSeq = 0
 function nextTurnId(): string {
@@ -136,21 +209,22 @@ export function AssistantChat() {
       if (isMobile) dismissKeyboard()
       setBusy(true)
       setDraft('')
+      // The question goes up the moment it's asked, answer pending. Waiting
+      // for the reply to post both is what made a slow answer look like the
+      // message had been swallowed.
+      const turnId = nextTurnId()
+      setTurns((t) => [
+        ...t,
+        { id: turnId, question: trimmed, answer: null, fellBack: false, chosen: [] },
+      ])
+      const settle = (patch: Partial<AssistantTurn>) =>
+        setTurns((t) => t.map((turn) => (turn.id === turnId ? { ...turn, ...patch } : turn)))
       try {
         const current = session.current ?? startSession()
         const { answer, session: next } = await askNetwork(current, trimmed, contacts, tagMap)
         if (epoch.current !== startedAt) return
         session.current = next
-        setTurns((t) => [
-          ...t,
-          {
-            id: nextTurnId(),
-            question: trimmed,
-            answer,
-            fellBack: false,
-            chosen: answer.actions.map(() => true),
-          },
-        ])
+        settle({ answer, fellBack: false, chosen: answer.actions.map(() => true) })
       } catch (err) {
         if (epoch.current !== startedAt) return
         if (err instanceof AiUnavailableError) {
@@ -164,7 +238,8 @@ export function AssistantChat() {
           })
         }
         session.current = null
-        setTurns((t) => [...t, keywordFallback(trimmed)])
+        const fallback = keywordFallback(trimmed)
+        settle({ answer: fallback.answer, fellBack: true, chosen: [] })
       } finally {
         if (epoch.current === startedAt) setBusy(false)
       }
@@ -213,6 +288,7 @@ export function AssistantChat() {
     session.current = null
   }
 
+  const starters = useStarters(contacts, tags)
   const canAsk = contacts.length > 0
   const started = turns.length > 0 || busy
   const last = turns[turns.length - 1]
@@ -244,13 +320,18 @@ export function AssistantChat() {
           touched.current = true
         }}
         data-keyboard-anchor={started ? 'end' : undefined}
-        className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin"
+        className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain bg-grouped scrollbar-thin md:bg-background"
       >
-        <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-4 md:px-6">
+        <div className="mx-auto w-full max-w-2xl px-4 pb-8 pt-3 md:px-6">
           {!started ? (
-            <Opening canAsk={canAsk} contactCount={contacts.length} onPick={(s) => void ask(s)} />
+            <Opening
+              canAsk={canAsk}
+              contactCount={contacts.length}
+              starters={starters}
+              onPick={(s) => void ask(s)}
+            />
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-7">
               {turns.map((turn) => (
                 <TurnBlock
                   key={turn.id}
@@ -261,7 +342,7 @@ export function AssistantChat() {
                   onGo={(route) => navigate(route)}
                 />
               ))}
-              {busy && <Thinking contactCount={contacts.length} first={turns.length === 0} />}
+              {busy && <Thinking />}
             </div>
           )}
         </div>
@@ -284,72 +365,111 @@ export function AssistantChat() {
   )
 }
 
-/** The opening screen: a plain heading and two short lists of openers. */
+/**
+ * Before anything is asked: one line about what this is, then a few openers
+ * naming people who are actually in the network. With nothing saved yet
+ * there's nothing to ask about, and it says so instead of offering openers
+ * that would come back empty.
+ */
 function Opening({
   canAsk,
   contactCount,
+  starters,
   onPick,
 }: {
   canAsk: boolean
   contactCount: number
+  starters: { ask: Starter[]; record: Starter[] }
   onPick: (s: string) => void
 }) {
   return (
-    <div className="pb-2 pt-4 sm:py-14">
+    <div className="pt-3 sm:pt-10">
       <h1 className="text-ios-title md:text-xl md:font-semibold md:tracking-[-0.02em]">
-        Ask about your network
+        {canAsk ? 'Ask about your network' : 'Nothing to ask about yet'}
       </h1>
       {/* Folds away while typing, so the openers below keep the room. */}
       <div className="keyboard-collapse">
         <div>
-          <p className="text-ios-subhead mt-2 max-w-md text-muted-foreground md:text-sm">
+          <p className="text-ios-subhead mt-1.5 max-w-md text-muted-foreground md:text-sm">
             {canAsk
-              ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you’ve saved. Say what happened and it drafts what to record — nothing is saved until you approve it.`
-              : 'Add a few people first. There’s nothing to ask about yet.'}
+              ? `Answers come from the ${contactCount} ${contactCount === 1 ? 'person' : 'people'} you've saved. Nothing is written down until you approve it.`
+              : 'Save a few people first — this answers from what you have written down, and there is nothing there yet.'}
           </p>
         </div>
       </div>
 
       {canAsk && (
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          {SUGGESTION_GROUPS.map((group) => (
-            <section key={group.label}>
-              <h2 className="text-ios-footnote flex items-center gap-1.5 px-4 pb-1.5 font-medium uppercase tracking-[0.05em] text-muted-foreground">
-                <group.icon className="h-3.5 w-3.5" />
-                {group.label}
-              </h2>
-              <div className="overflow-hidden rounded-[14px] bg-card ring-1 ring-inset ring-border/70">
-                {group.items.map((item, i) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => {
-                      tapFeedback()
-                      onPick(item)
-                    }}
-                    className="press-row flex w-full items-stretch pl-4 text-left md:hover:bg-accent/60"
-                  >
-                    <span
-                      className={cn(
-                        'text-ios-body flex min-w-0 flex-1 items-center gap-2 py-3 pr-4 md:py-2.5 md:text-sm',
-                        i < group.items.length - 1 && 'hairline-b',
-                      )}
-                    >
-                      <span className="min-w-0 flex-1">{item}</span>
-                      <ArrowUp className="h-4 w-4 shrink-0 rotate-45 text-muted-foreground/50" />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
+        <div className="mt-6 space-y-6">
+          {starters.ask.length > 0 && (
+            <StarterGroup label="Ask" items={starters.ask} onPick={onPick} />
+          )}
+          {starters.record.length > 0 && (
+            <StarterGroup label="Record" items={starters.record} onPick={onPick} />
+          )}
         </div>
       )}
     </div>
   )
 }
 
-/** One exchange: what you said, then what came back for it. */
+function StarterGroup({
+  label,
+  items,
+  onPick,
+}: {
+  label: string
+  items: Starter[]
+  onPick: (s: string) => void
+}) {
+  return (
+    <section>
+      <h2 className="text-ios-footnote px-1 pb-1.5 uppercase tracking-[0.04em] text-muted-foreground">
+        {label}
+      </h2>
+      <div className="overflow-hidden rounded-[14px] bg-grouped-cell ring-1 ring-inset ring-border/60">
+        {items.map((item, i) => (
+          <button
+            key={item.text}
+            type="button"
+            onClick={() => {
+              tapFeedback()
+              onPick(item.text)
+            }}
+            className="press-row flex w-full items-stretch gap-3 pl-4 text-left md:hover:bg-accent/50"
+          >
+            <span className="flex shrink-0 items-center py-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground/[0.06] text-text-secondary">
+                <item.icon className="h-[15px] w-[15px]" strokeWidth={2} />
+              </span>
+            </span>
+            <span
+              className={cn(
+                'flex min-w-0 flex-1 items-center gap-2 py-3 pr-4',
+                i < items.length - 1 && 'hairline-b',
+              )}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="text-ios-body block md:text-[15px]">{item.text}</span>
+                {item.detail && (
+                  <span className="text-ios-footnote mt-0.5 block truncate text-muted-foreground">
+                    {item.detail}
+                  </span>
+                )}
+              </span>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground/45" />
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * One exchange. The question is a bubble, as a thing you said; the reply is a
+ * card, as a thing the app made — prose, then who it found, then what it
+ * wants to write down.
+ */
 function TurnBlock({
   turn,
   onOpenContact,
@@ -367,22 +487,35 @@ function TurnBlock({
   const empty = answer && !answer.answer && answer.matches.length === 0 && answer.actions.length === 0
 
   return (
-    <div className="space-y-4">
+    <div className="turn-in space-y-3">
       <div className="flex justify-end">
-        <p className="text-ios-body max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-[6px] bg-bg-sunken px-3.5 py-2 md:rounded-lg md:text-[15px] md:leading-relaxed">
+        <p className="text-ios-body max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-[7px] bg-primary px-4 py-2.5 text-primary-foreground md:text-[15px] md:leading-relaxed">
           {question}
         </p>
       </div>
 
-      <div className="space-y-3 border-l-2 border-border pl-4">
-        {fellBack && (
-          <p className="text-label text-warning">Keyword search</p>
-        )}
-        {answer?.answer && <AnswerProse text={answer.answer} />}
-        {empty && (
-          <p className="text-[15px] text-muted-foreground">Nobody in your contacts fits that.</p>
-        )}
-        {answer && answer.actions.length > 0 && (
+      {/* Still waiting: the question stands alone until there's a reply. */}
+      {!answer ? null : (
+      <div className="space-y-3">
+        <div className="overflow-hidden rounded-[16px] bg-grouped-cell ring-1 ring-inset ring-border/60">
+          {fellBack && (
+            <p className="text-ios-footnote flex items-center gap-1.5 border-b px-4 py-2 text-warning">
+              <Search className="h-3.5 w-3.5" />
+              Keyword search — the model wasn't available
+            </p>
+          )}
+          {answer?.answer && <AnswerProse text={answer.answer} />}
+          {empty && (
+            <p className="text-ios-subhead px-4 py-3.5 text-muted-foreground md:text-[15px]">
+              Nobody in your contacts fits that.
+            </p>
+          )}
+          {answer && answer.matches.length > 0 && (
+            <MatchList matches={answer.matches} onOpen={onOpenContact} />
+          )}
+        </div>
+
+        {answer.actions.length > 0 && (
           <ActionPlan
             actions={answer.actions}
             chosen={turn.chosen}
@@ -393,14 +526,13 @@ function TurnBlock({
             onGo={onGo}
           />
         )}
-        {answer && answer.matches.length > 0 && (
-          <MatchList matches={answer.matches} onOpen={onOpenContact} />
-        )}
       </div>
+      )}
     </div>
   )
 }
 
+/** The prose part of an answer, with a quiet copy affordance under it. */
 function AnswerProse({ text }: { text: string }) {
   const [copied, setCopied] = React.useState(false)
   const html = React.useMemo(() => renderMarkdown(text), [text])
@@ -411,27 +543,27 @@ function AnswerProse({ text }: { text: string }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1600)
     } catch {
-      toast.error('Couldn’t copy that.')
+      toast.error('Couldn\u2019t copy that.')
     }
   }
 
   return (
-    <div className="group/prose">
+    <div className="group/prose px-4 pb-2.5 pt-3.5">
       {/* Sanitized in renderMarkdown (marked → DOMPurify). */}
       <div className="prose-chat" dangerouslySetInnerHTML={{ __html: html }} />
       <button
         type="button"
         onClick={() => void copy()}
         aria-label="Copy this answer"
-        className="mt-1 flex items-center gap-1 rounded-sm px-1 py-0.5 text-xs text-muted-foreground transition-opacity duration-fast hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand md:opacity-0 md:group-hover/prose:opacity-100"
+        className="text-ios-footnote -ml-1 mt-1.5 flex items-center gap-1 rounded-sm px-1 py-0.5 text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         {copied ? (
           <>
-            <Check className="h-3 w-3 text-success" /> Copied
+            <Check className="h-3.5 w-3.5 text-success" /> Copied
           </>
         ) : (
           <>
-            <Copy className="h-3 w-3" /> Copy
+            <Copy className="h-3.5 w-3.5" /> Copy
           </>
         )}
       </button>
@@ -439,31 +571,21 @@ function AnswerProse({ text }: { text: string }) {
   )
 }
 
-function Thinking({ contactCount, first }: { contactCount: number; first: boolean }) {
-  const stages = React.useMemo(
-    () =>
-      first
-        ? [
-            `Reading ${contactCount} ${contactCount === 1 ? 'person' : 'people'}…`,
-            'Working out what you meant…',
-            'Putting an answer together…',
-          ]
-        : ['Thinking…', 'Checking your contacts…', 'Almost there…'],
-    [contactCount, first],
-  )
-  const [stage, setStage] = React.useState(0)
-
-  React.useEffect(() => {
-    setStage(0)
-    const timer = setInterval(() => setStage((s) => Math.min(s + 1, stages.length - 1)), 2600)
-    return () => clearInterval(timer)
-  }, [stages])
-
+/** Composing: the three dots every messaging app uses for exactly this. */
+function Thinking() {
   return (
-    <div className="border-l-2 border-border pl-4">
-      <p className="shimmer text-[15px]" aria-live="polite">
-        {stages[stage]}
-      </p>
+    <div className="turn-in flex" aria-live="polite">
+      <span className="flex h-10 items-center gap-1.5 rounded-[16px] bg-grouped-cell px-4 ring-1 ring-inset ring-border/60">
+        <span className="sr-only">Thinking…</span>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="typing-dot h-2 w-2 rounded-full bg-foreground"
+            style={{ animationDelay: `${i * 160}ms` }}
+          />
+        ))}
+      </span>
     </div>
   )
 }
@@ -521,7 +643,7 @@ function Composer({
   return (
     // Hands the tab bar's room over to the keyboard as it arrives, on the
     // keyboard's curve, so the box rides up on top of it in one motion.
-    <div className="pb-tab-bar-until-keyboard shrink-0 border-t bg-background">
+    <div className="pb-tab-bar-until-keyboard glass shrink-0 border-t md:bg-background">
       <div className="mx-auto w-full max-w-3xl pb-2 pt-2 md:px-6 md:pb-3 md:pt-3">
         {followUps.length > 0 && (
           // Phone: one row of capsules that scrolls sideways. Desktop: quiet
@@ -536,7 +658,7 @@ function Composer({
                   onFollowUp(f)
                 }}
                 className={cn(
-                  'press text-ios-subhead h-8 shrink-0 whitespace-nowrap rounded-full bg-bg-sunken px-3.5 text-foreground ring-1 ring-inset ring-border/70',
+                  'press text-ios-subhead h-8 shrink-0 whitespace-nowrap rounded-full bg-grouped-cell px-3.5 text-foreground ring-1 ring-inset ring-border/70',
                   'md:h-auto md:rounded-sm md:bg-transparent md:px-0 md:text-xs md:text-text-secondary md:ring-0 md:underline-offset-2 md:hover:text-foreground md:hover:underline',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                 )}
@@ -553,7 +675,7 @@ function Composer({
             if (canSend) onSubmit()
           }}
           className={cn(
-            'mx-3 flex items-end gap-2 rounded-[20px] bg-bg-sunken py-1 pl-4 pr-1 ring-1 ring-inset ring-border/70 md:mx-0',
+            'mx-3 flex items-end gap-2 rounded-[20px] bg-grouped-cell py-1 pl-4 pr-1 ring-1 ring-inset ring-border/70 md:mx-0 md:bg-background',
             'md:rounded-lg md:bg-background md:py-1.5 md:pr-1.5 md:transition-shadow md:duration-fast md:focus-within:ring-2 md:focus-within:ring-brand/40',
             disabled && 'opacity-60',
           )}

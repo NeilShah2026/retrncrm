@@ -27,7 +27,9 @@ import {
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { OpportunityFormDialog } from '@/components/pipeline/OpportunityFormDialog'
+import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
 import { useContactMap, useOpportunities } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { opportunityRepo } from '@/services'
 import {
   OPPORTUNITY_OUTCOMES,
@@ -63,6 +65,7 @@ export function PipelinePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Opportunity | null>(null)
+  const isMobile = useIsMobile()
   const [addStage, setAddStage] = React.useState<OpportunityStage | undefined>()
   const [deleting, setDeleting] = React.useState<Opportunity | null>(null)
   const [dragId, setDragId] = React.useState<string | null>(null)
@@ -134,7 +137,9 @@ export function PipelinePage() {
   return (
     <PageShell
       width="wide"
-      scrollBody={false}
+      // The board scrolls its own columns; the phone's list scrolls as a page.
+      scrollBody={isMobile}
+      bodyClassName={isMobile ? 'bg-grouped' : undefined}
       mobile={{
         title: 'Pipeline',
         largeTitle: false,
@@ -179,7 +184,36 @@ export function PipelinePage() {
           />
         }
       >
-        {() => (
+        {() =>
+          isMobile ? (
+            // A phone reads a pipeline down the screen, not sideways: one
+            // group per stage that has anything in it, newest stages first.
+            <div className="space-y-6 pb-2">
+              {OPPORTUNITY_STAGE_KEYS.map((stage) => {
+                const cards = byStage[stage]
+                if (cards.length === 0) return null
+                const s = OPPORTUNITY_STAGES[stage]
+                return (
+                  <InsetGroup key={stage} title={`${s.label} · ${cards.length}`}>
+                    {cards.map((o, i) => (
+                      <InsetRow
+                        key={o.id}
+                        leading={<span className={cn('h-2 w-2 rounded-full', s.dot)} />}
+                        title={o.company}
+                        subtitle={[o.role, o.location].filter(Boolean).join(' · ') || undefined}
+                        detail={o.deadline ? formatDateShort(o.deadline) : undefined}
+                        last={i === cards.length - 1}
+                        onClick={() => openEdit(o)}
+                      />
+                    ))}
+                  </InsetGroup>
+                )
+              })}
+              <InsetGroup>
+                <InsetRow title="Add an Opportunity" centered last onClick={() => openNew()} />
+              </InsetGroup>
+            </div>
+          ) : (
           <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto pb-2 scrollbar-thin sm:snap-none">
             {OPPORTUNITY_STAGE_KEYS.map((stage) => {
               const cards = byStage[stage]
@@ -248,7 +282,8 @@ export function PipelinePage() {
               )
             })}
           </div>
-        )}
+          )
+        }
       </NetworkGate>
 
       <OpportunityFormDialog
