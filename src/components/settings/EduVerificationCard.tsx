@@ -1,21 +1,12 @@
 import * as React from 'react'
 import { BadgeCheck, GraduationCap, Mail } from 'lucide-react'
-import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useAuth } from '@/auth/AuthProvider'
-import { useEntitlement } from '@/hooks/useEntitlement'
-import {
-  BABSON_DOMAIN,
-  confirmVerification,
-  isBabsonEmail,
-  removeVerification,
-  startVerification,
-} from '@/lib/eduVerification'
-
-type Step = 'idle' | 'code'
+import { BABSON_DOMAIN } from '@/lib/eduVerification'
+import { useEduVerification } from './useEduVerification'
 
 /**
  * Babson verification, for accounts signed in with something other than a
@@ -24,59 +15,21 @@ type Step = 'idle' | 'code'
  */
 export function EduVerificationCard() {
   const { user } = useAuth()
-  const { edu } = useEntitlement()
-
-  const [step, setStep] = React.useState<Step>('idle')
-  const [email, setEmail] = React.useState('')
-  const [code, setCode] = React.useState('')
-  const [busy, setBusy] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const {
+    edu,
+    step,
+    email,
+    setEmail,
+    code,
+    setCode,
+    busy,
+    error,
+    send,
+    confirm,
+    remove,
+    useAnotherAddress,
+  } = useEduVerification()
   const [confirmRemove, setConfirmRemove] = React.useState(false)
-
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    if (!isBabsonEmail(email)) {
-      setError(`That doesn't look like an @${BABSON_DOMAIN} address.`)
-      return
-    }
-    setBusy(true)
-    try {
-      await startVerification(email)
-      setStep('code')
-      toast.success(`Code sent to ${email.trim().toLowerCase()}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that code.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleConfirm(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setBusy(true)
-    try {
-      const verified = await confirmVerification(email, code)
-      setStep('idle')
-      setEmail('')
-      setCode('')
-      toast.success(`${verified} verified — Retrn is free for you.`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'That code did not work.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleRemove() {
-    try {
-      await removeVerification()
-      toast.success('Babson verification removed')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not remove that.')
-    }
-  }
 
   // --- Verified -------------------------------------------------------------
   if (edu.verified) {
@@ -114,7 +67,7 @@ export function EduVerificationCard() {
             description="Your account keeps all its data, but it stops counting as a verified Babson student. You can verify the same address again later."
             confirmLabel="Remove"
             destructive
-            onConfirm={handleRemove}
+            onConfirm={remove}
           />
         </CardContent>
       </Card>
@@ -137,7 +90,13 @@ export function EduVerificationCard() {
         </p>
 
         {step === 'idle' ? (
-          <form onSubmit={handleSend} className="space-y-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void send()
+            }}
+            className="space-y-3"
+          >
             <Input
               type="email"
               value={email}
@@ -153,7 +112,13 @@ export function EduVerificationCard() {
             </Button>
           </form>
         ) : (
-          <form onSubmit={handleConfirm} className="space-y-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void confirm()
+            }}
+            className="space-y-3"
+          >
             <p className="text-sm text-muted-foreground">
               Enter the 6-digit code we sent to{' '}
               <span className="break-all text-foreground">
@@ -179,11 +144,7 @@ export function EduVerificationCard() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  setStep('idle')
-                  setCode('')
-                  setError(null)
-                }}
+                onClick={useAnotherAddress}
               >
                 Use a different address
               </Button>

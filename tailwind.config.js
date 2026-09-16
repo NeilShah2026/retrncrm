@@ -122,6 +122,13 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+
+        // ---- Phone grouped lists (inset-list.tsx) ----------------------
+        grouped: {
+          DEFAULT: 'hsl(var(--grouped))',
+          cell: 'hsl(var(--grouped-cell))',
+        },
+        'segment-thumb': 'hsl(var(--segment-thumb))',
       },
       // Radius roles: control 6 · card/panel 8 · modal 10. `rounded-xl` and
       // up are intentionally NOT mapped to tokens — reach for them only for

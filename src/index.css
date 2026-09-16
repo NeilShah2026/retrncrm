@@ -88,6 +88,33 @@
        out while one is up rather than leaving a gap above it. */
     --safe-bottom: env(safe-area-inset-bottom);
 
+    /* ---- Grouped lists (phone) ------------------------------------ */
+    /* iOS's grouped background and the cells that sit on it. Light: grey
+       ground, white cells. Dark: the cells are the *lighter* surface, as in
+       Settings — not a darker card sunk into a grey page. */
+    --grouped: 240 5% 96%;
+    --grouped-cell: 0 0% 100%;
+    /* The sliding thumb of a segmented control. */
+    --segment-thumb: 0 0% 100%;
+
+    /* ---- Phone sheets --------------------------------------------- */
+    /* How much of the screen a bottom sheet takes at rest. With the keyboard
+       up it grows by the keyboard's height (never past the status bar), so
+       the fields keep the room they had instead of being squeezed under it. */
+    --sheet-detent: 75dvh;
+    --sheet-max: calc(100dvh - env(safe-area-inset-top) - 0.5rem);
+    /* Dragging and settling: the curve a sheet follows under a finger. */
+    --sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    /* Arriving and leaving. Longer than a web modal on purpose — a sheet
+       crosses most of the screen, and at web speed that reads as a snap
+       rather than as something being presented. It eases in gently, spends
+       most of the time travelling, and settles slowly; on the way out it
+       accelerates away instead of decelerating into nothing. */
+    --sheet-in: 520ms;
+    --sheet-in-ease: cubic-bezier(0.3, 0.55, 0.12, 1);
+    --sheet-out: 360ms;
+    --sheet-out-ease: cubic-bezier(0.4, 0.02, 0.72, 0.2);
+
     /* ---- Motion --------------------------------------------------- */
     --duration-fast: 120ms;
     --duration-base: 160ms;
@@ -160,6 +187,10 @@
     --glass-shadow-opacity: 0.4;
 
     --destructive-foreground: 0 0% 98%;
+
+    --grouped: 240 6% 7%;
+    --grouped-cell: 240 5% 12%;
+    --segment-thumb: 240 5% 30%;
   }
 }
 
@@ -527,6 +558,85 @@
   .keyboard-spacer {
     height: var(--kb-height);
     transition: height var(--kb-duration) var(--kb-ease);
+  }
+
+  /* ---- Phone bottom sheets (ui/dialog.tsx) -------------------------
+     Below `sm` a dialog is a sheet. Its motion lives here rather than in
+     utility classes so the slide, the dimming and the height all run on
+     curves chosen together: the sheet arrives on UIKit's presentation curve,
+     leaves a little quicker, and the backdrop fades on the same clock so it
+     never finishes before the sheet does. */
+  @media (max-width: 639px) {
+    .sheet {
+      max-height: min(calc(var(--sheet-detent) + var(--kb-height)), var(--sheet-max));
+      transition: max-height var(--kb-duration) var(--kb-ease);
+    }
+    /* A sheet holding a long form sits at the detent even while its content
+       is short (a step that hasn't loaded, a section not yet expanded), so it
+       never changes height under someone's thumb. */
+    .sheet-tall {
+      height: min(calc(var(--sheet-detent) + var(--kb-height)), var(--sheet-max));
+      transition:
+        height var(--kb-duration) var(--kb-ease),
+        max-height var(--kb-duration) var(--kb-ease);
+    }
+    .sheet[data-state='open'] {
+      animation: sheet-in var(--sheet-in) var(--sheet-in-ease) backwards;
+    }
+    /* No `from`: a sheet let go of mid-drag leaves from where it was. */
+    .sheet[data-state='closed'] {
+      animation: sheet-out var(--sheet-out) var(--sheet-out-ease) forwards;
+    }
+    .sheet-overlay[data-state='open'] {
+      animation: sheet-dim-in var(--sheet-in) var(--sheet-in-ease) backwards;
+    }
+    .sheet-overlay[data-state='closed'] {
+      animation: sheet-dim-out var(--sheet-out) var(--sheet-out-ease) forwards;
+    }
+
+    /* The page behind a sheet stays put: no scaling it away, no rounding its
+       corners. A sheet arriving is the sheet's own movement — pushing the
+       whole app back as well reads as the screen zooming out. */
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translate3d(0, 100%, 0);
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      transform: translate3d(0, 100%, 0);
+    }
+  }
+  @keyframes sheet-dim-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-dim-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  /* Content that opens and closes in place (a "More details" section, the
+     filter chips under a search bar): its height eases between nothing and
+     its natural size, so what's below slides instead of jumping. */
+  .collapsible {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 320ms var(--sheet-ease),
+      opacity 200ms var(--ease-out);
+  }
+  .collapsible[data-open='true'] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .collapsible > * {
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* While a sheet is up, the app behind it stays exactly where it is. The

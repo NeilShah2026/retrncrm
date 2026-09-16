@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { UserPlus, PenLine, CalendarDays, Search } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { UserPlus, PenLine, CalendarDays, QrCode, Search } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
@@ -41,15 +41,22 @@ export function DashboardPage() {
   const contactMap = useContactMap()
   const tagMap = useTagMap()
   const { openNewContact, openVoiceCapture, openSearch } = useUI()
+  const navigate = useNavigate()
 
   return (
     <PageShell
       mobile={{
-        leading: <Logo className="pl-0.5" />,
+        // `pl-2` on top of the bar's own `px-2`: the mark then starts on the
+        // same 16px margin as the page's content below it, rather than four
+        // pixels to its left.
+        leading: <Logo className="pl-2" />,
         trailing: (
           <>
             <BarButton onClick={openSearch} aria-label="Search">
               <Search />
+            </BarButton>
+            <BarButton onClick={() => navigate(ROUTES.qr)} aria-label="QR code">
+              <QrCode />
             </BarButton>
             <BarButton onClick={openVoiceCapture} aria-label="Say who you met">
               <PenLine />

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/prerender-legal.mjs",
+    "ios": "npm run build && cap copy ios",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -40,6 +41,7 @@
     "dompurify": "^3.4.11",
     "framer-motion": "^12.42.2",
     "fuse.js": "^7.4.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.23.0",
     "marked": "^18.0.5",
     "qrcode.react": "^4.2.0",

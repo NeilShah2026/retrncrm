@@ -123,11 +123,12 @@ Prefer changing these over one-off page CSS:
 | Panel          | `ui/card.tsx` (`Panel`, `PanelHeader`, `PanelSection`; `Card` alias) | hairline, no shadow |
 | Input/Textarea | `ui/input.tsx`, `ui/textarea.tsx`     | brand ring on focus, `aria-invalid` |
 | Badge          | `ui/badge.tsx`                        | status variants + `SuggestedBadge` |
-| Dialog         | `ui/dialog.tsx`                       | 10px radius; bottom sheet on phone |
+| Dialog         | `ui/dialog.tsx`                       | 10px radius; on a phone a bottom sheet — three quarters of the screen (`tall` pins it there), growing with the keyboard, draggable to dismiss, with `SheetBar` for its Cancel/title/action bar |
 | EmptyState     | `common/EmptyState.tsx`               | `first-run` / `zero` / `no-results`; `ErrorState`, `SlowState` |
 | NetworkGate    | `common/NetworkGate.tsx`              | wraps every collection |
 | ConfirmDialog  | `common/ConfirmDialog.tsx`            | `confirmWord` for irreversible actions |
 | PageShell      | `layout/PageShell.tsx`                | pinned header + scrolling body |
+| Inset list     | `ui/inset-list.tsx`                   | the phone's grouped rows, fields, switches, segmented control; `outlined` for a list on a plain page |
 
 Every interactive element has: default, hover, focus-visible, active,
 disabled, loading (where it can be pending).

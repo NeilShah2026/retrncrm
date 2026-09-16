@@ -368,7 +368,7 @@ export function ContactsPage() {
               {...dismissKeyboardOnDrag}
               className="scroll-native min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin"
             >
-              <InsetGroup>
+              <InsetGroup outlined>
                 {visible.map((c, i) => (
                   <ContactListRow
                     key={c.id}

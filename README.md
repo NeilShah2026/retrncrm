@@ -44,13 +44,34 @@ row-level security. Sign in with email + password or a magic link — see
    npm install
    npm run dev      # http://localhost:5173
    npm run build    # type-check + production build
+   npm run ios      # production build, copied into the Xcode project
    ```
+
+### The iPhone app
+
+The native app is a Capacitor shell around **a copy** of the production build:
+`webDir` is `dist`, and `ios/App/App/public` is where that copy lives. Xcode
+builds whatever is in that folder — it does not read `src/`, and it does not
+run Vite. So a change is only in the app once it has been built *and* copied:
+
+```bash
+npm run ios      # = npm run build && cap copy ios
+```
+
+Then build/run in Xcode. Skipping it is why an app can come out of Xcode
+looking exactly like the last time it was copied, however much has changed in
+`src/`. (`ios/App/App/public` is gitignored — it is build output.)
 
 - `/` — the public marketing page (no auth required, loads instantly).
 - `/login` — sign in / sign up (password or magic link).
 - `/app` — the product itself: dashboard, contacts, pipeline, templates,
   tags, settings. Gated by `RequireAuth`; signed-out visitors are redirected
   to `/login`.
+
+On a phone browser, `retrnapp.com` shows "the iPhone app is coming soon"
+instead of the product — see `src/components/layout/MobileWebGate.tsx`, which
+also lists the paths that stay open there (the QR landing page and the legal
+pages) and the hosts it applies to.
 
 The first time someone signs up, the app seeds **one clearly-labeled example
 contact** plus a small starter library of outreach templates into their

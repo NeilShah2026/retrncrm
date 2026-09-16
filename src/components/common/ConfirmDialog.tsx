@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
   open: boolean
@@ -40,6 +41,7 @@ export function ConfirmDialog({
 }: Props) {
   const [typed, setTyped] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  const isMobile = useIsMobile()
 
   React.useEffect(() => {
     if (open) setTyped('')
@@ -59,8 +61,11 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      {/* On a phone this is an action sheet: what's about to happen, centred,
+          over the button that does it. No close affordance — Cancel is right
+          there, as it is in a UIAlertController. */}
+      <DialogContent hideClose={isMobile} className="sm:max-w-md">
+        <DialogHeader className="text-center sm:text-left">
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>

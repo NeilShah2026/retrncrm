@@ -3,17 +3,17 @@ import { toast } from 'sonner'
 import { Mic } from 'lucide-react'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogHeader,
-  DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { contactRepo } from '@/services'
 import { parseSpokenContact } from '@/lib/voiceParse'
 import { fullName, todayISO } from '@/lib/format'
 import { dismissKeyboard } from '@/lib/keyboard'
-import { impactFeedback, successFeedback, tapFeedback } from '@/lib/haptics'
+import { impactFeedback, successFeedback } from '@/lib/haptics'
 import { isNative } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
@@ -133,28 +133,15 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
         }}
       >
         <DialogHeader>
-          <div className="grid h-11 grid-cols-[1fr_auto_1fr] items-center px-2">
-            <DialogClose asChild>
-              <button
-                type="button"
-                className="press text-ios-body justify-self-start px-2 py-2 text-brand"
-              >
-                Cancel
-              </button>
-            </DialogClose>
-            <DialogTitle className="text-ios-headline sm:text-ios-headline">New Contact</DialogTitle>
-            <button
-              type="button"
-              disabled={!canSave}
-              onClick={() => {
-                tapFeedback()
-                void save()
-              }}
-              className="press text-ios-body justify-self-end px-2 py-2 font-semibold text-brand disabled:text-muted-foreground/50"
-            >
-              {duplicate ? 'Add anyway' : 'Add'}
-            </button>
-          </div>
+          <SheetBar
+            leading={<SheetBarButton close>Cancel</SheetBarButton>}
+            title="New Contact"
+            trailing={
+              <SheetBarButton strong disabled={!canSave} onClick={() => void save()}>
+                {duplicate ? 'Add anyway' : 'Add'}
+              </SheetBarButton>
+            }
+          />
         </DialogHeader>
 
         <form

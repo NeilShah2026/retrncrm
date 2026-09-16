@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { isNative } from '@/lib/platform'
 
-type Theme = 'light' | 'dark' | 'system'
+export type Theme = 'light' | 'dark' | 'system'
 
 interface ThemeContextValue {
   theme: Theme

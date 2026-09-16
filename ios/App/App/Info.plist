@@ -67,7 +67,7 @@
 	<false/>
 	<!-- Taking or choosing a contact's photo (ContactFormDialog). -->
 	<key>NSCameraUsageDescription</key>
-	<string>Retrn uses your camera so you can take a photo for someone in your contacts.</string>
+	<string>Retrn uses your camera to scan someone's Retrn QR code, and to take a photo for a contact.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Retrn uses your photo library so you can choose a photo for someone in your contacts.</string>
 	<!-- Say-who-you-met voice capture and dictation in the assistant

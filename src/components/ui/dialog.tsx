@@ -2,7 +2,8 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { impactFeedback } from '@/lib/haptics'
+import { impactFeedback, tapFeedback } from '@/lib/haptics'
+import { dismissKeyboard } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
 
 const Dialog = DialogPrimitive.Root
@@ -17,7 +18,9 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/40 duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 dark:bg-black/60',
+      // Phone: `.sheet-overlay` fades on the sheet's own clock (index.css).
+      'sheet-overlay fixed inset-0 z-50 bg-black/40 dark:bg-black/60',
+      'sm:duration-fast sm:data-[state=open]:animate-in sm:data-[state=closed]:animate-out sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0',
       className,
     )}
     {...props}
@@ -25,47 +28,86 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-/** How far the sheet has to travel before letting go dismisses it. */
-const DISMISS_AT = 110
-
+/** Past this far, letting go of a dragged sheet dismisses it… */
+const DISMISS_AT = 120
+/** …as does flicking it down at this speed (px/ms), from a shorter pull. */
+const DISMISS_VELOCITY = 0.9
+/** How the sheet settles back when a drag doesn't dismiss it. */
+const SETTLE = 'transform 360ms var(--sheet-ease)'
 
 /**
- * Swipe-down-to-dismiss for the phone's bottom sheet. The grabber at the top
- * of a sheet is a promise that it can be dragged; this makes it true.
+ * Swipe-down-to-dismiss for the phone's bottom sheet, from the grabber or the
+ * bar under it. The sheet follows the finger one-to-one, the backdrop lightens
+ * as it goes, a flick dismisses as readily as a long pull, and a sheet that
+ * is let go of leaves from wherever it was rather than snapping back first.
  */
 function useSheetDrag() {
   const sheetRef = React.useRef<HTMLDivElement | null>(null)
   const closeRef = React.useRef<HTMLButtonElement | null>(null)
-  const startY = React.useRef<number | null>(null)
-  const offset = React.useRef(0)
+  const drag = React.useRef<{ startY: number; offset: number; lastY: number; lastT: number; velocity: number } | null>(null)
+
+  const overlay = () => {
+    const prev = sheetRef.current?.previousElementSibling
+    return prev instanceof HTMLElement && prev.classList.contains('sheet-overlay') ? prev : null
+  }
 
   const handlers = {
     onTouchStart(e: React.TouchEvent) {
-      if (window.innerWidth >= 640) return
-      startY.current = e.touches[0].clientY
-      offset.current = 0
-      if (sheetRef.current) sheetRef.current.style.transition = 'none'
+      const sheet = sheetRef.current
+      if (window.innerWidth >= 640 || !sheet || e.touches.length !== 1) return
+      const y = e.touches[0].clientY
+      drag.current = { startY: y, offset: 0, lastY: y, lastT: e.timeStamp, velocity: 0 }
+      sheet.style.transition = 'none'
+      const dim = overlay()
+      if (dim) dim.style.transition = 'none'
     },
     onTouchMove(e: React.TouchEvent) {
-      if (startY.current === null || !sheetRef.current) return
-      offset.current = Math.max(0, e.touches[0].clientY - startY.current)
-      sheetRef.current.style.transform = `translateY(${offset.current}px)`
+      const state = drag.current
+      const sheet = sheetRef.current
+      if (!state || !sheet) return
+      const y = e.touches[0].clientY
+      const dy = y - state.startY
+      // Upward, it gives a little and stops, as a sheet at its detent does.
+      state.offset = dy >= 0 ? dy : -Math.min(12, Math.sqrt(-dy) * 1.5)
+      const dt = e.timeStamp - state.lastT
+      if (dt > 0) state.velocity = (y - state.lastY) / dt
+      state.lastY = y
+      state.lastT = e.timeStamp
+      if (state.offset > 8) dismissKeyboard()
+      sheet.style.transform = `translate3d(0, ${state.offset}px, 0)`
+      const dim = overlay()
+      if (dim) dim.style.opacity = String(1 - Math.max(0, state.offset) / sheet.offsetHeight)
     },
     onTouchEnd() {
+      const state = drag.current
       const sheet = sheetRef.current
-      if (startY.current === null || !sheet) return
-      startY.current = null
-      sheet.style.transition = 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1)'
-      if (offset.current > DISMISS_AT) {
-        sheet.style.transform = 'translateY(100%)'
+      drag.current = null
+      if (!state || !sheet) return
+      const dim = overlay()
+      const flicked = state.velocity > DISMISS_VELOCITY && state.offset > 32
+      if (state.offset > DISMISS_AT || flicked) {
+        // The exit animation has no starting keyframe, so it begins from
+        // this inline position.
         closeRef.current?.click()
-      } else {
-        sheet.style.transform = ''
+        return
       }
+      sheet.style.transition = SETTLE
+      sheet.style.transform = ''
+      if (dim) {
+        dim.style.transition = 'opacity 360ms var(--sheet-ease)'
+        dim.style.opacity = ''
+      }
+      // Hand transitions back to the stylesheet (the keyboard-driven height)
+      // once it has settled.
+      window.setTimeout(() => {
+        if (drag.current) return
+        sheet.style.transition = ''
+        if (dim) dim.style.transition = ''
+      }, 380)
     },
   }
 
-  return { sheetRef, closeRef, handlers }
+  return { sheetRef, closeRef, handlers: { ...handlers, onTouchCancel: handlers.onTouchEnd } }
 }
 
 const DialogContent = React.forwardRef<
@@ -81,10 +123,18 @@ const DialogContent = React.forwardRef<
      * is the exception — that's what it's for.
      */
     autoFocusOnOpen?: boolean
+    /**
+     * On a phone, hold the sheet at its detent (three quarters of the screen)
+     * whatever its content, instead of fitting a short sheet to what's in it.
+     * For long forms and multi-step sheets, which would otherwise change
+     * height as their content does.
+     */
+    tall?: boolean
   }
->(({ className, children, hideClose, padded = true, autoFocusOnOpen, ...props }, ref) => {
+>(({ className, children, hideClose, padded = true, autoFocusOnOpen, tall, ...props }, ref) => {
   const { sheetRef, closeRef, handlers } = useSheetDrag()
   const isMobile = useIsMobile()
+  const [scrolled, setScrolled] = React.useState(false)
 
   // A sheet arriving is a physical event on iOS — it gets the same soft
   // knock UIKit gives a presented view controller.
@@ -121,21 +171,17 @@ const DialogContent = React.forwardRef<
         }}
         className={cn(
           'fixed z-50 flex flex-col bg-background shadow-modal outline-none',
-          // Mobile: a bottom sheet, at the corner radius iOS gives one. It
-          // never leaves the bottom edge: the keyboard rises *over* it, as it
-          // does over a native sheet, and a spacer at its foot (below) grows
-          // on the keyboard's curve to keep the content above it. Never
-          // reaches under the status bar.
-          'inset-x-0 bottom-0 max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] w-full rounded-t-[16px]',
+          // Mobile: a bottom sheet, at the corner radius iOS gives one, three
+          // quarters of the screen at most (`.sheet`, index.css). It never
+          // leaves the bottom edge: the keyboard rises *over* it, the sheet
+          // grows by the keyboard's height on the keyboard's curve, and a
+          // spacer at its foot (below) keeps the content above the keyboard.
+          'sheet inset-x-0 bottom-0 w-full rounded-t-[16px]',
+          tall && 'sheet-tall',
           // Desktop: a centred window, 10px radius, hairline + soft shadow.
-          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[92vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-modal',
-          'data-[state=open]:animate-in data-[state=closed]:animate-out',
-          // The phone's sheet travels its whole height on UIKit's own curve;
-          // a 24px peek reads as a web popover dropping into place.
-          'duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
-          'data-[state=open]:slide-in-from-bottom-[100%] data-[state=closed]:slide-out-to-bottom-[100%]',
-          'sm:duration-base sm:ease-out sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0',
-          'sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:zoom-in-[0.98] sm:data-[state=closed]:zoom-out-[0.98]',
+          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-modal',
+          'sm:duration-base sm:ease-out sm:data-[state=open]:animate-in sm:data-[state=closed]:animate-out sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0',
+          'sm:data-[state=open]:zoom-in-[0.98] sm:data-[state=closed]:zoom-out-[0.98]',
           className,
         )}
         {...props}
@@ -149,12 +195,24 @@ const DialogContent = React.forwardRef<
         </div>
 
         {header.length > 0 && (
-          <div className={cn('shrink-0', padded && 'px-5 pb-3 pt-2 sm:px-6 sm:pt-5')}>
+          <div
+            {...handlers}
+            className={cn(
+              'shrink-0 border-b border-transparent transition-colors duration-base',
+              // The bar picks up a hairline once content passes beneath it.
+              scrolled && 'border-border',
+              padded && 'px-5 pb-3 pt-2 sm:px-6 sm:pt-5',
+            )}
+          >
             {header}
           </div>
         )}
 
         <div
+          onScroll={(e) => {
+            const next = e.currentTarget.scrollTop > 2
+            setScrolled((prev) => (prev === next ? prev : next))
+          }}
           className={cn(
             'scroll-native min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain scrollbar-thin',
             padded && 'px-5 sm:px-6',
@@ -170,7 +228,7 @@ const DialogContent = React.forwardRef<
         {footer.length > 0 && (
           <div
             className={cn(
-              'shrink-0 border-t bg-background',
+              'shrink-0 border-t bg-inherit',
               padded &&
                 'keyboard-padding px-5 pb-[max(1.25rem,var(--safe-bottom))] pt-3 sm:px-6 sm:pb-6',
             )}
@@ -210,6 +268,60 @@ const DialogContent = React.forwardRef<
   )
 })
 DialogContent.displayName = DialogPrimitive.Content.displayName
+
+/**
+ * The bar iOS puts across the top of a sheet: a text action at each end and
+ * the title between them. Used with `hideClose` and `padded={false}`, inside
+ * a `DialogHeader`.
+ */
+function SheetBar({
+  leading,
+  title,
+  trailing,
+}: {
+  leading?: React.ReactNode
+  title: React.ReactNode
+  trailing?: React.ReactNode
+}) {
+  return (
+    <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-2">
+      <div className="flex justify-start">{leading}</div>
+      <DialogTitle className="text-ios-headline sm:text-ios-headline truncate px-1 text-center">
+        {title}
+      </DialogTitle>
+      <div className="flex justify-end">{trailing}</div>
+    </div>
+  )
+}
+
+/**
+ * A text button in a `SheetBar`. `strong` is the sheet's confirming action
+ * (Add, Save, Done), set in semibold as iOS sets it; `close` makes it dismiss
+ * the sheet.
+ */
+const SheetBarButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { strong?: boolean; close?: boolean }
+>(({ strong, close, className, onClick, ...props }, ref) => {
+  const button = (
+    <button
+      ref={ref}
+      type="button"
+      onClick={(e) => {
+        tapFeedback()
+        onClick?.(e)
+      }}
+      className={cn(
+        'press text-ios-body max-w-full truncate px-2 py-2 text-brand disabled:text-muted-foreground/50',
+        strong && 'font-semibold',
+        className,
+      )}
+      {...props}
+    />
+  )
+  return close ? <DialogClose asChild>{button}</DialogClose> : button
+})
+SheetBarButton.displayName = 'SheetBarButton'
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -282,4 +394,6 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  SheetBar,
+  SheetBarButton,
 }

@@ -7,6 +7,7 @@ import { AssistantProvider } from '@/context/assistant-context'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { MobileWebGate } from '@/components/layout/MobileWebGate'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { AssistantPage } from '@/pages/AssistantPage'
 import { ContactsPage } from '@/pages/ContactsPage'
@@ -17,6 +18,7 @@ import { PipelinePage } from '@/pages/PipelinePage'
 import { CollegePage } from '@/pages/CollegePage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MorePage } from '@/pages/MorePage'
+import { QrPage } from '@/pages/QrPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -60,6 +62,7 @@ function AppEntry() {
               <Route path="pipeline" element={<PipelinePage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="tags" element={<TagsPage />} />
+              <Route path="qr" element={<QrPage />} />
               <Route path="more" element={<MorePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
@@ -77,22 +80,27 @@ export default function App() {
       <TooltipProvider delayDuration={200}>
         <AuthProvider>
           <BrowserRouter>
-            <Routes>
-              {/* The marketing site is a "visit our website" pitch — inside
-                  the native app there's no browser to have arrived from, so
-                  "/" goes straight to the product (RequireAuth sends signed-
-                  out visitors on to /login from there). */}
-              <Route
-                path={ROUTES.home}
-                element={isNative ? <Navigate to={ROUTES.app} replace /> : <LandingPage />}
-              />
-              <Route path={ROUTES.login} element={<LoginPage />} />
-              <Route path={ROUTES.add} element={<AddContactPage />} />
-              <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />
-              <Route path={ROUTES.terms} element={<TermsPage />} />
-              <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
-              <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
-            </Routes>
+            {/* On a phone, on the app-only hosts, everything but the QR
+                landing page and the legal pages gives way to "the app is
+                coming". See MobileWebGate. */}
+            <MobileWebGate>
+              <Routes>
+                {/* The marketing site is a "visit our website" pitch — inside
+                    the native app there's no browser to have arrived from, so
+                    "/" goes straight to the product (RequireAuth sends signed-
+                    out visitors on to /login from there). */}
+                <Route
+                  path={ROUTES.home}
+                  element={isNative ? <Navigate to={ROUTES.app} replace /> : <LandingPage />}
+                />
+                <Route path={ROUTES.login} element={<LoginPage />} />
+                <Route path={ROUTES.add} element={<AddContactPage />} />
+                <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />
+                <Route path={ROUTES.terms} element={<TermsPage />} />
+                <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />
+                <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
+              </Routes>
+            </MobileWebGate>
           </BrowserRouter>
         </AuthProvider>
         <ThemedToaster />

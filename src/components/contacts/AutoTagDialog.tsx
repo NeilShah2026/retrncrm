@@ -7,10 +7,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
+import { InsetCheckRow, InsetGroup } from '@/components/ui/inset-list'
 import { useContacts, useTags } from '@/hooks/useData'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { contactRepo } from '@/services'
 import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { suggestTagsForContacts, type BulkTagResult } from '@/lib/ai/tagging'
@@ -58,6 +62,7 @@ const key = (contactId: string, name: string): Key => `${contactId}::${name}`
 export function AutoTagDialog({ open, onOpenChange }: Props) {
   const contacts = useContacts() ?? []
   const tags = useTags() ?? []
+  const isMobile = useIsMobile()
 
   const [scope, setScope] = React.useState<Scope>('untagged')
   const [phase, setPhase] = React.useState<Phase>('setup')
@@ -247,209 +252,406 @@ export function AutoTagDialog({ open, onOpenChange }: Props) {
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+  const runLabel =
+    pool.length === 0
+      ? 'Nobody to tag'
+      : `Read ${Math.min(pool.length, MAX_PER_RUN)} ${
+          Math.min(pool.length, MAX_PER_RUN) === 1 ? 'person' : 'people'
+        }`
+
+  /** The phone's version: a sheet of grouped rows, one action at its foot. */
+  function renderPhone() {
+    return (
+      <DialogContent
+        // At the tall detent only once there are results to scroll: the two
+        // setup rows fit a short sheet, and a void under them reads as a bug.
+        tall={phase === 'review' || phase === 'applying'}
+        hideClose
+        padded={false}
+        className="bg-grouped"
+        aria-describedby={undefined}
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Tags className="h-4 w-4 text-muted-foreground" />
-            Suggest tags
-          </DialogTitle>
-          <DialogDescription>
-            {phase === 'review'
-              ? 'Uncheck anything you disagree with. Nothing is saved until you apply, and existing tags are never removed.'
-              : 'Reads what you already wrote about each person and proposes tags — reusing the tags you have wherever they fit.'}
-          </DialogDescription>
+          <SheetBar
+            leading={
+              phase === 'review' || phase === 'applying' ? (
+                <SheetBarButton disabled={phase === 'applying'} onClick={() => setPhase('setup')}>
+                  Back
+                </SheetBarButton>
+              ) : (
+                <SheetBarButton close>Cancel</SheetBarButton>
+              )
+            }
+            title="Suggest Tags"
+            trailing={
+              phase === 'review' && rows.length > 0 ? (
+                <SheetBarButton onClick={() => setAll(chosenCount === 0)}>
+                  {chosenCount === 0 ? 'Select All' : 'None'}
+                </SheetBarButton>
+              ) : undefined
+            }
+          />
         </DialogHeader>
 
-        {phase === 'setup' && (
-          <div className="space-y-3">
-            <ScopeOption
-              label="People with no tags"
-              count={untagged.length}
-              active={scope === 'untagged'}
-              onSelect={() => setScope('untagged')}
-              hint="The usual pass — everyone you never got round to tagging."
-            />
-            <ScopeOption
-              label="Everyone"
-              count={contacts.length}
-              active={scope === 'all'}
-              onSelect={() => setScope('all')}
-              hint="Also proposes additions for people who already have tags."
-            />
-            {pool.length > MAX_PER_RUN && (
-              <p className="text-xs text-muted-foreground">
-                This pass reads {MAX_PER_RUN} people at a time, starting with the
-                ones you've written most about. Run it again for the rest.
-              </p>
-            )}
-          </div>
-        )}
-
-        {phase === 'running' && (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            <p className="text-sm">
-              Read {progress.done} of {progress.total} people…
-            </p>
-            <div className="h-1.5 w-56 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-foreground transition-all"
-                style={{
-                  width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
-                }}
-              />
-            </div>
-            <Button variant="ghost" size="sm" onClick={cancelRun}>
-              Cancel
-            </Button>
-          </div>
-        )}
-
-        {(phase === 'review' || phase === 'applying') && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                {chosenCount} {chosenCount === 1 ? 'tag' : 'tags'} across{' '}
-                {peopleCount} {peopleCount === 1 ? 'person' : 'people'}
-                {skipped > 0 && ` · ${skipped} not read this pass`}
-              </span>
-              {rows.length > 0 && (
-                <span className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setAll(true)}
-                    className="rounded px-1.5 py-0.5 hover:bg-accent"
-                  >
-                    Select all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAll(false)}
-                    className="rounded px-1.5 py-0.5 hover:bg-accent"
-                  >
-                    None
-                  </button>
-                </span>
-              )}
-            </div>
-
-            {degraded && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                Some of this pass ran without AI — those suggestions are matches
-                against tags you already have.
-              </p>
-            )}
-
-            {rows.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Nothing to suggest. There isn't enough on these records yet — a
-                company, school, or a line of notes is usually enough.
-              </p>
-            ) : (
-              <div className="max-h-[45vh] space-y-1 overflow-y-auto scrollbar-thin pr-1">
-                {rows.map(({ contact, suggestions }) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-accent/40"
-                  >
-                    <ContactAvatar contact={contact} className="h-7 w-7 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
-                        {fullName(contact)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[contact.jobTitle, contact.company]
-                          .filter(Boolean)
-                          .join(' · ') || 'No company on file'}
-                      </p>
-                    </div>
-                    <div className="flex max-w-[55%] flex-wrap justify-end gap-1">
-                      {suggestions.map((s) => {
-                        const on = selected.has(key(contact.id, s.name))
-                        const color = s.tagId
-                          ? tagColor(tags.find((t) => t.id === s.tagId)?.color ?? 'slate')
-                          : null
-                        return (
-                          <button
-                            key={s.name}
-                            type="button"
-                            disabled={phase === 'applying'}
-                            onClick={() => toggle(contact.id, s.name)}
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity',
-                              on
-                                ? color?.badge ??
-                                    'bg-secondary text-text-secondary'
-                                : 'border border-dashed text-muted-foreground opacity-60',
-                            )}
-                          >
-                            {on ? (
-                              <Check className="h-3 w-3" />
-                            ) : (
-                              <X className="h-3 w-3" />
-                            )}
-                            {s.name}
-                            {!s.tagId && <span className="opacity-60">new</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <DialogFooter>
+        <div className="space-y-6 px-4 pb-6 pt-1">
           {phase === 'setup' && (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <p className="text-ios-subhead px-1 text-muted-foreground">
+                Reads what you already wrote about each person and proposes tags — reusing the
+                tags you have wherever they fit. Nothing is saved until you approve it.
+              </p>
+              <InsetGroup
+                footer={
+                  pool.length > MAX_PER_RUN
+                    ? `Reads ${MAX_PER_RUN} people at a time, starting with the ones you’ve written most about. Run it again for the rest.`
+                    : undefined
+                }
+              >
+                <InsetCheckRow
+                  role="radio"
+                  label="People with no tags"
+                  subtitle="Everyone you never got round to tagging."
+                  detail={untagged.length}
+                  checked={scope === 'untagged'}
+                  onToggle={() => setScope('untagged')}
+                />
+                <InsetCheckRow
+                  role="radio"
+                  label="Everyone"
+                  subtitle="Also proposes additions for people who already have tags."
+                  detail={contacts.length}
+                  checked={scope === 'all'}
+                  onToggle={() => setScope('all')}
+                  last
+                />
+              </InsetGroup>
+            </>
+          )}
+
+          {phase === 'running' && (
+            <div className="flex flex-col items-center gap-3 py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <p className="text-ios-subhead tnum">
+                Read {progress.done} of {progress.total} people…
+              </p>
+              <div className="h-1.5 w-56 overflow-hidden rounded-full bg-foreground/10">
+                <div
+                  className="h-full rounded-full bg-foreground transition-all"
+                  style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <button type="button" onClick={cancelRun} className="press text-ios-body mt-2 text-brand">
                 Cancel
-              </Button>
+              </button>
+            </div>
+          )}
+
+          {(phase === 'review' || phase === 'applying') && (
+            <>
+              <p className="text-ios-subhead tnum px-1 text-muted-foreground">
+                {chosenCount} {chosenCount === 1 ? 'tag' : 'tags'} across {peopleCount}{' '}
+                {peopleCount === 1 ? 'person' : 'people'}
+                {skipped > 0 && ` · ${skipped} not read this pass`}
+              </p>
+
+              {degraded && (
+                <p className="text-ios-footnote rounded-[12px] bg-warning-soft px-4 py-3 text-warning">
+                  Some of this pass ran without AI — those suggestions are matches against tags
+                  you already have.
+                </p>
+              )}
+
+              {rows.length === 0 ? (
+                <p className="text-ios-subhead px-1 py-8 text-center text-muted-foreground">
+                  Nothing to suggest. There isn’t enough on these records yet — a company,
+                  school, or a line of notes is usually enough.
+                </p>
+              ) : (
+                <InsetGroup footer="Tap a tag to drop it. Existing tags are never removed.">
+                  {rows.map(({ contact, suggestions }, i) => (
+                    <div key={contact.id} className="flex items-stretch gap-3 pl-4">
+                      <span className="flex shrink-0 items-start pt-2.5">
+                        <ContactAvatar contact={contact} className="h-8 w-8" />
+                      </span>
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 py-2.5 pr-4',
+                          i < rows.length - 1 && 'hairline-b',
+                        )}
+                      >
+                        <span className="text-ios-body block truncate">{fullName(contact)}</span>
+                        <span className="text-ios-footnote block truncate text-muted-foreground">
+                          {[contact.jobTitle, contact.company].filter(Boolean).join(' · ') ||
+                            'No company on file'}
+                        </span>
+                        <span className="mt-2 flex flex-wrap gap-1.5">
+                          {suggestions.map((s) => {
+                            const on = selected.has(key(contact.id, s.name))
+                            const color = s.tagId
+                              ? tagColor(tags.find((t) => t.id === s.tagId)?.color ?? 'slate')
+                              : null
+                            return (
+                              <button
+                                key={s.name}
+                                type="button"
+                                aria-pressed={on}
+                                disabled={phase === 'applying'}
+                                onClick={() => toggle(contact.id, s.name)}
+                                className={cn(
+                                  'press-scale text-ios-footnote inline-flex h-8 items-center gap-1 rounded-full px-3 font-medium',
+                                  on
+                                    ? color?.badge ?? 'bg-secondary text-text-secondary'
+                                    : 'text-muted-foreground line-through ring-1 ring-inset ring-border',
+                                )}
+                              >
+                                {s.name}
+                                {!s.tagId && <span className="opacity-60">new</span>}
+                              </button>
+                            )
+                          })}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </InsetGroup>
+              )}
+            </>
+          )}
+        </div>
+
+        {phase !== 'running' && (
+          <DialogFooter className="px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
+            {phase === 'setup' ? (
               <Button
                 onClick={() => void run()}
                 disabled={pool.length === 0}
-                className="gap-2"
+                className="text-ios-headline"
               >
-                <Tags className="h-4 w-4" />
-                {pool.length === 0
-                  ? 'Nobody to tag'
-                  : `Read ${Math.min(pool.length, MAX_PER_RUN)} ${
-                      Math.min(pool.length, MAX_PER_RUN) === 1 ? 'person' : 'people'
-                    }`}
+                {runLabel}
               </Button>
-            </>
-          )}
-          {(phase === 'review' || phase === 'applying') && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setPhase('setup')}
-                disabled={phase === 'applying'}
-              >
-                Back
-              </Button>
+            ) : (
               <Button
                 onClick={() => void apply()}
                 disabled={chosenCount === 0 || phase === 'applying'}
-                className="gap-2"
+                loading={phase === 'applying'}
+                className="text-ios-headline"
               >
-                {phase === 'applying' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                {phase === 'applying'
-                  ? 'Applying…'
-                  : `Apply to ${peopleCount} ${peopleCount === 1 ? 'person' : 'people'}`}
+                {`Apply to ${peopleCount} ${peopleCount === 1 ? 'person' : 'people'}`}
               </Button>
-            </>
-          )}
-        </DialogFooter>
+            )}
+          </DialogFooter>
+        )}
       </DialogContent>
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {isMobile ? (
+        renderPhone()
+      ) : (
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tags className="h-4 w-4 text-muted-foreground" />
+              Suggest tags
+            </DialogTitle>
+            <DialogDescription>
+              {phase === 'review'
+                ? 'Uncheck anything you disagree with. Nothing is saved until you apply, and existing tags are never removed.'
+                : 'Reads what you already wrote about each person and proposes tags — reusing the tags you have wherever they fit.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {phase === 'setup' && (
+            <div className="space-y-3">
+              <ScopeOption
+                label="People with no tags"
+                count={untagged.length}
+                active={scope === 'untagged'}
+                onSelect={() => setScope('untagged')}
+                hint="The usual pass — everyone you never got round to tagging."
+              />
+              <ScopeOption
+                label="Everyone"
+                count={contacts.length}
+                active={scope === 'all'}
+                onSelect={() => setScope('all')}
+                hint="Also proposes additions for people who already have tags."
+              />
+              {pool.length > MAX_PER_RUN && (
+                <p className="text-xs text-muted-foreground">
+                  This pass reads {MAX_PER_RUN} people at a time, starting with the
+                  ones you've written most about. Run it again for the rest.
+                </p>
+              )}
+            </div>
+          )}
+
+          {phase === 'running' && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <p className="text-sm">
+                Read {progress.done} of {progress.total} people…
+              </p>
+              <div className="h-1.5 w-56 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-foreground transition-all"
+                  style={{
+                    width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <Button variant="ghost" size="sm" onClick={cancelRun}>
+                Cancel
+              </Button>
+            </div>
+          )}
+
+          {(phase === 'review' || phase === 'applying') && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {chosenCount} {chosenCount === 1 ? 'tag' : 'tags'} across{' '}
+                  {peopleCount} {peopleCount === 1 ? 'person' : 'people'}
+                  {skipped > 0 && ` · ${skipped} not read this pass`}
+                </span>
+                {rows.length > 0 && (
+                  <span className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAll(true)}
+                      className="rounded px-1.5 py-0.5 hover:bg-accent"
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAll(false)}
+                      className="rounded px-1.5 py-0.5 hover:bg-accent"
+                    >
+                      None
+                    </button>
+                  </span>
+                )}
+              </div>
+
+              {degraded && (
+                <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Some of this pass ran without AI — those suggestions are matches
+                  against tags you already have.
+                </p>
+              )}
+
+              {rows.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nothing to suggest. There isn't enough on these records yet — a
+                  company, school, or a line of notes is usually enough.
+                </p>
+              ) : (
+                <div className="max-h-[45vh] space-y-1 overflow-y-auto scrollbar-thin pr-1">
+                  {rows.map(({ contact, suggestions }) => (
+                    <div
+                      key={contact.id}
+                      className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-accent/40"
+                    >
+                      <ContactAvatar contact={contact} className="h-7 w-7 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {fullName(contact)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[contact.jobTitle, contact.company]
+                            .filter(Boolean)
+                            .join(' · ') || 'No company on file'}
+                        </p>
+                      </div>
+                      <div className="flex max-w-[55%] flex-wrap justify-end gap-1">
+                        {suggestions.map((s) => {
+                          const on = selected.has(key(contact.id, s.name))
+                          const color = s.tagId
+                            ? tagColor(tags.find((t) => t.id === s.tagId)?.color ?? 'slate')
+                            : null
+                          return (
+                            <button
+                              key={s.name}
+                              type="button"
+                              disabled={phase === 'applying'}
+                              onClick={() => toggle(contact.id, s.name)}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-opacity',
+                                on
+                                  ? color?.badge ??
+                                      'bg-secondary text-text-secondary'
+                                  : 'border border-dashed text-muted-foreground opacity-60',
+                              )}
+                            >
+                              {on ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                              {s.name}
+                              {!s.tagId && <span className="opacity-60">new</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {phase === 'setup' && (
+              <>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void run()}
+                  disabled={pool.length === 0}
+                  className="gap-2"
+                >
+                  <Tags className="h-4 w-4" />
+                  {pool.length === 0
+                    ? 'Nobody to tag'
+                    : `Read ${Math.min(pool.length, MAX_PER_RUN)} ${
+                        Math.min(pool.length, MAX_PER_RUN) === 1 ? 'person' : 'people'
+                      }`}
+                </Button>
+              </>
+            )}
+            {(phase === 'review' || phase === 'applying') && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setPhase('setup')}
+                  disabled={phase === 'applying'}
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={() => void apply()}
+                  disabled={chosenCount === 0 || phase === 'applying'}
+                  className="gap-2"
+                >
+                  {phase === 'applying' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                  {phase === 'applying'
+                    ? 'Applying…'
+                    : `Apply to ${peopleCount} ${peopleCount === 1 ? 'person' : 'people'}`}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      )}
     </Dialog>
   )
 }

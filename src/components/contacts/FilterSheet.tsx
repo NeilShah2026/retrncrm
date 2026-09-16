@@ -1,15 +1,22 @@
 import * as React from 'react'
-import { Check, CircleX, SlidersHorizontal, X } from 'lucide-react'
+import { SlidersHorizontal, X } from 'lucide-react'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
+  SheetBar,
+  SheetBarButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { InsetGroup } from '@/components/ui/inset-list'
+import {
+  Collapsible,
+  InsetCheckRow,
+  InsetDateRow,
+  InsetGroup,
+  InsetRow,
+  Switch,
+} from '@/components/ui/inset-list'
 import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
@@ -174,36 +181,43 @@ export function ActiveFilterChips({
     }
   }
 
-  if (chips.length === 0) return null
+  // The row eases open and shut rather than appearing in one frame and
+  // shoving the list down; while it closes it keeps showing the chips it had.
+  const shown = React.useRef(chips)
+  if (chips.length > 0) shown.current = chips
 
   return (
-    <div className="scroll-x-chips -mx-4 mt-2 flex items-center gap-2 pl-4">
-      {chips.map((chip) => (
+    // Bleeds to the screen edges (the -mx-4 is on the clipping box itself,
+    // or the chips would be cut off at the toolbar's padding).
+    <Collapsible open={chips.length > 0} className="-mx-4">
+      <div className="scroll-x-chips flex items-center gap-2 pl-4 pt-2">
+        {shown.current.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            onClick={() => {
+              selectionFeedback()
+              chip.remove()
+            }}
+            aria-label={`Remove filter: ${typeof chip.label === 'string' ? chip.label : 'tag'}`}
+            className="press text-ios-subhead flex h-8 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-full bg-bg-sunken pl-3 pr-2 text-foreground"
+          >
+            <span className="flex min-w-0 items-center gap-1.5 truncate">{chip.label}</span>
+            <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2.5} />
+          </button>
+        ))}
         <button
-          key={chip.key}
           type="button"
           onClick={() => {
-            selectionFeedback()
-            chip.remove()
+            tapFeedback()
+            onChange(EMPTY_FILTERS)
           }}
-          aria-label={`Remove filter: ${typeof chip.label === 'string' ? chip.label : 'tag'}`}
-          className="press text-ios-subhead flex h-8 max-w-[14rem] shrink-0 items-center gap-1.5 rounded-full bg-bg-sunken pl-3 pr-2 text-foreground"
+          className="press text-ios-subhead h-8 shrink-0 px-1 text-brand"
         >
-          <span className="flex min-w-0 items-center gap-1.5 truncate">{chip.label}</span>
-          <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={2.5} />
+          Clear
         </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => {
-          tapFeedback()
-          onChange(EMPTY_FILTERS)
-        }}
-        className="press text-ios-subhead h-8 shrink-0 px-1 text-brand"
-      >
-        Clear
-      </button>
-    </div>
+      </div>
+    </Collapsible>
   )
 }
 
@@ -241,39 +255,42 @@ export function FilterSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent hideClose padded={false} aria-describedby={undefined} className="sm:max-w-md">
+      <DialogContent
+        tall
+        hideClose
+        padded={false}
+        aria-describedby={undefined}
+        className="bg-grouped sm:max-w-md"
+      >
         {/* The bar iOS puts on a sheet: undo on the left, done on the right. */}
         <DialogHeader>
-          <div className="grid h-11 grid-cols-[1fr_auto_1fr] items-center px-2">
-            <button
-              type="button"
-              disabled={!changed}
-              onClick={() => {
-                tapFeedback()
-                onChange(EMPTY_FILTERS)
-                onSortChange(DEFAULT_SORT)
-              }}
-              className="press text-ios-body justify-self-start px-2 py-2 text-brand disabled:text-muted-foreground/50"
-            >
-              Reset
-            </button>
-            <DialogTitle className="text-ios-headline sm:text-ios-headline">Sort & Filter</DialogTitle>
-            <DialogClose asChild>
-              <button
-                type="button"
-                className="press text-ios-body justify-self-end px-2 py-2 font-semibold text-brand"
+          <SheetBar
+            leading={
+              <SheetBarButton
+                disabled={!changed}
+                onClick={() => {
+                  onChange(EMPTY_FILTERS)
+                  onSortChange(DEFAULT_SORT)
+                }}
               >
+                Reset
+              </SheetBarButton>
+            }
+            title="Sort & Filter"
+            trailing={
+              <SheetBarButton strong close>
                 Done
-              </button>
-            </DialogClose>
-          </div>
+              </SheetBarButton>
+            }
+          />
         </DialogHeader>
 
-        <div className="space-y-7 px-4 pb-6 pt-3">
+        <div className="space-y-6 px-4 pb-6 pt-2">
           <InsetGroup title="Sort by">
             {SORTS.map((option, i) => (
-              <CheckRow
+              <InsetCheckRow
                 key={option.key}
+                role="radio"
                 label={option.label}
                 checked={sort.key === option.key}
                 last={i === SORTS.length - 1}
@@ -286,10 +303,14 @@ export function FilterSheet({
           </InsetGroup>
 
           <InsetGroup footer="People past the catch-up goal you set for them.">
-            <SwitchRow
-              label="Overdue to catch up"
+            <InsetRow
+              title="Overdue to catch up"
+              role="switch"
               checked={filters.overdueOnly}
-              onToggle={() => set({ overdueOnly: !filters.overdueOnly })}
+              chevron={false}
+              accessory={<Switch checked={filters.overdueOnly} />}
+              last
+              onClick={() => set({ overdueOnly: !filters.overdueOnly })}
             />
           </InsetGroup>
 
@@ -313,7 +334,7 @@ export function FilterSheet({
 
           <InsetGroup title="Relationship">
             {[5, 4, 3, 2, 1].map((n, i) => (
-              <CheckRow
+              <InsetCheckRow
                 key={n}
                 label={STRENGTH_LABELS[n]}
                 checked={filters.strengths.includes(n)}
@@ -350,13 +371,15 @@ export function FilterSheet({
           </ChipSection>
 
           <InsetGroup title="Date met">
-            <DateRow
+            <InsetDateRow
               label="After"
+              placeholder="Any date"
               value={filters.metFrom}
               onChange={(metFrom) => set({ metFrom })}
             />
-            <DateRow
+            <InsetDateRow
               label="Before"
+              placeholder="Any date"
               value={filters.metTo}
               onChange={(metTo) => set({ metTo })}
               last
@@ -389,8 +412,8 @@ export function FilterSheet({
           )}
         </div>
 
-        <DialogFooter className="keyboard-padding px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
-          <Button onClick={() => onOpenChange(false)} className="text-[17px] font-semibold">
+        <DialogFooter className="px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
+          <Button onClick={() => onOpenChange(false)} className="text-ios-headline">
             {resultCount === 0
               ? 'No one matches'
               : `Show ${resultCount} ${resultCount === 1 ? 'person' : 'people'}`}
@@ -398,85 +421,6 @@ export function FilterSheet({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/** A row that's on or off: a trailing checkmark, as in a Settings picker. */
-function CheckRow({
-  label,
-  checked,
-  onToggle,
-  last,
-}: {
-  label: React.ReactNode
-  checked: boolean
-  onToggle: () => void
-  last?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      onClick={onToggle}
-      className="press-row flex w-full items-stretch pl-4 text-left"
-    >
-      <span
-        className={cn(
-          'flex min-h-[44px] min-w-0 flex-1 items-center gap-3 py-2.5 pr-4',
-          !last && 'hairline-b',
-        )}
-      >
-        <span className="text-ios-body min-w-0 flex-1 truncate">{label}</span>
-        <Check
-          aria-hidden
-          strokeWidth={2.6}
-          className={cn(
-            'h-[18px] w-[18px] shrink-0 text-brand transition-[opacity,transform] duration-base ease-[var(--ease-spring)]',
-            checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
-          )}
-        />
-      </span>
-    </button>
-  )
-}
-
-/** A row with an iOS switch at its end; the whole row is the target. */
-function SwitchRow({
-  label,
-  checked,
-  onToggle,
-}: {
-  label: string
-  checked: boolean
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onToggle}
-      className="flex w-full items-center gap-3 py-1.5 pl-4 pr-3 text-left"
-    >
-      <span className="text-ios-body min-w-0 flex-1">{label}</span>
-      <span
-        aria-hidden
-        className={cn(
-          'relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200 ease-out',
-          checked ? 'bg-success' : 'bg-foreground/15',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute left-[2px] top-[2px] h-[27px] w-[27px] rounded-full bg-white',
-            'shadow-[0_3px_8px_rgba(0,0,0,0.15),0_1px_1px_rgba(0,0,0,0.16)]',
-            'transition-transform duration-300 ease-[var(--ease-spring)]',
-            checked && 'translate-x-5',
-          )}
-        />
-      </span>
-    </button>
   )
 }
 
@@ -492,7 +436,7 @@ function ChipSection({
 }) {
   return (
     <section>
-      <h2 className="text-ios-footnote px-4 pb-2 font-medium uppercase tracking-[0.05em] text-muted-foreground">
+      <h2 className="text-ios-footnote px-4 pb-1.5 uppercase tracking-[0.02em] text-muted-foreground">
         {title}
       </h2>
       <div className="flex flex-wrap gap-2">{children}</div>
@@ -519,67 +463,11 @@ function Chip({
         'press-scale text-ios-subhead inline-flex h-9 items-center gap-1.5 rounded-full px-3.5',
         selected
           ? 'bg-primary text-primary-foreground'
-          : 'bg-bg-sunken text-foreground ring-1 ring-inset ring-border/60',
+          : 'bg-grouped-cell text-foreground',
       )}
     >
       {children}
     </button>
-  )
-}
-
-/**
- * A date as a row. The real `<input type="date">` lies invisibly over it, so
- * a tap opens iOS's own calendar rather than a web date field.
- */
-function DateRow({
-  label,
-  value,
-  onChange,
-  last,
-}: {
-  label: string
-  value?: string
-  onChange: (value: string | undefined) => void
-  last?: boolean
-}) {
-  return (
-    <div className="relative flex w-full items-stretch pl-4">
-      <span
-        className={cn(
-          'flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 pr-3',
-          !last && 'hairline-b',
-        )}
-      >
-        <span className="text-ios-body shrink-0">{label}</span>
-        <span
-          className={cn(
-            'text-ios-body truncate',
-            value ? 'text-foreground' : 'text-muted-foreground',
-            // Leaves the clear button's slot free of the invisible input.
-            value && 'pr-9',
-          )}
-        >
-          {value ? formatDate(value) : 'Any date'}
-        </span>
-      </span>
-      <input
-        type="date"
-        aria-label={`Met ${label.toLowerCase()}`}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        className={cn('absolute inset-y-0 left-0 h-full opacity-0', value ? 'right-11' : 'right-0')}
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange(undefined)}
-          aria-label={`Clear the ${label.toLowerCase()} date`}
-          className="press absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-muted-foreground/70"
-        >
-          <CircleX className="h-[18px] w-[18px]" />
-        </button>
-      )}
-    </div>
   )
 }
 
@@ -609,7 +497,7 @@ function OptionList({
   return (
     <InsetGroup title={title}>
       {shown.map((v, i) => (
-        <CheckRow
+        <InsetCheckRow
           key={v}
           label={v}
           checked={selected.includes(v)}
