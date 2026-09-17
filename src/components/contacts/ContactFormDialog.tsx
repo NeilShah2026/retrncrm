@@ -54,6 +54,8 @@ import { TagSuggestBar } from './TagSuggestBar'
 import { contactRepo } from '@/services'
 import { useContacts } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useAuth } from '@/auth/AuthProvider'
+import { defaultContactFrequency } from '@/lib/onboarding'
 import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
@@ -133,6 +135,12 @@ interface FormState {
 function initialState(
   contact?: Contact | null,
   prefill?: Partial<Contact>,
+  /**
+   * The reconnect goal a *new* contact starts on, chosen during onboarding.
+   * Only ever a default: an existing contact keeps whatever it has, and a
+   * prefill that already carries a goal keeps that.
+   */
+  defaultFrequency: ContactFrequency = 'none',
 ): FormState {
   // Editing an existing contact always wins; otherwise a prefill (voice
   // capture, LinkedIn paste) seeds the blank form.
@@ -161,7 +169,7 @@ function initialState(
     tagIds: contactValues?.tagIds ?? [],
     relationshipStrength: contactValues?.relationshipStrength ?? 3,
     lastContactDate: contactValues?.lastContactDate ?? '',
-    contactFrequencyGoal: contactValues?.contactFrequencyGoal ?? 'none',
+    contactFrequencyGoal: contactValues?.contactFrequencyGoal ?? defaultFrequency,
     notes: contactValues?.notes ?? '',
   }
 }
@@ -182,10 +190,12 @@ export function ContactFormDialog({
   onSaved,
 }: Props) {
   const editing = Boolean(contact)
+  const { user } = useAuth()
   const isMobile = useIsMobile()
   const allContacts = useContacts() ?? []
+  const defaultFrequency = defaultContactFrequency(user)
   const [form, setForm] = React.useState<FormState>(() =>
-    initialState(contact, prefill),
+    initialState(contact, prefill, defaultFrequency),
   )
   const [expanded, setExpanded] = React.useState(false)
   const [duplicates, setDuplicates] = React.useState<Contact[]>([])
@@ -257,7 +267,7 @@ export function ContactFormDialog({
   // Reset the form whenever the dialog is (re)opened for a new target.
   React.useEffect(() => {
     if (open) {
-      setForm(initialState(contact, prefill))
+      setForm(initialState(contact, prefill, defaultFrequency))
       // A prefill has already filled fields that live below the fold — open
       // the extra section so nothing arrives hidden.
       setExpanded(Boolean(contact) || Boolean(prefill) || Boolean(focusField))
@@ -265,7 +275,7 @@ export function ContactFormDialog({
       setLiOpen(false)
       setLiText('')
     }
-  }, [open, contact, prefill, focusField])
+  }, [open, contact, prefill, focusField, defaultFrequency])
 
   /*
    * Opened onto a particular field ("Add email" on someone's page): wait for

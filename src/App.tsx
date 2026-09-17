@@ -18,6 +18,8 @@ import { PipelinePage } from '@/pages/PipelinePage'
 import { CollegePage } from '@/pages/CollegePage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MorePage } from '@/pages/MorePage'
+import { OnboardingPage } from '@/pages/OnboardingPage'
+import { SubscriptionPage } from '@/pages/SubscriptionPage'
 import { QrPage } from '@/pages/QrPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
@@ -52,6 +54,9 @@ function AppEntry() {
       <AssistantProvider>
         <UIProvider>
           <Routes>
+            {/* Outside AppLayout on purpose — onboarding covers the whole
+                screen, tab bar included. */}
+            <Route path="welcome" element={<OnboardingPage />} />
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
               <Route path="assistant" element={<AssistantPage />} />
@@ -64,6 +69,7 @@ function AppEntry() {
               <Route path="tags" element={<TagsPage />} />
               <Route path="qr" element={<QrPage />} />
               <Route path="more" element={<MorePage />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={ROUTES.dashboard} replace />} />
             </Route>

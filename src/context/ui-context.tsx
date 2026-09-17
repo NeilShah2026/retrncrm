@@ -5,8 +5,8 @@ import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { QuickAddSheet } from '@/components/contacts/QuickAddSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { CommandPalette } from '@/components/search/CommandPalette'
-import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useAuth } from '@/auth/AuthProvider'
+import { hasOnboarded } from '@/lib/onboarding'
 import { useAssistant } from '@/context/assistant-context'
 import { ROUTES } from '@/lib/routes'
 import type { Contact } from '@/types'
@@ -22,7 +22,8 @@ interface UIContextValue {
    * It's a screen rather than a dialog now, so this navigates.
    */
   openAssistant: (question?: string) => void
-  openWelcomeTour: () => void
+  /** Runs the first-run flow again, from Settings. */
+  openOnboarding: () => void
 }
 
 const UIContext = React.createContext<UIContextValue | null>(null)
@@ -40,13 +41,12 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
-  const { user, markOnboarded } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { handOff } = useAssistant()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Contact | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
-  const [tourOpen, setTourOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
   const isMobile = useIsMobile()
 
@@ -71,18 +71,28 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     [handOff, navigate],
   )
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
-  const openWelcomeTour = React.useCallback(() => setTourOpen(true), [])
+  const openOnboarding = React.useCallback(
+    () => navigate(ROUTES.onboarding),
+    [navigate],
+  )
 
-  // Show the welcome tour automatically the first time someone reaches the
-  // app on this account — tracked on the account itself (not localStorage)
-  // so it doesn't reappear every time they sign in on a new device.
+  // Onboarding runs automatically the first time someone reaches the app on
+  // this account. Tracked on the account itself (not localStorage) so it
+  // doesn't reappear every time they sign in on a new device — and so
+  // finishing it on a phone means it is done on the web too.
+  //
+  // At most once per session, and never on top of itself. `onboarded` is
+  // written asynchronously when the flow finishes, so without the latch a
+  // save that is slow (or fails) would send someone who just finished
+  // straight back to the welcome screen.
+  const autoStarted = React.useRef(false)
   React.useEffect(() => {
-    if (user && !user.user_metadata?.onboarded) setTourOpen(true)
-  }, [user])
-
-  function finishTour() {
-    void markOnboarded()
-  }
+    if (!user || autoStarted.current) return
+    if (hasOnboarded(user)) return
+    if (window.location.pathname === ROUTES.onboarding) return
+    autoStarted.current = true
+    navigate(ROUTES.onboarding, { replace: true })
+  }, [user, navigate])
 
   // Global keyboard shortcuts: Cmd/Ctrl+K → search, "N" → new contact.
   React.useEffect(() => {
@@ -99,7 +109,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         !isTypingTarget(e.target) &&
         !formOpen &&
         !searchOpen &&
-        !tourOpen &&
         !voiceOpen
       if (!bare) return
       if (e.key.toLowerCase() === 'n') {
@@ -118,7 +127,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   }, [
     formOpen,
     searchOpen,
-    tourOpen,
     voiceOpen,
     openNewContact,
     openVoiceCapture,
@@ -131,7 +139,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       openEditContact,
       openSearch,
       openAssistant,
-      openWelcomeTour,
+      openOnboarding,
     }),
     [
       openNewContact,
@@ -139,7 +147,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       openEditContact,
       openSearch,
       openAssistant,
-      openWelcomeTour,
+      openOnboarding,
     ],
   )
 
@@ -164,12 +172,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         onNewContact={openNewContact}
         onVoiceCapture={openVoiceCapture}
         onAssistant={openAssistant}
-      />
-      <WelcomeTour
-        open={tourOpen}
-        onOpenChange={setTourOpen}
-        onDismiss={finishTour}
-        onComplete={openNewContact}
       />
     </UIContext.Provider>
   )

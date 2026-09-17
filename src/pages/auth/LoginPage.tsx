@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { GraduationCap, Loader2, Mail, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Mail, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { errorFeedback, tapFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
+import { AppMark, CapsuleButton } from '@/components/ui/capsule'
 import { cn } from '@/lib/utils'
 
 type Mode = 'signin' | 'signup'
@@ -534,16 +535,6 @@ function DesktopEmailNotice({
 }
 
 /** The app's own icon, at the size iOS shows it during onboarding. */
-function AppMark() {
-  return (
-    <div className="flex justify-center">
-      <span className="flex h-[72px] w-[72px] items-center justify-center rounded-[20px] bg-primary text-primary-foreground shadow-[0_8px_24px_hsl(var(--glass-shadow)/0.18)]">
-        <span className="text-[34px] font-semibold leading-none tracking-[-0.02em]">R</span>
-      </span>
-    </div>
-  )
-}
-
 /** A row in an inset grouped form: 50pt, no box of its own. */
 function FormField({
   value,
@@ -574,45 +565,6 @@ function FormField({
       onChange={(e) => onChange(e.target.value)}
       className="text-ios-body h-[50px] w-full bg-transparent px-4 text-foreground outline-none placeholder:text-muted-foreground"
     />
-  )
-}
-
-const CAPSULE_VARIANT = {
-  apple: 'bg-[#000] text-white dark:bg-white dark:text-black',
-  outline: 'bg-bg-elevated text-foreground ring-1 ring-inset ring-border',
-  primary: 'bg-brand text-brand-foreground',
-} as const
-
-/** A 50pt full-width capsule — the only button shape on this screen. */
-function CapsuleButton({
-  variant,
-  loading,
-  className,
-  children,
-  onClick,
-  type = 'button',
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant: keyof typeof CAPSULE_VARIANT
-  loading?: boolean
-}) {
-  return (
-    <button
-      type={type}
-      onClick={(e) => {
-        tapFeedback()
-        onClick?.(e)
-      }}
-      className={cn(
-        'press-scale text-ios-headline flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px]',
-        'disabled:opacity-45',
-        CAPSULE_VARIANT[variant],
-        className,
-      )}
-      {...props}
-    >
-      {loading ? <Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden /> : children}
-    </button>
   )
 }
 

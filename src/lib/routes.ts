@@ -31,5 +31,9 @@ export const ROUTES = {
   qr: '/app/qr',
   /** Everything that doesn't fit on the phone's tab bar. */
   more: '/app/more',
+  /** First-run onboarding, and the "run it again" entry in Settings. */
+  onboarding: '/app/welcome',
+  /** Plans, prices, and where a subscription is bought and restored. */
+  subscription: '/app/subscription',
   settings: '/app/settings',
 } as const

@@ -7,6 +7,7 @@ import {
   QrCode,
   Search,
   Settings,
+  CreditCard,
   Tag as TagIcon,
   UserPlus,
 } from 'lucide-react'
@@ -16,6 +17,7 @@ import { InsetGroup, InsetRow, SegmentedControl } from '@/components/ui/inset-li
 import { useContacts, useOpportunities, useTags, useTemplates } from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
+import { useEntitlement } from '@/hooks/useEntitlement'
 import { useTheme, type Theme } from '@/components/theme-provider'
 import { tapFeedback } from '@/lib/haptics'
 import { displayName, initialFor } from '@/lib/displayName'
@@ -40,12 +42,20 @@ const THEMES: { value: Theme; label: string }[] = [
  * into and back out of, and that is the right shape here too: a sheet has to
  * be dismissed before you can go anywhere, can't be linked to, and puts a
  * modal in the middle of what is really just navigation.
+ *
+ * It is also sized to be a *screen* in the literal sense: everything here
+ * fits above the tab bar on a phone without scrolling, so the whole of "what
+ * else is in this app" is answered in one look. That is what the tightened
+ * rhythm below is for — 12px between groups rather than 28, and no section
+ * heading or footer that only restates its own control. The empty navigation bar over
+ * the title is collapsed by PageShell for the same reason.
  */
 export function MorePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { theme, setTheme } = useTheme()
   const { openNewContact, openSearch } = useUI()
+  const { label: planLabel, isPro } = useEntitlement()
 
   const contacts = useContacts()
   const tags = useTags()
@@ -66,7 +76,7 @@ export function MorePage() {
       header={<PageHeader title="More" description="Everything else in Retrn." />}
       bodyClassName="bg-grouped"
     >
-      <div className="space-y-7 pb-2 md:max-w-lg">
+      <div className="space-y-3 pb-1 md:max-w-lg">
         {/* Who you are, and what your network adds up to. */}
         <button
           type="button"
@@ -74,10 +84,10 @@ export function MorePage() {
             tapFeedback()
             navigate(ROUTES.settings)
           }}
-          className="press-scale block w-full rounded-[14px] bg-grouped-cell p-4 text-left"
+          className="press-scale block w-full rounded-[14px] bg-grouped-cell p-3.5 text-left"
         >
-          <span className="flex items-center gap-3.5">
-            <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-[21px] font-semibold text-text-secondary">
+          <span className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-[20px] font-semibold text-text-secondary">
               {initialFor(user)}
             </span>
             <span className="min-w-0 flex-1">
@@ -88,7 +98,7 @@ export function MorePage() {
             </span>
             <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted-foreground/45" />
           </span>
-          <span className="text-ios-footnote mt-3.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-muted-foreground">
+          <span className="text-ios-footnote mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-2.5 text-muted-foreground">
             {/* Contacts always; the rest only once there are any, so the card
                 never opens on a row of zeroes. */}
             <Stat n={contacts?.length} label="contacts" />
@@ -119,20 +129,35 @@ export function MorePage() {
           ))}
         </InsetGroup>
 
-        <InsetGroup title="Appearance" footer="Automatic follows your phone's light and dark setting.">
-          <div className="p-3">
-            <SegmentedControl label="Appearance" value={theme} onChange={setTheme} options={THEMES} />
-          </div>
-        </InsetGroup>
-
         <InsetGroup>
+          {/* The plan sits with Settings rather than with the destinations:
+              both are about the account, not about the network. */}
+          <InsetRow
+            leading={
+              <CreditCard
+                className={cn('h-[22px] w-[22px]', isPro ? 'text-brand' : 'text-muted-foreground')}
+                strokeWidth={1.9}
+              />
+            }
+            title="Subscription"
+            detail={planLabel}
+            onClick={() => navigate(ROUTES.subscription)}
+          />
           <InsetRow
             leading={<Settings className="h-[22px] w-[22px] text-muted-foreground" strokeWidth={1.9} />}
             title="Settings & Data"
-            subtitle="Profile, backup, privacy, sign out"
             last
             onClick={() => navigate(ROUTES.settings)}
           />
+        </InsetGroup>
+
+        {/* No section heading: three segments reading Light / Dark / Automatic
+            are their own label, and the heading is 23px this screen would
+            rather spend on fitting. */}
+        <InsetGroup>
+          <div className="p-3">
+            <SegmentedControl label="Appearance" value={theme} onChange={setTheme} options={THEMES} />
+          </div>
         </InsetGroup>
       </div>
     </PageShell>
@@ -157,7 +182,7 @@ function ActionTile({
         onClick()
       }}
       className={cn(
-        'press-scale flex h-[86px] flex-col items-center justify-center gap-2 rounded-[14px] bg-grouped-cell px-2',
+        'press-scale flex h-[76px] flex-col items-center justify-center gap-1.5 rounded-[14px] bg-grouped-cell px-2',
       )}
     >
       <Icon className="h-[22px] w-[22px] text-foreground/75" strokeWidth={1.9} />

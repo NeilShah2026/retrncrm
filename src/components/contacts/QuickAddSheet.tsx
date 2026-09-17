@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { contactRepo } from '@/services'
+import { useAuth } from '@/auth/AuthProvider'
+import { defaultContactFrequency } from '@/lib/onboarding'
 import { parseSpokenContact } from '@/lib/voiceParse'
 import { fullName, todayISO } from '@/lib/format'
 import { dismissKeyboard } from '@/lib/keyboard'
@@ -32,6 +34,7 @@ interface Props {
  * for when typing is the harder option.
  */
 export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
+  const { user } = useAuth()
   const speech = useSpeechRecognition()
   const [name, setName] = React.useState('')
   const [where, setWhere] = React.useState('')
@@ -94,7 +97,9 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
         otherLinks: [],
         tagIds: [],
         relationshipStrength: 2,
-        contactFrequencyGoal: 'none',
+        // The reconnect goal chosen during onboarding, so a contact added
+        // the fast way still arrives with a cadence on it.
+        contactFrequencyGoal: defaultContactFrequency(user),
       })
       successFeedback()
       toast.success(`${fullName(created)} added`)

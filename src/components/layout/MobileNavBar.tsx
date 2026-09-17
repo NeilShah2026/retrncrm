@@ -98,6 +98,14 @@ interface Props {
    * scrolls under it.
    */
   transparent?: boolean
+  /**
+   * True for a large-title screen whose bar holds nothing at all — no back
+   * chevron, no actions, no toolbar. There is then nothing for the 44pt row
+   * to carry, and leaving it there puts an empty band between the status bar
+   * and the title. Collapsed, the bar keeps only the safe-area inset and a
+   * sliver of glass, and the title starts where the screen does.
+   */
+  collapsed?: boolean
   className?: string
 }
 
@@ -108,6 +116,7 @@ export function MobileNavBar({
   pinLargeTitle,
   separated,
   transparent,
+  collapsed,
   className,
 }: Props) {
   return (
@@ -119,7 +128,12 @@ export function MobileNavBar({
         className,
       )}
     >
-      <div className="grid h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-2">
+      <div
+        className={cn(
+          'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-2',
+          collapsed ? 'h-2' : 'h-11',
+        )}
+      >
         <div className="flex items-center justify-start gap-1">{chrome.leading}</div>
 
         <div

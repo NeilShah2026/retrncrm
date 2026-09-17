@@ -1,9 +1,11 @@
 import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearSubscriptionCache } from '@/lib/billing/store'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
 import { syncAccountEmail } from '@/lib/eduVerification'
 import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
+import type { OnboardingPrefs } from '@/lib/onboarding'
 import { isNative } from '@/lib/platform'
 import {
   NATIVE_AUTH_REDIRECT_URL,
@@ -29,7 +31,8 @@ interface AuthContextValue {
   updateName: (name: string) => Promise<AuthResult>
   updateCollege: (college: string) => Promise<AuthResult>
   updateProfile: (profile: ShareProfile) => Promise<AuthResult>
-  markOnboarded: () => Promise<AuthResult>
+  /** Writes the onboarding answers (and the completion flag) onto the account. */
+  saveOnboarding: (prefs: OnboardingPrefs) => Promise<AuthResult>
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
@@ -147,6 +150,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signOut = React.useCallback(async () => {
+    // The cached App Store entitlement is per-device, not per-account, so it
+    // has to go with the session — otherwise the next person to sign in on a
+    // shared phone inherits the last one's plan until the store is asked
+    // again. The receipt itself is untouched: restoring brings it straight
+    // back for the Apple ID that actually paid.
+    await clearSubscriptionCache()
     await supabase.auth.signOut()
   }, [])
 
@@ -170,10 +179,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   )
 
-  const markOnboarded = React.useCallback(async (): Promise<AuthResult> => {
-    const { error } = await supabase.auth.updateUser({ data: { onboarded: true } })
-    return { error: error?.message ?? null }
-  }, [])
+  /**
+   * The onboarding answers live in `user_metadata` rather than a table of
+   * their own: they are preferences about how the app should behave for this
+   * person, they are small, and putting them on the account means they follow
+   * the user to a new device without a fetch. `updateUser` merges top-level
+   * keys, so this never clobbers the name, college or share profile.
+   */
+  const saveOnboarding = React.useCallback(
+    async (prefs: OnboardingPrefs): Promise<AuthResult> => {
+      const { error } = await supabase.auth.updateUser({ data: { ...prefs } })
+      return { error: error?.message ?? null }
+    },
+    [],
+  )
 
   const value = React.useMemo<AuthContextValue>(
     () => ({
@@ -189,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateName,
       updateCollege,
       updateProfile,
-      markOnboarded,
+      saveOnboarding,
     }),
     [
       session,
@@ -203,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateName,
       updateCollege,
       updateProfile,
-      markOnboarded,
+      saveOnboarding,
     ],
   )
 

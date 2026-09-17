@@ -68,6 +68,16 @@ export function PageShell({
   const inlineLargeTitle = wantsLargeTitle && scrollBody
   const pinLargeTitle = wantsLargeTitle && !scrollBody
 
+  // A large-title screen whose bar carries nothing — no back chevron, no
+  // actions, no toolbar — has a 44pt row with nothing in it sitting between
+  // the status bar and the title, which reads as the page starting a long way
+  // down. Collapse it: the title then begins just under the status bar, and
+  // since the bar has no room for a compact title there is no handoff to
+  // make on scroll either. The height is fixed, not animated, so nothing
+  // reflows mid-scroll.
+  const collapseBar =
+    inlineLargeTitle && !mobile?.leading && !mobile?.trailing && !mobile?.toolbar
+
   // A page that runs its own scroll regions (a board, a table with a sticky
   // header) has nothing passing under the bar, so the bar stays above that
   // region in flow and keeps its material.
@@ -77,7 +87,7 @@ export function PageShell({
     const { scrollTop } = e.currentTarget
     const nextAtTop = scrollTop <= MATERIALISE_AT
     setAtTop((prev) => (prev === nextAtTop ? prev : nextAtTop))
-    if (!inlineLargeTitle) return
+    if (!inlineLargeTitle || collapseBar) return
     const nextScrolled = scrollTop > COLLAPSE_AT
     setScrolled((prev) => (prev === nextScrolled ? prev : nextScrolled))
   }
@@ -85,10 +95,11 @@ export function PageShell({
   const navBar = mobile && (
     <MobileNavBar
       chrome={mobile}
-      showCompactTitle={hasTitle && (!wantsLargeTitle || scrolled)}
+      showCompactTitle={hasTitle && !collapseBar && (!wantsLargeTitle || scrolled)}
       pinLargeTitle={pinLargeTitle}
       separated={Boolean(mobile.toolbar) || pinLargeTitle || scrolled}
       transparent={stickyBar && atTop}
+      collapsed={collapseBar}
       className={stickyBar ? 'sticky top-0' : undefined}
     />
   )

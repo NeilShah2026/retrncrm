@@ -87,8 +87,8 @@ export function EduVerificationSheet({
               <p className="text-ios-subhead px-1 text-muted-foreground">
                 Verify an <span className="text-foreground">@{BABSON_DOMAIN}</span> address and
                 Retrn is free — every paid feature, no card. You're signed in as{' '}
-                <span className="break-all text-foreground">{user?.email}</span>, so we'll send a
-                code to your school address to confirm it's yours.
+                <span className="break-all text-foreground">{user?.email}</span>, so we'll email
+                your school address to confirm it's yours.
               </p>
               <InsetGroup footer={error}>
                 <InsetInputRow
@@ -108,16 +108,25 @@ export function EduVerificationSheet({
           ) : (
             <>
               <p className="text-ios-subhead px-1 text-muted-foreground">
-                Enter the code we sent to{' '}
+                Check{' '}
                 <span className="break-all text-foreground">{email.trim().toLowerCase()}</span>.
+                Enter the code from that email — or paste the whole link, if that's what it
+                contains.
               </p>
-              <InsetGroup footer={error}>
+              <InsetGroup
+                footer={
+                  error ?? (
+                    // Tapping the link signs this device in *as the school
+                    // account*, which is not what they came here to do.
+                    'Paste the link rather than tapping it — tapping signs you in as your school account instead of verifying this one.'
+                  )
+                }
+              >
                 <InsetInputRow
                   label="Code"
                   value={code}
                   onChange={setCode}
-                  placeholder="123456"
-                  inputMode="numeric"
+                  placeholder="123456 or paste the link"
                   autoComplete="one-time-code"
                   enterKeyHint="done"
                   onEnter={() => void confirm()}
@@ -139,7 +148,7 @@ export function EduVerificationSheet({
                 else void confirm()
               }}
             >
-              {step === 'idle' ? 'Send Code' : 'Verify'}
+              {step === 'idle' ? 'Send Email' : 'Verify'}
             </Button>
           </DialogFooter>
         )}

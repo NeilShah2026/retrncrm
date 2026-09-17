@@ -1,5 +1,6 @@
 import { isNative } from '@/lib/platform'
 import { startKeyboardTracking } from '@/lib/keyboard'
+import { refreshSubscription } from '@/lib/billing/store'
 
 /**
  * The viewport the native shell needs, which is *not* the one the web build
@@ -34,4 +35,11 @@ export function bootstrapNative(): void {
 
   // Everything that moves out of the keyboard's way — see src/lib/keyboard.ts.
   startKeyboardTracking()
+
+  // What this Apple ID has paid for, re-read at every launch: a subscription
+  // can lapse, renew or be cancelled while the app is closed, and the cached
+  // answer is only as good as the last time the store was asked. A no-op
+  // until `setBillingProvider()` is called with a real StoreKit adapter —
+  // which is also where that call belongs. See src/lib/billing/store.ts.
+  void refreshSubscription()
 }

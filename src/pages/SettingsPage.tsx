@@ -13,6 +13,10 @@ import {
   LogOut,
   ShieldCheck,
   UserRound,
+  UserX,
+  Scale,
+  CreditCard,
+  LifeBuoy,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -32,6 +36,8 @@ import { InsetGroup, InsetRow, InsetRowIcon } from '@/components/ui/inset-list'
 import { useContacts, useOpportunities, useTags, useTemplates } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useEntitlement } from '@/hooks/useEntitlement'
+import { deleteAccount } from '@/lib/deleteAccount'
+import { LEGAL } from '@/pages/legal/legalInfo'
 import { contactRepo, opportunityRepo, tagRepo, templateRepo } from '@/services'
 import { ShareableProfileCard } from '@/components/profile/ShareableProfileCard'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
@@ -46,9 +52,9 @@ import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
 
 export function SettingsPage() {
-  const { openWelcomeTour } = useUI()
+  const { openOnboarding } = useUI()
   const { user, signOut } = useAuth()
-  const { edu } = useEntitlement()
+  const { edu, label: planLabel, isPro } = useEntitlement()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
   const contacts = useContacts() ?? []
@@ -61,6 +67,7 @@ export function SettingsPage() {
   const [confirmClear, setConfirmClear] = React.useState(false)
   const [confirmReset, setConfirmReset] = React.useState(false)
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [profileOpen, setProfileOpen] = React.useState(false)
   const [eduOpen, setEduOpen] = React.useState(false)
 
@@ -136,6 +143,21 @@ export function SettingsPage() {
     toast.success('Restored starter content')
   }
 
+  /**
+   * Permanent account deletion — an App Store requirement (Guideline
+   * 5.1.1(v)), not a nicety. The server removes the auth user and every table
+   * cascades from it; by the time this resolves the session is gone too, so
+   * RequireAuth takes over and lands on the sign-in screen.
+   */
+  async function handleDeleteAccount() {
+    try {
+      await deleteAccount()
+      toast.success('Your account and all its data have been deleted.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete your account.')
+    }
+  }
+
   const interactions = contacts.reduce((n, c) => n + c.interactions.length, 0)
 
   /**
@@ -172,6 +194,17 @@ export function SettingsPage() {
             subtitle="Show yours, or scan someone else's"
             last
             onClick={() => navigate(ROUTES.qr)}
+          />
+        </InsetGroup>
+
+        <InsetGroup title="Subscription">
+          <InsetRow
+            leading={<InsetRowIcon icon={CreditCard} />}
+            title="Plan"
+            subtitle={isPro ? 'Every paid feature is unlocked' : 'Upgrade for unlimited contacts'}
+            detail={planLabel}
+            last
+            onClick={() => navigate(ROUTES.subscription)}
           />
         </InsetGroup>
 
@@ -231,14 +264,32 @@ export function SettingsPage() {
         <InsetGroup title="Help">
           <InsetRow
             leading={<InsetRowIcon icon={CircleHelp} />}
-            title="Replay the Tour"
-            onClick={openWelcomeTour}
+            title="Run Through Onboarding"
+            subtitle="The welcome flow, and re-answer the setup questions"
+            onClick={openOnboarding}
+          />
+          <InsetRow
+            leading={<InsetRowIcon icon={LifeBuoy} />}
+            title="Contact Support"
+            subtitle={LEGAL.emails.hello}
+            chevron={false}
+            // A location change, not `window.open`: WKWebView drops a popup
+            // to a non-http scheme, and Capacitor hands a mailto: navigation
+            // to the system mail app.
+            onClick={() => {
+              window.location.href = `mailto:${LEGAL.emails.hello}`
+            }}
           />
           <InsetRow
             leading={<InsetRowIcon icon={ShieldCheck} />}
             title="Privacy Policy"
-            last
             onClick={() => navigate(ROUTES.privacy)}
+          />
+          <InsetRow
+            leading={<InsetRowIcon icon={Scale} />}
+            title="Terms of Use"
+            last
+            onClick={() => navigate(ROUTES.terms)}
           />
         </InsetGroup>
 
@@ -257,6 +308,20 @@ export function SettingsPage() {
             chevron={false}
             last
             onClick={() => setConfirmClear(true)}
+          />
+        </InsetGroup>
+
+        {/* Deleting the account itself, in a group of its own — it is not a
+            bigger version of "clear data", it ends the account. Reachable in
+            two taps from the tab bar, as App Store review expects. */}
+        <InsetGroup footer="Deletes your account and everything in it, everywhere. This cannot be undone.">
+          <InsetRow
+            leading={<InsetRowIcon icon={UserX} tone="danger" />}
+            title="Delete Account"
+            destructive
+            chevron={false}
+            last
+            onClick={() => setConfirmDelete(true)}
           />
         </InsetGroup>
 
@@ -306,6 +371,27 @@ export function SettingsPage() {
           <Panel>
             <PanelHeader
               action={
+                <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.subscription)}>
+                  <CreditCard />
+                  {isPro ? 'View plan' : 'See plans'}
+                </Button>
+              }
+            >
+              Subscription
+            </PanelHeader>
+            <PanelSection className="text-sm">
+              <p className="font-medium">{planLabel}</p>
+              <p className="text-muted-foreground">
+                {isPro
+                  ? 'Every paid feature is unlocked on this account.'
+                  : 'Up to 30 contacts and the basics. Upgrade for unlimited contacts, capture and pipeline.'}
+              </p>
+            </PanelSection>
+          </Panel>
+
+          <Panel>
+            <PanelHeader
+              action={
                 <Button variant="outline" size="sm" onClick={() => setConfirmSignOut(true)}>
                   <LogOut />
                   Sign out
@@ -330,6 +416,10 @@ export function SettingsPage() {
               Stored in your own account, readable only by you.{' '}
               <Link to={ROUTES.privacy} className="text-brand hover:underline">
                 Privacy policy
+              </Link>{' '}
+              ·{' '}
+              <Link to={ROUTES.terms} className="text-brand hover:underline">
+                Terms of use
               </Link>
             </PanelSection>
           </Panel>
@@ -368,10 +458,16 @@ export function SettingsPage() {
           <Panel>
             <PanelHeader>Help</PanelHeader>
             <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">New here, or want a refresher on how Retrn fits together?</p>
-              <Button variant="outline" size="sm" onClick={openWelcomeTour} className="shrink-0">
+              <div className="text-sm">
+                <p className="font-medium">Run through onboarding</p>
+                <p className="text-muted-foreground">
+                  The welcome flow again — including the setup questions, so you can change what
+                  Retrn tailored to you.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={openOnboarding} className="shrink-0">
                 <CircleHelp />
-                Replay the tour
+                Run it
               </Button>
             </PanelSection>
           </Panel>
@@ -396,6 +492,18 @@ export function SettingsPage() {
               <Button variant="destructive" size="sm" onClick={() => setConfirmClear(true)} className="shrink-0">
                 <Trash2 />
                 Clear everything
+              </Button>
+            </PanelSection>
+            <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <p className="font-medium">Delete account</p>
+                <p className="text-muted-foreground">
+                  Ends your account and deletes everything in it, everywhere. This cannot be undone.
+                </p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)} className="shrink-0">
+                <UserX />
+                Delete account
               </Button>
             </PanelSection>
           </Panel>
@@ -443,6 +551,16 @@ export function SettingsPage() {
         confirmWord="restore"
         destructive
         onConfirm={handleReset}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete your account?"
+        description="This permanently deletes your Retrn account and every contact, activity, tag, opportunity and template in it. It cannot be undone, and signing in again will not bring it back. Export a backup first if you want to keep any of it."
+        confirmLabel="Delete my account"
+        confirmWord="delete"
+        destructive
+        onConfirm={handleDeleteAccount}
       />
       <ConfirmDialog
         open={confirmSignOut}

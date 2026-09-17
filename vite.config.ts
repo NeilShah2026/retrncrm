@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleAiRequest } from './api/_lib/ai.ts'
 import { handleVerifyEduRequest } from './api/_lib/eduVerify.ts'
+import { handleDeleteAccountRequest } from './api/_lib/deleteAccount.ts'
 
 type EdgeHandler = (req: Request) => Promise<Response>
 
@@ -16,6 +17,7 @@ type EdgeHandler = (req: Request) => Promise<Response>
 const DEV_ROUTES: Record<string, EdgeHandler> = {
   '/api/ai': handleAiRequest,
   '/api/verify-edu': handleVerifyEduRequest,
+  '/api/delete-account': handleDeleteAccountRequest,
 }
 
 function devApi(): Plugin {

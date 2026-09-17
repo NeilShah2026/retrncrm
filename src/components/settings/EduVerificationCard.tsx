@@ -86,7 +86,7 @@ export function EduVerificationCard() {
           Verify an <span className="text-foreground">@{BABSON_DOMAIN}</span> address
           and Retrn is free — every paid feature, no card. You&apos;re signed in as{' '}
           <span className="break-all text-foreground">{user?.email}</span>, so we&apos;ll
-          send a code to your school address to confirm it&apos;s yours.
+          email your school address to confirm it&apos;s yours.
         </p>
 
         {step === 'idle' ? (
@@ -108,7 +108,7 @@ export function EduVerificationCard() {
             {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" disabled={busy} className="gap-2">
               <Mail className="h-4 w-4" />
-              {busy ? 'Sending…' : 'Send verification code'}
+              {busy ? 'Sending…' : 'Send verification email'}
             </Button>
           </form>
         ) : (
@@ -120,22 +120,28 @@ export function EduVerificationCard() {
             className="space-y-3"
           >
             <p className="text-sm text-muted-foreground">
-              Enter the 6-digit code we sent to{' '}
+              Check{' '}
               <span className="break-all text-foreground">
                 {email.trim().toLowerCase()}
               </span>
-              .
+              . Enter the code from that email — or paste the whole link, if that&apos;s
+              what it contains.
             </p>
+            {/* No `maxLength` and no numeric input mode: either would quietly
+                mangle a pasted verification link, which is the other half of
+                what this field legitimately accepts. */}
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="123456"
-              inputMode="numeric"
+              placeholder="123456 or paste the link"
               autoComplete="one-time-code"
-              maxLength={10}
               required
               autoFocus
             />
+            <p className="text-xs text-muted-foreground">
+              Paste the link rather than opening it — opening it signs you in as your
+              school account instead of verifying this one.
+            </p>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" disabled={busy}>

@@ -306,10 +306,12 @@ export function TermsPage() {
       <Section n={14} title="Suspension & termination">
         <P>
           <Strong>You</Strong> can stop using Retrn at any time, clear your data
-          from <em>Settings → Clear all data</em>, or ask us to delete your account
-          (see the <DocLink to={ROUTES.privacy}>Privacy Policy</DocLink>). Deleting
-          the app does not cancel an App Store subscription, so cancel it
-          separately.
+          from <em>Settings → Clear all data</em>, or delete your account outright
+          from <em>Settings → Delete account</em> — which removes the account and
+          all of its data permanently (see the{' '}
+          <DocLink to={ROUTES.privacy}>Privacy Policy</DocLink>). Deleting your
+          account or the app does not cancel an App Store subscription, so cancel
+          that separately in <em>iOS Settings → your name → Subscriptions</em>.
         </P>
         <P>
           <Strong>We</Strong> may suspend or end your access if you materially or

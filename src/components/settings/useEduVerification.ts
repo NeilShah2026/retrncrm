@@ -5,6 +5,7 @@ import {
   BABSON_DOMAIN,
   confirmVerification,
   isBabsonEmail,
+  parseVerificationInput,
   removeVerification,
   startVerification,
 } from '@/lib/eduVerification'
@@ -12,8 +13,13 @@ import {
 export type EduStep = 'idle' | 'code'
 
 /**
- * Babson verification: send a code to a school address, then confirm it.
+ * Babson verification: email a school address, then confirm what came back.
  * Shared by the desktop card and the phone's sheet so both behave the same.
+ *
+ * "What came back" is deliberately loose: the email's contents are decided by
+ * a Supabase template that also serves the login page's magic link, so it may
+ * hold a code, a link, or both. Either is accepted — see
+ * `parseVerificationInput`.
  */
 export function useEduVerification() {
   const { edu } = useEntitlement()
@@ -33,9 +39,9 @@ export function useEduVerification() {
     try {
       await startVerification(email)
       setStep('code')
-      toast.success(`Code sent to ${email.trim().toLowerCase()}`)
+      toast.success(`Email sent to ${email.trim().toLowerCase()}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that code.')
+      setError(err instanceof Error ? err.message : 'Could not send that email.')
     } finally {
       setBusy(false)
     }
@@ -44,6 +50,11 @@ export function useEduVerification() {
   /** True once the address is verified. */
   async function confirm(): Promise<boolean> {
     setError(null)
+    // Say what is wrong with the entry before spending a round trip on it.
+    if (!parseVerificationInput(code)) {
+      setError('Enter the code from the email, or paste the whole link.')
+      return false
+    }
     setBusy(true)
     try {
       const verified = await confirmVerification(email, code)
@@ -53,7 +64,7 @@ export function useEduVerification() {
       toast.success(`${verified} verified — Retrn is free for you.`)
       return true
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That code did not work.')
+      setError(err instanceof Error ? err.message : 'That did not work — try a fresh email.')
       return false
     } finally {
       setBusy(false)

@@ -1,4 +1,9 @@
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
+import {
+  createClient,
+  type EmailOtpType,
+  type SupabaseClient,
+  type User,
+} from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { postApi } from './apiFetch'
 
@@ -139,7 +144,76 @@ function otpClient(): SupabaseClient {
   return otp
 }
 
-/** Email a six-digit code to `email`. Throws with a message worth showing. */
+/**
+ * What the student pasted back from the verification email.
+ *
+ * Supabase sends *one* email whose content is decided by the project's email
+ * template, and the same template serves the sign-in magic link on the login
+ * page. So depending on how that template is written, the email may carry a
+ * six-digit code, a link, or both — and this flow has to work either way
+ * rather than insisting on the one the template happens to contain today.
+ *
+ * Both forms prove the same thing: control of the address. A code is the
+ * token itself; a link carries the same token pre-hashed in its query string,
+ * along with the grant type that minted it.
+ */
+export type VerificationInput =
+  | { kind: 'code'; token: string }
+  | { kind: 'link'; tokenHash: string; type: EmailOtpType }
+
+/** The grant types a Supabase email link can carry, and what to assume. */
+function otpTypeFrom(raw: string | null): EmailOtpType {
+  switch (raw) {
+    case 'magiclink':
+    case 'signup':
+    case 'invite':
+    case 'recovery':
+    case 'email_change':
+      return raw
+    default:
+      // `email` covers a code from either a sign-up confirmation or a magic
+      // link, which is what `signInWithOtp` produces here.
+      return 'email'
+  }
+}
+
+function asUrl(raw: string): URL | null {
+  // Mail clients love to wrap a URL in <angle brackets> or leave a trailing
+  // full stop or paren on it.
+  const cleaned = raw.replace(/^[<([]+/, '').replace(/[>)\].,]+$/, '')
+  try {
+    const url = new URL(cleaned)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Read whatever was pasted into the box: a code, or the whole verification
+ * link out of the email. Returns `null` when it is neither, so the caller can
+ * say something specific rather than sending nonsense to the server.
+ */
+export function parseVerificationInput(raw: string): VerificationInput | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+
+  // A bare code, however the student spaced or hyphenated it.
+  const digits = trimmed.replace(/[\s-]/g, '')
+  if (/^\d{6,10}$/.test(digits)) return { kind: 'code', token: digits }
+
+  const url = asUrl(trimmed)
+  if (url) {
+    const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token')
+    if (tokenHash) {
+      return { kind: 'link', tokenHash, type: otpTypeFrom(url.searchParams.get('type')) }
+    }
+  }
+
+  return null
+}
+
+/** Email a verification code (or link) to `email`. Throws a showable message. */
 export async function startVerification(email: string): Promise<void> {
   const address = email.trim().toLowerCase()
   if (!isBabsonEmail(address)) {
@@ -157,27 +231,45 @@ export async function startVerification(email: string): Promise<void> {
 }
 
 /**
- * Check the code and, on success, record the verification against the account
- * the user is actually signed in as. Returns the verified address.
+ * Check what came back from the email — a code or a pasted link — and, on
+ * success, record the verification against the account the user is actually
+ * signed in as. Returns the verified address.
  */
-export async function confirmVerification(email: string, code: string): Promise<string> {
+export async function confirmVerification(email: string, entry: string): Promise<string> {
   const address = email.trim().toLowerCase()
-  const token = code.replace(/\s/g, '')
+  const input = parseVerificationInput(entry)
+  if (!input) {
+    throw new Error('Enter the code from the email, or paste the whole link.')
+  }
 
   const client = otpClient()
-  const { data, error } = await client.auth.verifyOtp({
-    email: address,
-    token,
-    type: 'email',
-  })
+  // A code is checked against the address it was sent to; a link's token hash
+  // already identifies the address on the server, and passing an email
+  // alongside it is rejected as an over-specified request.
+  const { data, error } = await client.auth.verifyOtp(
+    input.kind === 'code'
+      ? { email: address, token: input.token, type: 'email' }
+      : { token_hash: input.tokenHash, type: input.type },
+  )
   if (error) throw new Error(error.message)
 
   const proofToken = data.session?.access_token
-  if (!proofToken) throw new Error('That code could not be confirmed. Try again.')
+  if (!proofToken) throw new Error('That could not be confirmed. Ask for a new email and retry.')
+
+  // A pasted link proves control of whatever address it was issued to, which
+  // is not necessarily the one typed into the form. Check what was actually
+  // proven before treating it as this student's school address.
+  const proven = data.user?.email?.toLowerCase() ?? null
+  if (!isBabsonEmail(proven)) {
+    await client.auth.signOut({ scope: 'local' })
+    throw new Error(`That link isn't for an @${BABSON_DOMAIN} address.`)
+  }
 
   try {
     const result = await callVerifyEndpoint({ proofToken })
-    return result.email ?? address
+    // The server reads the address out of the proof token itself, so prefer
+    // its answer over the one typed into the form.
+    return result.email ?? proven ?? address
   } finally {
     // Drop the throwaway session locally. `local` scope on purpose: a global
     // sign-out would revoke the school account's own real sessions elsewhere.

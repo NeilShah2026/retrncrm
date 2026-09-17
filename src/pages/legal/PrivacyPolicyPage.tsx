@@ -486,12 +486,15 @@ export function PrivacyPolicyPage() {
               template in your account while keeping your login.
             </>,
             <>
-              <Strong>Deleting your account:</Strong> email{' '}
+              <Strong>Deleting your account:</Strong>{' '}
+              <em>Settings → Delete account</em> permanently deletes your account
+              and everything in it, immediately and from inside the app — no
+              request and no waiting period. When an account is deleted, all of
+              its contacts, meetings, opportunities, templates, tags, calendar
+              feed links, and verification records are deleted with it. If you
+              would rather we did it for you, email{' '}
               <Mail to={LEGAL.emails.privacy} /> from the address on your account
-              and we will delete your account and all associated data within 30
-              days. When an account is deleted, all of its contacts, meetings,
-              opportunities, templates, tags, calendar feed links, and
-              verification records are deleted with it.
+              and we will delete it within 30 days.
             </>,
             <>
               <Strong>Backups and logs:</Strong> deleted data may remain in
@@ -524,7 +527,7 @@ export function PrivacyPolicyPage() {
             </>,
             <>
               <Strong>Delete</Strong> individual items, all of your data, or your
-              whole account (Section 9).
+              whole account from <em>Settings → Delete account</em> (Section 9).
             </>,
             <>
               <Strong>Withdraw permissions</Strong> for the camera, photo library,
