@@ -1,7 +1,7 @@
-import type { Contact, Opportunity, OutreachTemplate, Tag } from '@/types'
+import type { Contact, FollowUp, KeyDate, Opportunity, OutreachTemplate, Tag } from '@/types'
 import { FREQUENCY_OPTIONS } from './constants'
 
-export const EXPORT_VERSION = 2
+export const EXPORT_VERSION = 3
 
 export interface ExportBundle {
   app: 'retrn-crm'
@@ -11,6 +11,10 @@ export interface ExportBundle {
   tags: Tag[]
   opportunities: Opportunity[]
   templates: OutreachTemplate[]
+  /** Since version 3. */
+  followUps?: FollowUp[]
+  /** Since version 3. */
+  keyDates?: KeyDate[]
 }
 
 export function buildExportBundle(
@@ -18,6 +22,8 @@ export function buildExportBundle(
   tags: Tag[],
   opportunities: Opportunity[],
   templates: OutreachTemplate[],
+  followUps: FollowUp[] = [],
+  keyDates: KeyDate[] = [],
 ): ExportBundle {
   return {
     app: 'retrn-crm',
@@ -27,6 +33,8 @@ export function buildExportBundle(
     tags,
     opportunities,
     templates,
+    followUps,
+    keyDates,
   }
 }
 
@@ -56,8 +64,10 @@ export function exportJson(
   tags: Tag[],
   opportunities: Opportunity[],
   templates: OutreachTemplate[],
+  followUps: FollowUp[] = [],
+  keyDates: KeyDate[] = [],
 ): void {
-  const bundle = buildExportBundle(contacts, tags, opportunities, templates)
+  const bundle = buildExportBundle(contacts, tags, opportunities, templates, followUps, keyDates)
   downloadFile(
     `retrn-export-${datestamp()}.json`,
     JSON.stringify(bundle, null, 2),
@@ -125,6 +135,8 @@ export interface ParsedImport {
   tags: Tag[]
   opportunities: Opportunity[]
   templates: OutreachTemplate[]
+  followUps: FollowUp[]
+  keyDates: KeyDate[]
 }
 
 /** Validate and normalize an imported JSON bundle. Throws on invalid input. */
@@ -164,7 +176,28 @@ export function parseImportBundle(raw: string): ParsedImport {
   if (contacts.length === 0) {
     throw new Error('No valid contacts found in this file.')
   }
-  return { contacts, tags, opportunities, templates }
+  const contactIds = new Set(contacts.map((c) => c.id))
+  const followUps: FollowUp[] = Array.isArray(bundle.followUps)
+    ? bundle.followUps.filter(
+        (f): f is FollowUp =>
+          Boolean(f) &&
+          typeof f.id === 'string' &&
+          typeof f.dueDate === 'string' &&
+          /^\d{4}-\d{2}-\d{2}$/.test(f.dueDate) &&
+          contactIds.has(f.contactId),
+      )
+    : []
+  const keyDates: KeyDate[] = Array.isArray(bundle.keyDates)
+    ? bundle.keyDates.filter(
+        (k): k is KeyDate =>
+          Boolean(k) &&
+          typeof k.id === 'string' &&
+          Number.isInteger(k.month) &&
+          Number.isInteger(k.day) &&
+          contactIds.has(k.contactId),
+      )
+    : []
+  return { contacts, tags, opportunities, templates, followUps, keyDates }
 }
 
 function normalizeTag(t: unknown): Tag | null {

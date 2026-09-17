@@ -20,6 +20,7 @@ import {
   Send,
   Trash2,
   Plus,
+  AlarmClockPlus,
   Globe,
   AtSign,
   UserX,
@@ -50,6 +51,12 @@ import { MergeContactDialog } from '@/components/contacts/MergeContactDialog'
 import { EventFormDialog } from '@/components/calendar/EventFormDialog'
 import { CoffeeChatPrepDialog } from '@/components/contacts/CoffeeChatPrepDialog'
 import { ComposeDialog } from '@/components/templates/ComposeDialog'
+import {
+  DesktopFollowUps,
+  DesktopKeyDates,
+  PhoneContactReminders,
+  type ReminderSheets,
+} from '@/components/reminders/ContactReminders'
 import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
 import { useContact, useContactMap, useEvents, useTagMap } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -124,6 +131,7 @@ function ContactDetail({ contact }: { contact: Contact }) {
   const [deletingInteraction, setDeletingInteraction] = React.useState<Interaction | null>(null)
   const [prepping, setPrepping] = React.useState(false)
   const [composing, setComposing] = React.useState(false)
+  const followUpsRef = React.useRef<ReminderSheets>(null)
 
   const tags = contact.tagIds.map((tid) => tagMap.get(tid)).filter(Boolean) as Tag[]
   const status = getReconnectStatus(contact)
@@ -225,6 +233,8 @@ function ContactDetail({ contact }: { contact: Contact }) {
           <QuickAction icon={Send} label="Message" onClick={() => setComposing(true)} />
           <QuickAction icon={Coffee} label="Prep" onClick={() => setPrepping(true)} />
         </div>
+
+        <PhoneContactReminders contact={contact} />
 
         <InsetGroup title="Contact">
           {channels.map((row, i) => (
@@ -497,6 +507,7 @@ function ContactDetail({ contact }: { contact: Contact }) {
           onPrep={() => setPrepping(true)}
           onCaughtUp={() => void markCaughtUp(contact)}
           onCompose={() => setComposing(true)}
+          onFollowUp={() => followUpsRef.current?.addFollowUp()}
           onEdit={() => setEditing(true)}
           onMerge={() => setMerging(true)}
           onDelete={() => setDeleting(true)}
@@ -560,6 +571,8 @@ function ContactDetail({ contact }: { contact: Contact }) {
                   <div className="prose-notes" dangerouslySetInnerHTML={{ __html: notesHtml }} />
                 </PanelSection>
               )}
+
+              <DesktopFollowUps ref={followUpsRef} contact={contact} />
 
               <PanelSection className="px-0 py-0">
                 <div className="flex h-11 items-center justify-between px-4">
@@ -757,6 +770,8 @@ function ContactDetail({ contact }: { contact: Contact }) {
                   Strength: {STRENGTH_LABELS[contact.relationshipStrength]}
                 </p>
               </PanelSection>
+
+              <DesktopKeyDates contact={contact} />
             </Panel>
           </div>
         </div>
@@ -871,6 +886,7 @@ function PageHeaderBar({
   onPrep,
   onCaughtUp,
   onCompose,
+  onFollowUp,
   onEdit,
   onMerge,
   onDelete,
@@ -879,6 +895,7 @@ function PageHeaderBar({
   onPrep?: () => void
   onCaughtUp?: () => void
   onCompose?: () => void
+  onFollowUp?: () => void
   onEdit?: () => void
   onMerge?: () => void
   onDelete?: () => void
@@ -905,6 +922,7 @@ function PageHeaderBar({
           </Button>
           <ContactActionsMenu
             onCompose={onCompose}
+            onFollowUp={onFollowUp}
             onEdit={onEdit}
             onMerge={onMerge}
             onDelete={onDelete}
@@ -923,12 +941,14 @@ function PageHeaderBar({
 function ContactActionsMenu({
   trigger,
   onCompose,
+  onFollowUp,
   onEdit,
   onMerge,
   onDelete,
 }: {
   trigger: React.ReactNode
   onCompose?: () => void
+  onFollowUp?: () => void
   onEdit?: () => void
   onMerge?: () => void
   onDelete?: () => void
@@ -940,6 +960,11 @@ function ContactActionsMenu({
         <DropdownMenuItem onClick={onCompose}>
           <Send /> Send a message
         </DropdownMenuItem>
+        {onFollowUp && (
+          <DropdownMenuItem onClick={onFollowUp}>
+            <AlarmClockPlus /> Set a follow-up
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={onEdit}>
           <Pencil /> Edit contact
         </DropdownMenuItem>

@@ -14,10 +14,14 @@ import {
   rowToTag,
   rowToTemplate,
   rowToEvent,
+  rowToFollowUp,
+  rowToKeyDate,
 } from '@/services/supabaseMappers'
 import type {
   CalendarEvent,
   Contact,
+  FollowUp,
+  KeyDate,
   Opportunity,
   OutreachTemplate,
   Tag,
@@ -38,6 +42,13 @@ import type {
 function useRealtimeTable<T>(
   table: TableName,
   mapRow: (row: never) => T,
+  /**
+   * The table arrived in a later migration. Until that migration has been
+   * run, a missing table reads as empty rather than as a failed load, so a
+   * deploy that lands before the SQL does degrades to "nothing yet" instead
+   * of an error screen.
+   */
+  { missingOk = false }: { missingOk?: boolean } = {},
 ): T[] | undefined {
   const { user } = useAuth()
   // Key on the id, not the object: the auth client hands out a fresh user
@@ -60,6 +71,12 @@ function useRealtimeTable<T>(
       // Status is settled by attempt id, so a late failure from a torn-down
       // effect can't mask a newer success — and vice versa. Data is only
       // applied while this effect is still the live one.
+      if (error && missingOk && isMissingTable(error)) {
+        console.warn(`${table} does not exist yet — run the latest migration in supabase/migrations.`)
+        if (active) setData([])
+        markLoaded(table, attempt)
+        return
+      }
       if (error) {
         console.error(`Failed to load ${table}`, error)
         markFailed(table, error.message, attempt)
@@ -88,9 +105,18 @@ function useRealtimeTable<T>(
       unregister()
       void supabase.removeChannel(channel)
     }
-  }, [userId, table, mapRow])
+  }, [userId, table, mapRow, missingOk])
 
   return data
+}
+
+/** PostgREST's "relation not in the schema cache" / Postgres's "undefined table". */
+function isMissingTable(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    /does not exist|schema cache/i.test(error.message ?? '')
+  )
 }
 
 export function useContacts(): Contact[] | undefined {
@@ -153,3 +179,23 @@ export function useEvents(): CalendarEvent[] | undefined {
     [events],
   )
 }
+
+/** Every follow-up, open and done, soonest first. */
+export function useFollowUps(): FollowUp[] | undefined {
+  const items = useRealtimeTable(
+    'follow_ups',
+    rowToFollowUp as (row: never) => FollowUp,
+    MISSING_OK,
+  )
+  return React.useMemo(
+    () => (items ? [...items].sort((a, b) => a.dueDate.localeCompare(b.dueDate)) : items),
+    [items],
+  )
+}
+
+export function useKeyDates(): KeyDate[] | undefined {
+  return useRealtimeTable('key_dates', rowToKeyDate as (row: never) => KeyDate, MISSING_OK)
+}
+
+/** Stable across renders, so the realtime effect doesn't resubscribe. */
+const MISSING_OK = { missingOk: true }

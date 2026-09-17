@@ -13,9 +13,21 @@ import { postApi } from '@/lib/apiFetch'
  * toast, and carry on with the non-AI path — and no AI call ever gates a save.
  */
 
+/** A photo sent with a message — base64, no `data:` prefix. */
+export interface AiImageBlock {
+  type: 'image'
+  source: { type: 'base64'; media_type: 'image/jpeg' | 'image/png' | 'image/webp'; data: string }
+}
+
+export interface AiTextBlock {
+  type: 'text'
+  text: string
+}
+
 export interface AiMessage {
   role: 'user' | 'assistant'
-  content: string
+  /** Plain text, or blocks when a photo goes with it. */
+  content: string | (AiTextBlock | AiImageBlock)[]
 }
 
 export interface AskOptions {

@@ -1,6 +1,8 @@
 import type {
   CalendarEvent,
   Contact,
+  FollowUp,
+  KeyDate,
   Interaction,
   Opportunity,
   OutreachTemplate,
@@ -27,6 +29,8 @@ export interface ContactRepository {
   getAll(): Promise<Contact[]>
   getById(id: string): Promise<Contact | undefined>
   create(draft: ContactDraft): Promise<Contact>
+  /** One round trip for many — used by address-book import. */
+  createMany(drafts: ContactDraft[]): Promise<Contact[]>
   update(id: string, patch: ContactPatch): Promise<Contact>
   remove(id: string): Promise<void>
   /** Warn-on-add duplicate detection: same name + company (case-insensitive). */
@@ -104,4 +108,28 @@ export interface EventRepository {
   remove(id: string): Promise<void>
   replaceAll(items: CalendarEvent[]): Promise<void>
   clear(): Promise<void>
+}
+
+export type FollowUpDraft = Omit<FollowUp, 'id' | 'createdAt' | 'updatedAt'>
+export type FollowUpPatch = Partial<Omit<FollowUp, 'id' | 'createdAt'>>
+
+export interface FollowUpRepository {
+  getAll(): Promise<FollowUp[]>
+  create(draft: FollowUpDraft): Promise<FollowUp>
+  update(id: string, patch: FollowUpPatch): Promise<FollowUp>
+  remove(id: string): Promise<void>
+  /** Bulk insert with ids kept — backup restore and duplicate merges. */
+  insertAll(items: FollowUp[]): Promise<void>
+}
+
+export type KeyDateDraft = Omit<KeyDate, 'id' | 'createdAt' | 'updatedAt'>
+export type KeyDatePatch = Partial<Omit<KeyDate, 'id' | 'createdAt'>>
+
+export interface KeyDateRepository {
+  getAll(): Promise<KeyDate[]>
+  create(draft: KeyDateDraft): Promise<KeyDate>
+  update(id: string, patch: KeyDatePatch): Promise<KeyDate>
+  remove(id: string): Promise<void>
+  /** Bulk insert with ids kept — address-book import and backup restore. */
+  insertAll(items: KeyDate[]): Promise<void>
 }

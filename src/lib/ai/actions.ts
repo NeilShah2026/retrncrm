@@ -1,5 +1,5 @@
 import { addMinutes, format, isValid, parseISO } from 'date-fns'
-import { contactRepo, eventRepo, opportunityRepo } from '@/services'
+import { contactRepo, eventRepo, followUpRepo, keyDateRepo, opportunityRepo } from '@/services'
 import { ensureTags } from '@/lib/tagging'
 import {
   CONNECTION_TYPE_KEYS,
@@ -12,6 +12,8 @@ import {
   OPPORTUNITY_TYPE_KEYS,
 } from '@/lib/constants'
 import { formatDate, fullName, todayISO } from '@/lib/format'
+import { daysUntilDue } from '@/lib/followUps'
+import { MONTH_NAMES, daysInMonth } from '@/lib/keyDates'
 import { ROUTES } from '@/lib/routes'
 import type {
   ConnectionType,
@@ -107,6 +109,25 @@ export interface SetFollowUpAction {
   frequency: ContactFrequency
 }
 
+/** A one-off, dated follow-up — "remind me to email Sarah back in December". */
+export interface AddFollowUpAction {
+  type: 'add_followup'
+  person: string
+  /** ISO date */
+  dueDate: string
+  note?: string
+}
+
+/** A birthday or other yearly date. */
+export interface AddKeyDateAction {
+  type: 'add_key_date'
+  person: string
+  label: string
+  month: number
+  day: number
+  year?: number
+}
+
 export interface AddOpportunityAction {
   type: 'add_opportunity'
   company: string
@@ -125,6 +146,8 @@ export type AssistantAction =
   | AddNoteAction
   | AddTagsAction
   | SetFollowUpAction
+  | AddFollowUpAction
+  | AddKeyDateAction
   | AddOpportunityAction
 
 // ---------------------------------------------------------------------------
@@ -268,6 +291,36 @@ function parseAction(raw: Raw): AssistantAction | null {
       return { type: 'set_followup', person, frequency }
     }
 
+    case 'add_followup':
+    case 'add_follow_up':
+    case 'remind': {
+      const person = str(raw.person)
+      const dueDate = isoDate(raw.dueDate ?? raw.date)
+      if (!person || !dueDate || daysUntilDue(dueDate) < 0) return null
+      return { type: 'add_followup', person, dueDate, note: str(raw.note ?? raw.text, 140) }
+    }
+
+    case 'add_key_date':
+    case 'add_birthday': {
+      const person = str(raw.person)
+      const month = Number(raw.month)
+      const day = Number(raw.day)
+      const year = raw.year === undefined || raw.year === null ? undefined : Number(raw.year)
+      if (!person || !Number.isInteger(month) || month < 1 || month > 12) return null
+      if (!Number.isInteger(day) || day < 1 || day > daysInMonth(month)) return null
+      if (year !== undefined && (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear())) {
+        return null
+      }
+      return {
+        type: 'add_key_date',
+        person,
+        label: str(raw.label, 40) ?? 'Birthday',
+        month,
+        day,
+        year,
+      }
+    }
+
     case 'add_opportunity':
     case 'add_application': {
       const company = str(raw.company)
@@ -360,8 +413,18 @@ export function describeAction(action: AssistantAction): ActionDescription {
       }
     case 'set_followup':
       return {
-        label: `Follow up with ${action.person}`,
+        label: `Set a catch-up goal for ${action.person}`,
         detail: FREQUENCY_OPTIONS[action.frequency].label,
+      }
+    case 'add_followup':
+      return {
+        label: `Follow up with ${action.person}`,
+        detail: [formatDate(action.dueDate), action.note].filter(Boolean).join(' · '),
+      }
+    case 'add_key_date':
+      return {
+        label: `Save ${action.person}’s ${action.label.toLowerCase()}`,
+        detail: `${MONTH_NAMES[action.month - 1]} ${action.day}${action.year ? `, ${action.year}` : ''}`,
       }
     case 'add_opportunity':
       return {
@@ -616,6 +679,40 @@ async function runOne(
         action,
         status: 'done',
         message: `${contact.firstName}: ${FREQUENCY_OPTIONS[action.frequency].label.toLowerCase()}`,
+        route: ROUTES.contact(contact.id),
+      }
+    }
+
+    case 'add_followup': {
+      const contact = resolvePerson(action.person, index)
+      if (!contact) {
+        return { action, status: 'skipped', message: unresolved(action.person, index) }
+      }
+      await followUpRepo.create({ contactId: contact.id, dueDate: action.dueDate, note: action.note })
+      return {
+        action,
+        status: 'done',
+        message: `Follow-up with ${contact.firstName} set for ${formatDate(action.dueDate)}`,
+        route: ROUTES.contact(contact.id),
+      }
+    }
+
+    case 'add_key_date': {
+      const contact = resolvePerson(action.person, index)
+      if (!contact) {
+        return { action, status: 'skipped', message: unresolved(action.person, index) }
+      }
+      await keyDateRepo.create({
+        contactId: contact.id,
+        label: action.label,
+        month: action.month,
+        day: action.day,
+        year: action.year,
+      })
+      return {
+        action,
+        status: 'done',
+        message: `${action.label} saved for ${contact.firstName}`,
         route: ROUTES.contact(contact.id),
       }
     }

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { toast } from 'sonner'
-import { Mic } from 'lucide-react'
+import { AlarmClock, Cake, Loader2, Mic, ScanLine, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,11 @@ import { contactRepo } from '@/services'
 import { useAuth } from '@/auth/AuthProvider'
 import { defaultContactFrequency } from '@/lib/onboarding'
 import { parseSpokenContact } from '@/lib/voiceParse'
+import { saveCaptureReminders } from '@/components/reminders/followUpActions'
+import { CardScanError, scanBusinessCard } from '@/lib/ai/cardScan'
+import { AiUnavailableError } from '@/lib/ai/client'
+import { describeDue, dueInSentence } from '@/lib/followUps'
+import { formatKeyDate } from '@/lib/keyDates'
 import { fullName, todayISO } from '@/lib/format'
 import { dismissKeyboard } from '@/lib/keyboard'
 import { impactFeedback, successFeedback } from '@/lib/haptics'
@@ -24,6 +29,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved?: (contact: Contact) => void
+  /** A business card was read; the caller opens the full form with it. */
+  onCardScanned?: (fields: Partial<Contact>) => void
 }
 
 /**
@@ -33,15 +40,42 @@ interface Props {
  * and then adds, and a small microphone fills both fields from one sentence
  * for when typing is the harder option.
  */
-export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
+export function QuickAddSheet({ open, onOpenChange, onSaved, onCardScanned }: Props) {
   const { user } = useAuth()
   const speech = useSpeechRecognition()
   const [name, setName] = React.useState('')
   const [where, setWhere] = React.useState('')
   const [saving, setSaving] = React.useState(false)
   const [duplicate, setDuplicate] = React.useState<Contact | null>(null)
+  /** Reminders read out of the sentence that the user has waved away. */
+  const [dismissed, setDismissed] = React.useState({ followUp: false, birthday: false })
   const nameRef = React.useRef<HTMLInputElement>(null)
   const whereRef = React.useRef<HTMLInputElement>(null)
+  const cardRef = React.useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = React.useState(false)
+
+  async function scanCard(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !onCardScanned) return
+    speech.stop()
+    setScanning(true)
+    try {
+      const fields = await scanBusinessCard(file)
+      successFeedback()
+      // Whatever was already typed about where you met comes along too.
+      onCardScanned({ ...fields, whereWeMet: where.trim() || undefined, dateMet: todayISO() })
+    } catch (err) {
+      if (err instanceof AiUnavailableError) toast.error('Card scanning isn’t available right now.')
+      else if (err instanceof CardScanError) toast.error(err.message)
+      else {
+        console.error(err)
+        toast.error('Couldn’t read that card. Try again.')
+      }
+    } finally {
+      setScanning(false)
+    }
+  }
 
   // A fresh, empty sheet every time; the microphone never starts on its own.
   React.useEffect(() => {
@@ -49,6 +83,7 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
       setName('')
       setWhere('')
       setDuplicate(null)
+      setDismissed({ followUp: false, birthday: false })
       speech.reset()
     } else {
       speech.stop()
@@ -68,6 +103,16 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
     setWhere(heard.where)
     setDuplicate(null)
   }, [spoken])
+
+  // "…email her back in December" or "her birthday's March 3": whatever was
+  // said (or typed into either field) past the name and the place.
+  const extras = React.useMemo(() => {
+    const parsed = parseSpokenContact(spoken || [name, where].filter(Boolean).join('. '))
+    return {
+      followUp: dismissed.followUp ? undefined : parsed.followUp,
+      birthday: dismissed.birthday ? undefined : parsed.birthday,
+    }
+  }, [spoken, name, where, dismissed])
 
   const trimmedName = name.trim()
   const canSave = Boolean(trimmedName) && !saving
@@ -101,8 +146,13 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
         // the fast way still arrives with a cadence on it.
         contactFrequencyGoal: defaultContactFrequency(user),
       })
+      await saveCaptureReminders(created.id, extras)
       successFeedback()
-      toast.success(`${fullName(created)} added`)
+      toast.success(
+        extras.followUp
+          ? `${fullName(created)} added · follow up ${dueInSentence(extras.followUp.dueDate)}`
+          : `${fullName(created)} added`,
+      )
       onSaved?.(created)
       onOpenChange(false)
     } catch (err) {
@@ -181,14 +231,59 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
             />
           </div>
 
+          {(extras.followUp || extras.birthday) && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {extras.followUp && (
+                <ExtraChip
+                  icon={AlarmClock}
+                  label={`Follow up ${describeDue(extras.followUp.dueDate)}`}
+                  detail={extras.followUp.note}
+                  onDismiss={() => setDismissed((d) => ({ ...d, followUp: true }))}
+                />
+              )}
+              {extras.birthday && (
+                <ExtraChip
+                  icon={Cake}
+                  label={`Birthday ${formatKeyDate(extras.birthday)}`}
+                  onDismiss={() => setDismissed((d) => ({ ...d, birthday: true }))}
+                />
+              )}
+            </div>
+          )}
+
           {duplicate && (
             <p className="text-ios-footnote mt-2 px-4 text-warning" aria-live="polite">
               {fullName(duplicate)} is already in your contacts. Tap Add anyway to keep both.
             </p>
           )}
 
-          {speech.supported && (
-            <div className="mt-3 flex items-center justify-center">
+          {(speech.supported || onCardScanned) && (
+            <div className="mt-3 flex items-center justify-center gap-1">
+              {onCardScanned && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => cardRef.current?.click()}
+                    disabled={scanning}
+                    className="press text-ios-subhead flex h-9 items-center gap-2 rounded-full px-3.5 text-muted-foreground disabled:opacity-60"
+                  >
+                    {scanning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ScanLine className="h-4 w-4" strokeWidth={2.2} />
+                    )}
+                    {scanning ? 'Reading card…' : 'Scan a card'}
+                  </button>
+                  <input
+                    ref={cardRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => void scanCard(e)}
+                  />
+                </>
+              )}
+              {speech.supported && (
               <button
                 type="button"
                 onClick={toggleSpeech}
@@ -208,6 +303,7 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
                 </span>
                 {speech.listening ? 'Listening… tap to stop' : 'Or say it'}
               </button>
+              )}
             </div>
           )}
 
@@ -220,6 +316,37 @@ export function QuickAddSheet({ open, onOpenChange, onSaved }: Props) {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** A reminder the sentence will also set, with a way to not. */
+function ExtraChip({
+  icon: Icon,
+  label,
+  detail,
+  onDismiss,
+}: {
+  icon: typeof Mic
+  label: string
+  detail?: string
+  onDismiss: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-[12px] bg-brand/[0.08] py-1.5 pl-3.5 pr-1">
+      <Icon className="h-4 w-4 shrink-0 text-brand" strokeWidth={2.2} />
+      <span className="text-ios-subhead min-w-0 flex-1 truncate">
+        <span className="font-medium text-brand">{label}</span>
+        {detail && <span className="text-text-secondary"> · {detail}</span>}
+      </span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={`Don’t set: ${label}`}
+        className="press flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
   )
 }
 
@@ -264,7 +391,11 @@ function splitSpoken(sentence: string): { name: string; where: string } {
   const parsed = parseSpokenContact(sentence)
   const name = [parsed.firstName, parsed.lastName].filter(Boolean).join(' ')
   const after = sentence.match(/\b(?:at|from|during|in)\s+(?:the\s+|a\s+|an\s+)?(.+)$/i)?.[1]
-  const where = (after ?? parsed.whereWeMet ?? parsed.howWeMet ?? '').trim()
+  // A place stops at the first break: "the career fair, email her back in
+  // December" is the career fair plus a follow-up, not one long place.
+  const where = (after ?? parsed.whereWeMet ?? parsed.howWeMet ?? '')
+    .split(/\s*(?:[,.;]|—|\s-\s)\s*/)[0]
+    .trim()
   // Nothing recognisable as a name yet: show what was heard so it can be fixed.
   return name ? { name, where } : { name: after ? '' : sentence, where }
 }

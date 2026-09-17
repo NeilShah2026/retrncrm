@@ -17,6 +17,8 @@ import {
   Scale,
   CreditCard,
   LifeBuoy,
+  BookUser,
+  Bell,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -33,12 +35,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { InsetGroup, InsetRow, InsetRowIcon } from '@/components/ui/inset-list'
-import { useContacts, useOpportunities, useTags, useTemplates } from '@/hooks/useData'
+import {
+  useContacts,
+  useFollowUps,
+  useKeyDates,
+  useOpportunities,
+  useTags,
+  useTemplates,
+} from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { deleteAccount } from '@/lib/deleteAccount'
+import { isNative } from '@/lib/platform'
+import { ReminderSettingsRow } from '@/components/reminders/ReminderSettingsRow'
 import { LEGAL } from '@/pages/legal/legalInfo'
-import { contactRepo, opportunityRepo, tagRepo, templateRepo } from '@/services'
+import {
+  contactRepo,
+  followUpRepo,
+  keyDateRepo,
+  opportunityRepo,
+  tagRepo,
+  templateRepo,
+} from '@/services'
 import { ShareableProfileCard } from '@/components/profile/ShareableProfileCard'
 import { ProfileSheet } from '@/components/profile/ProfileSheet'
 import { EduVerificationCard } from '@/components/settings/EduVerificationCard'
@@ -52,7 +70,7 @@ import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
 
 export function SettingsPage() {
-  const { openOnboarding } = useUI()
+  const { openOnboarding, openImportContacts } = useUI()
   const { user, signOut } = useAuth()
   const { edu, label: planLabel, isPro } = useEntitlement()
   const isMobile = useIsMobile()
@@ -61,6 +79,8 @@ export function SettingsPage() {
   const tags = useTags() ?? []
   const opportunities = useOpportunities() ?? []
   const templates = useTemplates() ?? []
+  const followUps = useFollowUps() ?? []
+  const keyDates = useKeyDates() ?? []
   const fileRef = React.useRef<HTMLInputElement>(null)
 
   const [pendingImport, setPendingImport] = React.useState<ParsedImport | null>(null)
@@ -72,7 +92,7 @@ export function SettingsPage() {
   const [eduOpen, setEduOpen] = React.useState(false)
 
   function handleExportJson() {
-    exportJson(contacts, tags, opportunities, templates)
+    exportJson(contacts, tags, opportunities, templates, followUps, keyDates)
     toast.success('Exported JSON backup')
   }
 
@@ -108,11 +128,24 @@ export function SettingsPage() {
         await contactRepo.replaceAll(pendingImport.contacts)
         await opportunityRepo.replaceAll(pendingImport.opportunities)
         await templateRepo.replaceAll(pendingImport.templates)
+        // Rewriting contacts cascades their follow-ups and dates away; put
+        // back the ones in the backup.
+        await followUpRepo.insertAll(pendingImport.followUps)
+        await keyDateRepo.insertAll(pendingImport.keyDates)
       } else {
         await tagRepo.replaceAll(mergeById(tags, pendingImport.tags))
         await contactRepo.replaceAll(mergeById(contacts, pendingImport.contacts))
         await opportunityRepo.replaceAll(mergeById(opportunities, pendingImport.opportunities))
         await templateRepo.replaceAll(mergeById(templates, pendingImport.templates))
+        // Same cascade on a merge: restore what was here plus what came in,
+        // for every contact that still exists.
+        const kept = new Set(mergeById(contacts, pendingImport.contacts).map((c) => c.id))
+        await followUpRepo.insertAll(
+          mergeById(followUps, pendingImport.followUps).filter((f) => kept.has(f.contactId)),
+        )
+        await keyDateRepo.insertAll(
+          mergeById(keyDates, pendingImport.keyDates).filter((k) => kept.has(k.contactId)),
+        )
       }
       toast.success(`Imported ${pendingImport.contacts.length} contacts (${mode})`)
     } catch (err) {
@@ -260,6 +293,31 @@ export function SettingsPage() {
             onClick={() => fileRef.current?.click()}
           />
         </InsetGroup>
+
+        <InsetGroup
+          title="Bring people in"
+          footer={
+            isNative
+              ? 'Pick who to add from your iPhone’s Contacts. Their birthdays come too.'
+              : 'From a .vcf file exported from iCloud, Google Contacts or Outlook.'
+          }
+        >
+          <InsetRow
+            leading={<InsetRowIcon icon={BookUser} />}
+            title={isNative ? 'Import from Contacts' : 'Import a Contacts File'}
+            last
+            onClick={openImportContacts}
+          />
+        </InsetGroup>
+
+        {isNative && (
+          <InsetGroup
+            title="Reminders"
+            footer="Follow-ups and birthdays arrive as a notification at 9am on the day."
+          >
+            <ReminderSettingsRow icon={<InsetRowIcon icon={Bell} />} />
+          </InsetGroup>
+        )}
 
         <InsetGroup title="Help">
           <InsetRow
@@ -451,6 +509,18 @@ export function SettingsPage() {
               <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} className="shrink-0">
                 <Upload />
                 Choose file
+              </Button>
+            </PanelSection>
+            <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <p className="font-medium">Import contacts</p>
+                <p className="text-muted-foreground">
+                  From a .vcf file exported from iCloud, Google Contacts or Outlook. You pick who to add; birthdays come too.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={openImportContacts} className="shrink-0">
+                <BookUser />
+                Import
               </Button>
             </PanelSection>
           </Panel>

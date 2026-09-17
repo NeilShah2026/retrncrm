@@ -7,12 +7,17 @@
  * design; every field it finds is shown for confirmation before saving.
  *
  * "Met Sarah Chen at the career fair — she's a PM at Fidelity, Babson alum,
- *  class of 2022. Follow up in a month."
+ *  class of 2022. Email her back in December about the internship."
+ *
+ * A dated promise ("…in December", "next Tuesday") becomes a one-off
+ * follow-up; only a repeating phrase ("every month") sets a cadence.
  */
 
-import { todayISO } from './format'
-import { CONNECTION_TYPES, MEET_SOURCES } from './constants'
-import type { ConnectionType, ContactFrequency, MeetSource } from '@/types'
+import { formatDate, todayISO } from './format'
+import { CONNECTION_TYPES, FREQUENCY_OPTIONS, MEET_SOURCES } from './constants'
+import { extractFollowUp, type ExtractedFollowUp } from './followUps'
+import { formatKeyDate, parseBirthday } from './keyDates'
+import type { ConnectionType, ContactFrequency, KeyDate, MeetSource } from '@/types'
 
 export interface ParsedCapture {
   firstName?: string
@@ -30,6 +35,10 @@ export interface ParsedCapture {
   phone?: string
   linkedinUrl?: string
   contactFrequencyGoal?: ContactFrequency
+  /** A one-off, dated follow-up — created alongside the contact. */
+  followUp?: ExtractedFollowUp
+  /** Month/day (and year) of their birthday, if the sentence says it. */
+  birthday?: Pick<KeyDate, 'month' | 'day' | 'year'>
   dateMet?: string
   /** Tag names (not ids) — resolved or created at save time. */
   tagNames: string[]
@@ -107,13 +116,16 @@ const SOURCE_PHRASES: [RegExp, MeetSource][] = [
   [/\b(over (?:zoom|email|linkedin|twitter|discord|slack)|on (?:linkedin|twitter|discord|slack|reddit))\b/i, 'online'],
 ]
 
-/** "follow up in a month" → a cadence goal. */
+/**
+ * "keep in touch every month" → a cadence goal. Only repeating phrases:
+ * "in a month" is a one-off follow-up (see `extractFollowUp`).
+ */
 const CADENCE_PHRASES: [RegExp, ContactFrequency][] = [
-  [/\b(?:every|each) week\b|\bweekly\b|\bin a week\b/i, 'weekly'],
-  [/\b(?:every|each) month\b|\bmonthly\b|\bin a month\b|\bin (?:four|4) weeks\b/i, 'monthly'],
-  [/\b(?:every|each) (?:quarter|(?:three|3) months)\b|\bquarterly\b|\bin (?:three|3) months\b/i, 'quarterly'],
-  [/\b(?:every|each) (?:six|6) months\b|\btwice a year\b|\bin (?:six|6) months\b/i, 'biannually'],
-  [/\b(?:every|each) year\b|\byearly\b|\bannually\b|\bin a year\b/i, 'annually'],
+  [/\b(?:every|each) week\b|\bweekly\b/i, 'weekly'],
+  [/\b(?:every|each) month\b|\bmonthly\b/i, 'monthly'],
+  [/\b(?:every|each) (?:quarter|(?:three|3) months)\b|\bquarterly\b/i, 'quarterly'],
+  [/\b(?:every|each) (?:six|6) months\b|\btwice a year\b/i, 'biannually'],
+  [/\b(?:every|each) year\b|\byearly\b|\bannually\b/i, 'annually'],
 ]
 
 /** Capitalised words that still can't be part of a person's name. */
@@ -399,21 +411,19 @@ export function parseSpokenContact(input: string): ParsedCapture {
     result.connectionType = 'recruiter'
   }
 
-  // --- cadence ------------------------------------------------------------
+  // --- cadence & follow-up -------------------------------------------------
   for (const [re, freq] of CADENCE_PHRASES) {
     if (re.test(text)) {
       result.contactFrequencyGoal = freq
       break
     }
   }
-  if (
-    !result.contactFrequencyGoal &&
-    /\b(?:follow(?:\s|-)?up|reconnect|reach out|check in|ping|circle back|touch base)\b/i.test(
-      text,
-    )
-  ) {
-    result.contactFrequencyGoal = 'monthly'
-  }
+  // "follow up" with no date still means something: a week is the default.
+  const followUp = extractFollowUp(text, new Date(), { fallbackDays: 7 })
+  if (followUp) result.followUp = followUp
+
+  const birthday = parseBirthday(text)
+  if (birthday) result.birthday = birthday
 
   // --- tags ---------------------------------------------------------------
   const tagPhrase = text.match(
@@ -462,9 +472,19 @@ export function captureFields(p: ParsedCapture): CaptureField[] {
   if (p.contactFrequencyGoal && p.contactFrequencyGoal !== 'none') {
     out.push({
       key: 'contactFrequencyGoal',
-      label: 'Follow up',
-      value: p.contactFrequencyGoal,
+      label: 'Catch up',
+      value: FREQUENCY_OPTIONS[p.contactFrequencyGoal]?.short ?? p.contactFrequencyGoal,
     })
+  }
+  if (p.followUp) {
+    out.push({
+      key: 'followUp',
+      label: 'Follow up',
+      value: [formatDate(p.followUp.dueDate), p.followUp.note].filter(Boolean).join(' · '),
+    })
+  }
+  if (p.birthday) {
+    out.push({ key: 'birthday', label: 'Birthday', value: formatKeyDate(p.birthday) })
   }
   for (const t of p.tagNames) out.push({ key: 'tagNames', label: 'Tag', value: t })
   return out

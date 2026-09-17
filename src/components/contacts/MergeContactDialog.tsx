@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
-import { useContacts } from '@/hooks/useData'
-import { contactRepo } from '@/services'
+import { useContacts, useFollowUps, useKeyDates } from '@/hooks/useData'
+import { contactRepo, followUpRepo, keyDateRepo } from '@/services'
 import { fullName } from '@/lib/format'
 import { buildMergePatch } from '@/lib/mergeContacts'
 import type { Contact } from '@/types'
@@ -26,6 +26,8 @@ interface Props {
 
 export function MergeContactDialog({ open, onOpenChange, primary }: Props) {
   const contacts = useContacts() ?? []
+  const followUps = useFollowUps()
+  const keyDates = useKeyDates()
   const [query, setQuery] = React.useState('')
   const [dup, setDup] = React.useState<Contact | null>(null)
   const [merging, setMerging] = React.useState(false)
@@ -56,6 +58,22 @@ export function MergeContactDialog({ open, onOpenChange, primary }: Props) {
     setMerging(true)
     try {
       await contactRepo.update(primary.id, buildMergePatch(primary, dup))
+      // Follow-ups and dates belong to a contact by foreign key, so deleting
+      // the duplicate would take them with it — move them across first. A
+      // date the primary already has (their birthday twice) is left to go.
+      const primaryLabels = new Set(
+        (keyDates ?? [])
+          .filter((k) => k.contactId === primary.id)
+          .map((k) => k.label.toLowerCase()),
+      )
+      for (const f of (followUps ?? []).filter((f) => f.contactId === dup.id)) {
+        await followUpRepo.update(f.id, { contactId: primary.id })
+      }
+      for (const k of (keyDates ?? []).filter((k) => k.contactId === dup.id)) {
+        if (!primaryLabels.has(k.label.toLowerCase())) {
+          await keyDateRepo.update(k.id, { contactId: primary.id })
+        }
+      }
       await contactRepo.remove(dup.id)
       toast.success(`Merged ${fullName(dup)} into ${fullName(primary)}`)
       onOpenChange(false)

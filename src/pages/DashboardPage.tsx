@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { UserPlus, PenLine, CalendarDays, QrCode, Search } from 'lucide-react'
+import { BookUser, UserPlus, PenLine, CalendarDays, QrCode, Search } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
 import { BarButton } from '@/components/layout/MobileNavBar'
@@ -14,18 +14,22 @@ import { AssistantLauncher } from '@/components/ai/AssistantLauncher'
 import { NextUp } from '@/components/dashboard/BriefingCard'
 import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
 import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
+import { ComingUpPanel, FollowUpsPanel } from '@/components/dashboard/FollowUpsPanel'
 import {
   useContacts,
   useContactMap,
   useEvents,
+  useFollowUps,
+  useKeyDates,
   useOpportunities,
   useTagMap,
 } from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
 import { getReconnectStatus } from '@/lib/reconnect'
+import { isDue } from '@/lib/followUps'
 import { fullName, formatDateShort, daysSince } from '@/lib/format'
 import { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_KEYS } from '@/lib/constants'
-import type { CalendarEvent, Contact, Opportunity } from '@/types'
+import type { CalendarEvent, Contact, FollowUp, KeyDate, Opportunity } from '@/types'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 
@@ -38,9 +42,11 @@ export function DashboardPage() {
   const contacts = useContacts()
   const opportunities = useOpportunities()
   const events = useEvents()
+  const followUps = useFollowUps()
+  const keyDates = useKeyDates()
   const contactMap = useContactMap()
   const tagMap = useTagMap()
-  const { openNewContact, openVoiceCapture, openSearch } = useUI()
+  const { openNewContact, openVoiceCapture, openSearch, openImportContacts } = useUI()
   const navigate = useNavigate()
 
   return (
@@ -97,6 +103,10 @@ export function DashboardPage() {
                 <Button variant="outline" onClick={openNewContact}>
                   New contact
                 </Button>
+                <Button variant="outline" onClick={openImportContacts}>
+                  <BookUser />
+                  Import contacts
+                </Button>
               </>
             }
           />
@@ -107,6 +117,8 @@ export function DashboardPage() {
             contacts={list}
             opportunities={opportunities}
             events={events}
+            followUps={followUps ?? []}
+            keyDates={keyDates ?? []}
             contactMap={contactMap}
             tagMap={tagMap}
           />
@@ -120,16 +132,20 @@ function DashboardBody({
   contacts,
   opportunities,
   events,
+  followUps,
+  keyDates,
   contactMap,
   tagMap,
 }: {
   contacts: Contact[]
   opportunities: Opportunity[] | undefined
   events: CalendarEvent[] | undefined
+  followUps: FollowUp[]
+  keyDates: KeyDate[]
   contactMap: Map<string, Contact>
   tagMap: ReturnType<typeof useTagMap>
 }) {
-  const stats = computeStats(contacts, events, opportunities)
+  const stats = computeStats(contacts, events, opportunities, followUps)
   const pipeline = computePipelineStats(opportunities)
 
   return (
@@ -150,6 +166,12 @@ function DashboardBody({
         </div>
 
         <UpcomingMeetings events={events ?? []} contactMap={contactMap} />
+
+        <div className="lg:col-span-2">
+          <FollowUpsPanel followUps={followUps} contactMap={contactMap} />
+        </div>
+
+        <ComingUpPanel keyDates={keyDates} contactMap={contactMap} />
 
         <div className="lg:col-span-2">
           <NeedsAttention contacts={contacts} />
@@ -262,6 +284,15 @@ function MetricStrip({ stats }: { stats: Stats }) {
         label={stats.total === 1 ? 'contact' : 'contacts'}
         emphasis
       />
+      {stats.followUpsDue > 0 && (
+        <Metric
+          to={ROUTES.dashboard}
+          value={stats.followUpsDue}
+          label={stats.followUpsDue === 1 ? 'follow-up due' : 'follow-ups due'}
+          emphasis
+          tone="warning"
+        />
+      )}
       <Metric
         to={ROUTES.contactsOverdue}
         value={stats.overdueCount}
@@ -319,6 +350,7 @@ interface Stats {
   total: number
   recent: Contact[]
   overdueCount: number
+  followUpsDue: number
   meetingsThisWeek: number
   openOpportunities: number
 }
@@ -327,6 +359,7 @@ function computeStats(
   contacts: Contact[] | undefined,
   events: CalendarEvent[] | undefined,
   opportunities: Opportunity[] | undefined,
+  followUps: FollowUp[],
 ): Stats {
   const recentSorted = [...(contacts ?? [])].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
@@ -342,6 +375,7 @@ function computeStats(
     total: contacts?.length ?? 0,
     recent: recentSorted.slice(0, 5),
     overdueCount: (contacts ?? []).filter((c) => getReconnectStatus(c).overdue).length,
+    followUpsDue: followUps.filter((f) => isDue(f)).length,
     meetingsThisWeek,
     openOpportunities: (opportunities ?? []).filter((o) => o.stage !== 'closed').length,
   }

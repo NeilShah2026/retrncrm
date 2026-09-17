@@ -36,12 +36,23 @@ const MAX_TOKENS_CAP = 1500
 const DEFAULT_MAX_TOKENS = 700
 /** A roster of a few hundred contacts is ~40KB; past this something is wrong. */
 const MAX_BODY_BYTES = 120_000
+/**
+ * A request carrying a photo (a business card) gets more room: the client
+ * downsizes to ~1600px JPEG first, which is a few hundred KB as base64.
+ */
+const MAX_IMAGE_BODY_BYTES = 2_500_000
+const MAX_IMAGES = 2
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 /** The gateway is fast, but a hung upstream must not hold the function open. */
 const TIMEOUT_MS = 45_000
 
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
+
 interface ChatMessage {
   role: 'user' | 'assistant'
-  content: string
+  content: string | ContentBlock[]
 }
 
 interface AiRequestBody {
@@ -62,13 +73,39 @@ function json(body: unknown, status: number): Response {
   })
 }
 
+function isContentBlock(value: unknown): value is ContentBlock {
+  if (typeof value !== 'object' || value === null) return false
+  const b = value as Record<string, unknown>
+  if (b.type === 'text') return typeof b.text === 'string' && b.text.trim().length > 0
+  if (b.type !== 'image') return false
+  const src = b.source as Record<string, unknown> | undefined
+  return (
+    src?.type === 'base64' &&
+    typeof src.media_type === 'string' &&
+    IMAGE_TYPES.has(src.media_type) &&
+    typeof src.data === 'string' &&
+    /^[A-Za-z0-9+/=]+$/.test(src.data)
+  )
+}
+
 function isChatMessage(value: unknown): value is ChatMessage {
   if (typeof value !== 'object' || value === null) return false
   const m = value as Record<string, unknown>
+  if (m.role !== 'user' && m.role !== 'assistant') return false
+  if (typeof m.content === 'string') return m.content.trim().length > 0
+  // Images only ever come from the user, and only alongside valid blocks.
   return (
-    (m.role === 'user' || m.role === 'assistant') &&
-    typeof m.content === 'string' &&
-    m.content.trim().length > 0
+    Array.isArray(m.content) &&
+    m.content.length > 0 &&
+    m.content.every(isContentBlock) &&
+    (m.role === 'user' || m.content.every((b) => (b as ContentBlock).type === 'text'))
+  )
+}
+
+function imageCount(messages: ChatMessage[]): number {
+  return messages.reduce(
+    (n, m) => n + (Array.isArray(m.content) ? m.content.filter((b) => b.type === 'image').length : 0),
+    0,
   )
 }
 
@@ -105,7 +142,7 @@ async function handle(req: Request): Promise<Response> {
   }
 
   const raw = await req.text()
-  if (raw.length > MAX_BODY_BYTES) {
+  if (raw.length > MAX_IMAGE_BODY_BYTES) {
     return json({ error: 'That request is too large.' }, 413)
   }
 
@@ -126,6 +163,11 @@ async function handle(req: Request): Promise<Response> {
     : []
   if (messages.length === 0) {
     return json({ error: 'No prompt provided.' }, 400)
+  }
+  // The larger ceiling is only for requests that actually carry a photo.
+  const images = imageCount(messages)
+  if (images > MAX_IMAGES || (images === 0 && raw.length > MAX_BODY_BYTES)) {
+    return json({ error: 'That request is too large.' }, 413)
   }
 
   const requested =

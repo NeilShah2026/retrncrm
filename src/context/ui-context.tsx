@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { QuickAddSheet } from '@/components/contacts/QuickAddSheet'
+import { ImportContactsDialog } from '@/components/contacts/ImportContactsDialog'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useAuth } from '@/auth/AuthProvider'
@@ -13,6 +14,8 @@ import type { Contact } from '@/types'
 
 interface UIContextValue {
   openNewContact: () => void
+  /** The full contact form, pre-filled — a scanned business card, say. */
+  openNewContactWith: (prefill: Partial<Contact>) => void
   /** The one-sentence capture sheet — the low-friction way to add someone. */
   openVoiceCapture: () => void
   openEditContact: (contact: Contact) => void
@@ -24,6 +27,8 @@ interface UIContextValue {
   openAssistant: (question?: string) => void
   /** Runs the first-run flow again, from Settings. */
   openOnboarding: () => void
+  /** Bring people in from the phone's Contacts or a .vcf file. */
+  openImportContacts: () => void
 }
 
 const UIContext = React.createContext<UIContextValue | null>(null)
@@ -46,12 +51,21 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const { handOff } = useAssistant()
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Contact | null>(null)
+  const [prefill, setPrefill] = React.useState<Partial<Contact> | undefined>()
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
+  const [importOpen, setImportOpen] = React.useState(false)
   const isMobile = useIsMobile()
 
   const openNewContact = React.useCallback(() => {
     setEditing(null)
+    setPrefill(undefined)
+    setFormOpen(true)
+  }, [])
+
+  const openNewContactWith = React.useCallback((next: Partial<Contact>) => {
+    setEditing(null)
+    setPrefill(next)
     setFormOpen(true)
   }, [])
 
@@ -71,6 +85,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     [handOff, navigate],
   )
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
+  const openImportContacts = React.useCallback(() => setImportOpen(true), [])
   const openOnboarding = React.useCallback(
     () => navigate(ROUTES.onboarding),
     [navigate],
@@ -135,19 +150,23 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo(
     () => ({
       openNewContact,
+      openNewContactWith,
       openVoiceCapture,
       openEditContact,
       openSearch,
       openAssistant,
       openOnboarding,
+      openImportContacts,
     }),
     [
       openNewContact,
+      openNewContactWith,
       openVoiceCapture,
       openEditContact,
       openSearch,
       openAssistant,
       openOnboarding,
+      openImportContacts,
     ],
   )
 
@@ -158,14 +177,23 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         open={formOpen}
         onOpenChange={setFormOpen}
         contact={editing}
+        prefill={prefill}
       />
       {/* A phone gets the two-field sheet — name, where you met, a small mic.
           A desktop keeps the one-sentence capture with its review step. */}
       {isMobile ? (
-        <QuickAddSheet open={voiceOpen} onOpenChange={setVoiceOpen} />
+        <QuickAddSheet
+          open={voiceOpen}
+          onOpenChange={setVoiceOpen}
+          onCardScanned={(fields) => {
+            setVoiceOpen(false)
+            openNewContactWith(fields)
+          }}
+        />
       ) : (
         <VoiceCaptureDialog open={voiceOpen} onOpenChange={setVoiceOpen} />
       )}
+      <ImportContactsDialog open={importOpen} onOpenChange={setImportOpen} />
       <CommandPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}

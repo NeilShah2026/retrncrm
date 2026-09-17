@@ -12,6 +12,7 @@ import {
   UserPlus,
   Users,
   X,
+  BookUser,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -70,7 +71,7 @@ export function ContactsPage() {
   const contacts = useContacts()
   const tags = useTags() ?? []
   const tagMap = useTagMap()
-  const { openNewContact, openVoiceCapture } = useUI()
+  const { openNewContact, openVoiceCapture, openImportContacts } = useUI()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [query, setQuery] = React.useState(searchParams.get('q') ?? '')
@@ -323,6 +324,10 @@ export function ContactsPage() {
                 <Button variant="outline" onClick={openNewContact}>
                   <ClipboardPaste />
                   Paste from LinkedIn
+                </Button>
+                <Button variant="outline" onClick={openImportContacts}>
+                  <BookUser />
+                  Import contacts
                 </Button>
               </>
             }

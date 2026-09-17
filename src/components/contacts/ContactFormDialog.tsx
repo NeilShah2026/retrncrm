@@ -11,6 +11,8 @@ import {
   Plus,
   Upload,
   X,
+  Loader2,
+  ScanLine,
 } from 'lucide-react'
 import {
   Dialog,
@@ -70,6 +72,8 @@ import { tapFeedback } from '@/lib/haptics'
 import { createId } from '@/lib/utils'
 import { fullName } from '@/lib/format'
 import { parseLinkedIn } from '@/lib/linkedin'
+import { CardScanError, scanBusinessCard } from '@/lib/ai/cardScan'
+import { AiUnavailableError } from '@/lib/ai/client'
 import type {
   Contact,
   ConnectionType,
@@ -205,6 +209,8 @@ export function ContactFormDialog({
   const [photoOpen, setPhotoOpen] = React.useState(false)
   const [photoUrl, setPhotoUrl] = React.useState('')
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const cardInputRef = React.useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = React.useState(false)
   const firstNameRef = React.useRef<HTMLInputElement>(null)
   const lastNameRef = React.useRef<HTMLInputElement>(null)
   const companyRef = React.useRef<HTMLInputElement>(null)
@@ -262,6 +268,62 @@ export function ContactFormDialog({
       parsed.linkedinUrl && 'LinkedIn',
     ].filter(Boolean)
     toast.success(`Filled ${filled.join(', ') || 'what we could find'} — review below`)
+  }
+
+  /** A photo of their business card → the empty fields, filled for review. */
+  async function handleCard(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setScanning(true)
+    try {
+      const card = await scanBusinessCard(file)
+      const filled: string[] = []
+      setForm((f) => {
+        const pick = (key: 'firstName' | 'lastName' | 'company' | 'jobTitle' | 'email' | 'phone' | 'linkedinUrl' | 'twitter', label: string) => {
+          const value = card[key]
+          if (!f[key] && value) {
+            filled.push(label)
+            return value
+          }
+          return f[key]
+        }
+        const known = new Set(f.otherLinks.map((l) => l.url))
+        return {
+          ...f,
+          firstName: pick('firstName', 'name'),
+          lastName: pick('lastName', 'name'),
+          company: pick('company', 'company'),
+          jobTitle: pick('jobTitle', 'title'),
+          email: pick('email', 'email'),
+          phone: pick('phone', 'phone'),
+          linkedinUrl: pick('linkedinUrl', 'LinkedIn'),
+          twitter: pick('twitter', 'X'),
+          otherLinks: [...f.otherLinks, ...card.otherLinks.filter((l) => !known.has(l.url))],
+          notes: card.notes && !f.notes.includes(card.notes) ? [f.notes.trim(), card.notes].filter(Boolean).join('\n\n') : f.notes,
+        }
+      })
+      setDuplicates([])
+      // Email and phone live under More Details — open it so nothing filled arrives hidden.
+      setExpanded(true)
+      const unique = [...new Set(filled)]
+      toast.success(
+        unique.length
+          ? `Filled ${unique.join(', ')} from the card. Check them before saving.`
+          : 'Read the card, but every field it found is already filled.',
+      )
+    } catch (err) {
+      if (err instanceof AiUnavailableError) {
+        toast.error('Card scanning needs the assistant, which isn’t available right now.')
+      } else if (err instanceof CardScanError) {
+        toast.error(err.message)
+      } else {
+        console.error(err)
+        toast.error('Couldn’t read that card. Try again.')
+      }
+    } finally {
+      setScanning(false)
+    }
   }
 
   // Reset the form whenever the dialog is (re)opened for a new target.
@@ -608,6 +670,21 @@ export function ContactFormDialog({
             }
           >
             <InsetRow
+              leading={
+                scanning ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-brand" />
+                ) : (
+                  <ScanLine className="h-5 w-5 text-brand" />
+                )
+              }
+              title={
+                <span className="text-brand">{scanning ? 'Reading Card…' : 'Scan Business Card'}</span>
+              }
+              chevron={false}
+              disabled={scanning}
+              onClick={() => cardInputRef.current?.click()}
+            />
+            <InsetRow
               leading={<ClipboardPaste className="h-5 w-5 text-brand" />}
               title={<span className="text-brand">Paste from LinkedIn</span>}
               chevron={false}
@@ -857,6 +934,15 @@ export function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Outside both layouts so either can trigger it; the card photo is
+          read and discarded, never kept as the contact's photo. */}
+      <input
+        ref={cardInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void handleCard(e)}
+      />
       {isMobile ? (
         renderPhone()
       ) : (
@@ -878,7 +964,18 @@ export function ContactFormDialog({
             }}
             className="space-y-5"
           >
-            {/* Quick-fill from LinkedIn (paste-to-parse — no scraping) */}
+            {/* Quick-fill: a card photo, or LinkedIn (paste-to-parse — no scraping) */}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={scanning}
+              onClick={() => cardInputRef.current?.click()}
+            >
+              {scanning ? <Loader2 className="animate-spin" /> : <ScanLine />}
+              {scanning ? 'Reading card…' : 'Scan business card'}
+            </Button>
             <Popover open={liOpen} onOpenChange={setLiOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -923,6 +1020,7 @@ export function ContactFormDialog({
                 </div>
               </PopoverContent>
             </Popover>
+            </div>
 
             {/* Photo + essentials */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">

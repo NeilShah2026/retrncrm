@@ -2,6 +2,8 @@ import type { Database } from '@/lib/database.types'
 import type {
   CalendarEvent,
   Contact,
+  FollowUp,
+  KeyDate,
   ConnectionType,
   ContactFrequency,
   Interaction,
@@ -229,5 +231,70 @@ export function eventToRow(
     logged: e.logged ?? false,
     created_at: e.createdAt,
     updated_at: e.updatedAt,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Follow-ups & key dates
+// ---------------------------------------------------------------------------
+
+type FollowUpRow = Database['public']['Tables']['follow_ups']['Row']
+type KeyDateRow = Database['public']['Tables']['key_dates']['Row']
+
+export function rowToFollowUp(row: FollowUpRow): FollowUp {
+  return {
+    id: row.id,
+    contactId: row.contact_id,
+    dueDate: row.due_date,
+    note: row.note ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function followUpToRow(
+  userId: string,
+  f: Partial<FollowUp> & { id: string },
+): Database['public']['Tables']['follow_ups']['Insert'] {
+  return {
+    id: f.id,
+    user_id: userId,
+    contact_id: f.contactId!,
+    due_date: f.dueDate!,
+    note: f.note ?? null,
+    completed_at: f.completedAt ?? null,
+    created_at: f.createdAt,
+    updated_at: f.updatedAt,
+  }
+}
+
+export function rowToKeyDate(row: KeyDateRow): KeyDate {
+  return {
+    id: row.id,
+    contactId: row.contact_id,
+    label: row.label,
+    month: row.month,
+    day: row.day,
+    year: row.year ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function keyDateToRow(
+  userId: string,
+  k: Partial<KeyDate> & { id: string },
+): Database['public']['Tables']['key_dates']['Insert'] {
+  return {
+    id: k.id,
+    user_id: userId,
+    contact_id: k.contactId!,
+    label: k.label ?? 'Birthday',
+    month: k.month!,
+    day: k.day!,
+    year: k.year ?? null,
+    created_at: k.createdAt,
+    updated_at: k.updatedAt,
   }
 }

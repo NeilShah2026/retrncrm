@@ -15,8 +15,11 @@ import {
   startOfWeek,
 } from 'date-fns'
 import {
+  AlarmClock,
+  Cake,
   CalendarClock,
   CalendarDays,
+  CalendarHeart,
   CalendarPlus,
   CalendarCheck,
   ChevronLeft,
@@ -34,22 +37,54 @@ import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { EventFormDialog } from '@/components/calendar/EventFormDialog'
 import { CalendarSyncDialog } from '@/components/calendar/CalendarSyncDialog'
-import { useEvents, useOpportunities, useContactMap } from '@/hooks/useData'
+import {
+  useContactMap,
+  useEvents,
+  useFollowUps,
+  useKeyDates,
+  useOpportunities,
+} from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { fullName } from '@/lib/format'
+import { nextOccurrence } from '@/lib/keyDates'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
-import type { CalendarEvent, Contact, Opportunity } from '@/types'
+import type { CalendarEvent, Contact } from '@/types'
 
 type View = 'month' | 'week' | 'agenda'
 
-type Item =
-  | { kind: 'event'; date: Date; event: CalendarEvent }
-  | { kind: 'deadline'; date: Date; opp: Opportunity }
+/**
+ * Anything on a day that isn't a meeting — an application deadline, a
+ * follow-up, a birthday. They render the same way everywhere: a short tag,
+ * a title, and a link to where the thing lives.
+ */
+interface Marker {
+  kind: 'marker'
+  date: Date
+  key: string
+  type: 'deadline' | 'follow-up' | 'key-date'
+  /** "Due", "Follow up", "Birthday" — the column label in week and agenda views. */
+  tag: string
+  /** Short enough for a month-grid cell. */
+  short: string
+  title: string
+  subtitle: string
+  to: string
+}
+
+type Item = { kind: 'event'; date: Date; event: CalendarEvent } | Marker
+
+const MARKER_STYLE: Record<Marker['type'], { text: string; chip: string; icon: typeof Cake }> = {
+  deadline: { text: 'text-warning', chip: 'bg-warning-soft text-warning', icon: CalendarClock },
+  'follow-up': { text: 'text-brand', chip: 'bg-brand/10 text-brand', icon: AlarmClock },
+  'key-date': { text: 'text-text-secondary', chip: 'bg-foreground/[0.06] text-text-secondary', icon: Cake },
+}
 
 export function CalendarPage() {
   const events = useEvents()
   const opportunities = useOpportunities()
+  const followUps = useFollowUps()
+  const keyDates = useKeyDates()
   const contactMap = useContactMap()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -85,12 +120,60 @@ export function CalendarPage() {
     if (showDeadlines) {
       for (const o of opportunities ?? []) {
         if (o.deadline && o.stage !== 'closed') {
-          out.push({ kind: 'deadline', date: parseISO(o.deadline), opp: o })
+          out.push({
+            kind: 'marker',
+            type: 'deadline',
+            key: `deadline-${o.id}`,
+            date: parseISO(o.deadline),
+            tag: 'Due',
+            short: `Due: ${o.company}`,
+            title: `${o.company} · ${o.role}`,
+            subtitle: 'Application due',
+            to: ROUTES.pipeline,
+          })
         }
       }
     }
+    for (const f of followUps ?? []) {
+      const contact = contactMap.get(f.contactId)
+      if (f.completedAt || !contact) continue
+      out.push({
+        kind: 'marker',
+        type: 'follow-up',
+        key: `follow-up-${f.id}`,
+        date: parseISO(f.dueDate),
+        tag: 'Follow up',
+        short: `↩ ${contact.firstName}`,
+        title: f.note || `Follow up with ${fullName(contact)}`,
+        subtitle: fullName(contact),
+        to: ROUTES.contact(contact.id),
+      })
+    }
+    // A key date recurs, so it's placed in last year, this year and next —
+    // enough for any month someone pages to from here.
+    const thisYear = new Date().getFullYear()
+    for (const k of keyDates ?? []) {
+      const contact = contactMap.get(k.contactId)
+      if (!contact) continue
+      for (const year of [thisYear - 1, thisYear, thisYear + 1]) {
+        const date = nextOccurrence(k, new Date(year, 0, 1))
+        if (date.getFullYear() !== year) continue
+        const birthday = /birthday/i.test(k.label)
+        out.push({
+          kind: 'marker',
+          type: 'key-date',
+          key: `key-date-${k.id}-${year}`,
+          date,
+          tag: birthday ? 'Birthday' : 'Date',
+          short: birthday ? `🎂 ${contact.firstName}` : `${contact.firstName}: ${k.label}`,
+          title: birthday ? `${fullName(contact)}’s birthday` : `${fullName(contact)} · ${k.label}`,
+          subtitle: k.label,
+          to: ROUTES.contact(contact.id),
+        })
+      }
+    }
     return out.sort((a, b) => a.date.getTime() - b.date.getTime())
-  }, [events, opportunities, showDeadlines])
+  }, [events, opportunities, followUps, keyDates, contactMap, showDeadlines])
 
   function openNew(dateStr?: string) {
     setEditing(null)
@@ -307,20 +390,28 @@ function WeekView({
                   </button>
                 ) : (
                   <Link
-                    key={`d-${it.opp.id}-${i}`}
-                    to={ROUTES.pipeline}
+                    key={it.key}
+                    to={it.to}
                     className="press-row flex w-full items-stretch gap-3 pl-4 text-left"
                   >
-                    <span className="text-ios-footnote flex w-12 shrink-0 items-center text-warning">
-                      Due
+                    <span
+                      className={cn(
+                        'text-ios-footnote flex w-12 shrink-0 items-center leading-tight',
+                        MARKER_STYLE[it.type].text,
+                      )}
+                    >
+                      {it.tag}
                     </span>
                     <span
                       className={cn(
-                        'flex min-w-0 flex-1 items-center py-3 pr-4',
+                        'flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-4',
                         i < dayItems.length - 1 && 'hairline-b',
                       )}
                     >
-                      <span className="text-ios-body truncate">{it.opp.company}</span>
+                      <span className="text-ios-body truncate">{it.title}</span>
+                      {it.type !== 'deadline' && (
+                        <span className="text-ios-footnote truncate text-muted-foreground">{it.subtitle}</span>
+                      )}
                     </span>
                   </Link>
                 ),
@@ -389,7 +480,7 @@ function MonthGrid({
                 {format(day, 'd')}
               </span>
               <div className="mt-0.5 space-y-0.5">
-                {dayItems.slice(0, 3).map((it, i) =>
+                {dayItems.slice(0, 3).map((it) =>
                   it.kind === 'event' ? (
                     <button
                       key={it.event.id}
@@ -407,12 +498,16 @@ function MonthGrid({
                     </button>
                   ) : (
                     <Link
-                      key={`d-${it.opp.id}-${i}`}
-                      to={ROUTES.pipeline}
+                      key={it.key}
+                      to={it.to}
+                      title={it.title}
                       onClick={(e) => e.stopPropagation()}
-                      className="block truncate rounded-sm bg-warning-soft px-1 py-px text-[11px] leading-4 text-warning"
+                      className={cn(
+                        'block truncate rounded-sm px-1 py-px text-[11px] leading-4',
+                        MARKER_STYLE[it.type].chip,
+                      )}
                     >
-                      Due: {it.opp.company}
+                      {it.short}
                     </Link>
                   ),
                 )}
@@ -477,7 +572,7 @@ function AgendaList({
             {format(parseISO(key), 'EEEE, MMM d')}
           </p>
           <ul>
-            {dayItems.map((it, i) =>
+            {dayItems.map((it) =>
               it.kind === 'event' ? (
                 <li key={it.event.id} className="border-b last:border-b-0">
                   <button
@@ -518,20 +613,15 @@ function AgendaList({
                   </button>
                 </li>
               ) : (
-                <li key={`d-${it.opp.id}-${i}`} className="border-b last:border-b-0">
+                <li key={it.key} className="border-b last:border-b-0">
                   <Link
-                    to={ROUTES.pipeline}
+                    to={it.to}
                     className="flex items-center gap-3 px-3 py-2.5 transition-colors duration-fast hover:bg-accent/50"
                   >
-                    <span className="flex w-24 shrink-0 items-center gap-1 text-xs text-warning">
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      Deadline
-                    </span>
+                    <MarkerTag marker={it} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">
-                        {it.opp.company} · {it.opp.role}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">Application due</span>
+                      <span className="block truncate text-sm">{it.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{it.subtitle}</span>
                     </span>
                   </Link>
                 </li>
@@ -541,5 +631,16 @@ function AgendaList({
         </div>
       ))}
     </div>
+  )
+}
+
+function MarkerTag({ marker }: { marker: Marker }) {
+  const { text, icon } = MARKER_STYLE[marker.type]
+  const Icon = marker.type === 'key-date' && marker.tag !== 'Birthday' ? CalendarHeart : icon
+  return (
+    <span className={cn('flex w-24 shrink-0 items-center gap-1 text-xs', text)}>
+      <Icon className="h-3.5 w-3.5" />
+      {marker.type === 'deadline' ? 'Deadline' : marker.tag}
+    </span>
   )
 }

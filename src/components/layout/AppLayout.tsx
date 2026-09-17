@@ -34,6 +34,7 @@ import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
+import { useReminderSync } from '@/hooks/useReminderSync'
 import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
@@ -209,6 +210,7 @@ export function AppLayout() {
   const [shareOpen, setShareOpen] = React.useState(false)
 
   useAutoLogMeetings()
+  useReminderSync()
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">

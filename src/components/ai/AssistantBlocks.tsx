@@ -10,6 +10,8 @@ import {
   Tag as TagIcon,
   TriangleAlert,
   UserPlus,
+  AlarmClockPlus,
+  Cake,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SuggestedBadge } from '@/components/ui/badge'
@@ -33,6 +35,8 @@ const ACTION_ICON: Record<AssistantAction['type'], typeof UserPlus> = {
   add_note: NotebookPen,
   add_tags: TagIcon,
   set_followup: Clock,
+  add_followup: AlarmClockPlus,
+  add_key_date: Cake,
   add_opportunity: KanbanSquare,
 }
 

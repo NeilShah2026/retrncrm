@@ -1,5 +1,5 @@
 /**
- * Hand-written to match supabase/migrations/0001_init.sql, in the same shape
+ * Hand-written to match supabase/migrations/ (0001–0004), in the same shape
  * `supabase gen types typescript` produces. Once the project is connected via
  * the CLI, regenerate the canonical version with:
  *   npx supabase gen types typescript --project-id <ref> > src/lib/database.types.ts
@@ -144,6 +144,46 @@ export interface Database {
           ends_at: string
         }
         Update: Partial<Database['public']['Tables']['events']['Row']>
+        Relationships: []
+      }
+      follow_ups: {
+        Row: {
+          id: string
+          user_id: string
+          contact_id: string
+          due_date: string
+          note: string | null
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['follow_ups']['Row']> & {
+          user_id: string
+          contact_id: string
+          due_date: string
+        }
+        Update: Partial<Database['public']['Tables']['follow_ups']['Row']>
+        Relationships: []
+      }
+      key_dates: {
+        Row: {
+          id: string
+          user_id: string
+          contact_id: string
+          label: string
+          month: number
+          day: number
+          year: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['key_dates']['Row']> & {
+          user_id: string
+          contact_id: string
+          month: number
+          day: number
+        }
+        Update: Partial<Database['public']['Tables']['key_dates']['Row']>
         Relationships: []
       }
       calendar_tokens: {

@@ -10,7 +10,14 @@ import * as React from 'react'
  * only the most recent attempt for a table is allowed to settle the status —
  * an older request finishing late can't overwrite a newer one.
  */
-export type TableName = 'contacts' | 'tags' | 'opportunities' | 'templates' | 'events'
+export type TableName =
+  | 'contacts'
+  | 'tags'
+  | 'opportunities'
+  | 'templates'
+  | 'events'
+  | 'follow_ups'
+  | 'key_dates'
 
 interface TableStatus {
   /** The last failure message, or null once a load succeeds. */

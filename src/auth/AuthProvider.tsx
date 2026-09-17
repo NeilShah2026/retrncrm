@@ -12,6 +12,7 @@ import {
   listenForNativeAuthRedirect,
   openNativeAuthUrl,
 } from '@/lib/nativeAuth'
+import { clearReminders } from '@/lib/reminderNotifications'
 
 interface AuthResult {
   error: string | null
@@ -156,6 +157,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // again. The receipt itself is untouched: restoring brings it straight
     // back for the Apple ID that actually paid.
     await clearSubscriptionCache()
+    // Reminders are scheduled on the phone itself, so they'd otherwise keep
+    // firing for this account after someone else signs in.
+    await clearReminders()
     await supabase.auth.signOut()
   }, [])
 

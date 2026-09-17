@@ -72,6 +72,8 @@
 	<string>Retrn uses your photo library so you can choose a photo for someone in your contacts.</string>
 	<!-- Say-who-you-met voice capture and dictation in the assistant
 	     (src/components/contacts/VoiceCaptureDialog.tsx, src/hooks/useSpeechRecognition.ts). -->
+	<key>NSContactsUsageDescription</key>
+	<string>Retrn reads your contacts so you can choose people to add to your network. Only the people you pick are saved.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Retrn uses your microphone so you can add a contact by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

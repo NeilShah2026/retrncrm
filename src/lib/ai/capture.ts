@@ -9,6 +9,9 @@ import {
 } from '@/lib/constants'
 import { MAX_TAGS_PER_CONTACT } from '@/lib/tagging'
 import type { ParsedCapture } from '@/lib/voiceParse'
+import { formatDate, todayISO } from '@/lib/format'
+import { daysUntilDue } from '@/lib/followUps'
+import { daysInMonth, formatKeyDate } from '@/lib/keyDates'
 import type { ConnectionType, ContactFrequency, MeetSource } from '@/types'
 
 /**
@@ -53,7 +56,9 @@ const FIELD_LABELS: Partial<Record<keyof ParsedCapture, string>> = {
   email: 'Email',
   phone: 'Phone',
   linkedinUrl: 'LinkedIn',
-  contactFrequencyGoal: 'Follow up',
+  contactFrequencyGoal: 'Catch up',
+  followUp: 'Follow up',
+  birthday: 'Birthday',
   tagNames: 'Tags',
   notes: 'Note',
 }
@@ -96,6 +101,9 @@ Keys:
   connectionType: one of ${CONNECTION_TYPE_KEYS.join(', ')}
   source: one of ${MEET_SOURCE_KEYS.join(', ')}
   contactFrequencyGoal: one of ${FREQUENCY_KEYS.join(', ')}
+  followUpDate: YYYY-MM-DD, resolved from today's date (given below the sentence)
+  followUpNote: what the speaker promised to do, as a short to-do ("Email her back about the internship")
+  birthday: MM-DD, or YYYY-MM-DD when the year is said
   tagNames: tags for this person (see the tag rule below)
   notes: the sentence rewritten as a clean note about this person
 
@@ -104,7 +112,12 @@ Rules:
 - Expand spoken shorthand in titles ("PM" -> "Product Manager").
 - Fix dictation artifacts in names and companies, but keep real spellings.
 - A school is only a school if the sentence says so; a workplace is the company.
-- Use contactFrequencyGoal only for an explicit cadence ("follow up in a month").
+- Use contactFrequencyGoal only for a repeating cadence ("every month", "quarterly").
+- A one-off promise with a time ("email her back in December", "follow up in \
+two weeks", "call him next Tuesday") is followUpDate + followUpNote, never a \
+cadence. A month on its own means the 1st of its next occurrence. If they \
+promise to follow up with no time at all, use a week from today. Omit both \
+keys when nothing was promised.
 - Tags: always include a tag the speaker asked for out loud. Beyond those, \
 add a tag from the user's existing tag list (given below the sentence) when \
 the sentence plainly puts this person in it, and at most one new tag of your \
@@ -129,6 +142,9 @@ interface RawCapture {
   connectionType?: unknown
   source?: unknown
   contactFrequencyGoal?: unknown
+  followUpDate?: unknown
+  followUpNote?: unknown
+  birthday?: unknown
   tagNames?: unknown
   notes?: unknown
 }
@@ -157,6 +173,11 @@ function humanize(key: keyof ParsedCapture, value: unknown): string {
   if (key === 'contactFrequencyGoal') {
     return FREQUENCY_OPTIONS[value as ContactFrequency]?.short ?? String(value)
   }
+  if (key === 'followUp') {
+    const f = value as NonNullable<ParsedCapture['followUp']>
+    return [formatDate(f.dueDate), f.note].filter(Boolean).join(' · ')
+  }
+  if (key === 'birthday') return formatKeyDate(value as NonNullable<ParsedCapture['birthday']>)
   if (Array.isArray(value)) return value.join(', ')
   return String(value)
 }
@@ -183,6 +204,7 @@ export async function refineCapture(
         role: 'user',
         content: [
           `Sentence: "${truncate(transcript, 1200)}"`,
+          `Today is ${todayISO()}.`,
           '',
           'The regex parser produced:',
           JSON.stringify(stripLocal(local)),
@@ -222,6 +244,8 @@ export async function refineCapture(
   apply('connectionType', pickEnum(raw.connectionType, CONNECTION_TYPE_KEYS))
   apply('source', pickEnum(raw.source, MEET_SOURCE_KEYS))
   apply('contactFrequencyGoal', pickEnum(raw.contactFrequencyGoal, FREQUENCY_KEYS))
+  apply('followUp', pickFollowUp(raw.followUpDate, raw.followUpNote))
+  apply('birthday', pickBirthday(raw.birthday))
 
   // The note is the one thing here that's prose rather than a field, so it
   // gets a prose-sized budget — and only replaces the transcript if the model
@@ -237,6 +261,26 @@ export async function refineCapture(
   if (tagNames?.length) apply('tagNames', tagNames)
 
   return { parsed, changes }
+}
+
+/** A follow-up date the model gave, if it's a real day between today and two years out. */
+function pickFollowUp(date: unknown, note: unknown): ParsedCapture['followUp'] {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined
+  const days = daysUntilDue(date)
+  if (Number.isNaN(days) || days < 0 || days > 730) return undefined
+  return { dueDate: date, note: cleanText(note, 140) }
+}
+
+function pickBirthday(value: unknown): ParsedCapture['birthday'] {
+  if (typeof value !== 'string') return undefined
+  const m = value.trim().match(/^(?:(\d{4})-)?(\d{2})-(\d{2})$/)
+  if (!m) return undefined
+  const month = Number(m[2])
+  const day = Number(m[3])
+  const year = m[1] ? Number(m[1]) : undefined
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(month)) return undefined
+  if (year !== undefined && (year < 1900 || year > new Date().getFullYear())) return undefined
+  return { month, day, year }
 }
 
 /** What the model sees of the local parse — fields, not bookkeeping. */

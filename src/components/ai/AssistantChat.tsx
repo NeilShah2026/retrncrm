@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useAssistant, type AssistantTurn } from '@/context/assistant-context'
 import { useUI } from '@/context/ui-context'
-import { useContacts, useTagMap, useTags } from '@/hooks/useData'
+import { useContacts, useFollowUps, useKeyDates, useTagMap, useTags } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { getReconnectStatus } from '@/lib/reconnect'
@@ -136,6 +136,8 @@ export function AssistantChat() {
   const contacts = React.useMemo(() => loaded ?? [], [loaded])
   const tags = useTags() ?? []
   const tagMap = useTagMap()
+  const reminderFollowUps = useFollowUps()
+  const reminderKeyDates = useKeyDates()
 
   const { turns, setTurns, busy, setBusy, draft, setDraft, session, epoch, pending, handoff } =
     useAssistant()
@@ -221,7 +223,10 @@ export function AssistantChat() {
         setTurns((t) => t.map((turn) => (turn.id === turnId ? { ...turn, ...patch } : turn)))
       try {
         const current = session.current ?? startSession()
-        const { answer, session: next } = await askNetwork(current, trimmed, contacts, tagMap)
+        const { answer, session: next } = await askNetwork(current, trimmed, contacts, tagMap, undefined, {
+          followUps: reminderFollowUps ?? [],
+          keyDates: reminderKeyDates ?? [],
+        })
         if (epoch.current !== startedAt) return
         session.current = next
         settle({ answer, fellBack: false, chosen: answer.actions.map(() => true) })
@@ -244,7 +249,7 @@ export function AssistantChat() {
         if (epoch.current === startedAt) setBusy(false)
       }
     },
-    [busy, contacts, tagMap, keywordFallback, session, epoch, setBusy, setDraft, setTurns, isMobile],
+    [busy, contacts, tagMap, reminderFollowUps, reminderKeyDates, keywordFallback, session, epoch, setBusy, setDraft, setTurns, isMobile],
   )
 
   const askRef = React.useRef(ask)

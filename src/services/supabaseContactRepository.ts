@@ -53,6 +53,28 @@ export class SupabaseContactRepository implements ContactRepository {
     return contact
   }
 
+  async createMany(drafts: ContactDraft[]): Promise<Contact[]> {
+    if (drafts.length === 0) return []
+    const userId = await getCurrentUserId()
+    const timestamp = now()
+    const contacts: Contact[] = drafts.map((draft) => ({
+      ...draft,
+      interactions: draft.interactions ?? [],
+      id: createId(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }))
+    // Chunked so a few-thousand-person address book stays under the request
+    // size limit; each chunk is still one round trip.
+    for (let i = 0; i < contacts.length; i += 200) {
+      const { error } = await supabase
+        .from('contacts')
+        .insert(contacts.slice(i, i + 200).map((c) => contactToRow(userId, c)))
+      if (error) throw error
+    }
+    return contacts
+  }
+
   async update(id: string, patch: ContactPatch): Promise<Contact> {
     const userId = await getCurrentUserId()
     const existing = await this.getById(id)

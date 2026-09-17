@@ -12,7 +12,8 @@ import {
   OPPORTUNITY_TYPE_KEYS,
 } from '@/lib/constants'
 import { fullName } from '@/lib/format'
-import type { Contact, Tag } from '@/types'
+import { MONTH_NAMES } from '@/lib/keyDates'
+import type { Contact, FollowUp, KeyDate, Tag } from '@/types'
 
 /**
  * The assistant: one box that both answers questions about your network and
@@ -115,7 +116,8 @@ ACTIONS
 
 When the message asks you to *record* something — "met Priya at the AI meetup, \
 she's a PM at Klaviyo", "coffee with Sarah next Tuesday at 3", "I spoke to \
-Marcus today", "tag Dan as fintech", "add the Fidelity internship, due Nov 1" \
+Marcus today", "tag Dan as fintech", "add the Fidelity internship, due Nov 1", \
+"remind me to email Sarah back in December", "Priya's birthday is March 3" \
 — put it in "actions" and say what you are about to do in "answer". The user \
 approves the list before any of it is saved, so propose the whole request; \
 never ask for confirmation in "answer" and never claim something is already \
@@ -129,6 +131,8 @@ doesn't give you — never invent a company, title, email, or time:
 {"type":"add_note","person":"Full Name","text":"…"}
 {"type":"add_tags","person":"Full Name","tagNames":["…"]}
 {"type":"set_followup","person":"Full Name","frequency":"${FREQUENCY_KEYS.join('|')}"}
+{"type":"add_followup","person":"Full Name","dueDate":"YYYY-MM-DD","note":"what to do, as a short to-do"}
+{"type":"add_key_date","person":"Full Name","label":"Birthday","month":3,"day":14,"year":1999}
 {"type":"add_opportunity","company":"…","role":"…","opportunityType":"${OPPORTUNITY_TYPE_KEYS.join('|')}","stage":"${OPPORTUNITY_STAGE_KEYS.join('|')}","deadline":"YYYY-MM-DD","people":["Full Name"]}
 
 connectionType is one of ${CONNECTION_TYPE_KEYS.join(', ')}. \
@@ -144,6 +148,13 @@ which is given with the roster. "next Tuesday at 3" becomes a real \
 YYYY-MM-DDTHH:mm. Never return a relative phrase. Assume a sensible hour when \
 one isn't given (coffee 9am, lunch 12pm, a call 10am) and say which you \
 assumed in "answer".
+- set_followup is a repeating cadence ("keep in touch every month"). A single \
+dated promise ("follow up in two weeks", "email her back in December", \
+"remind me to call Dan on Friday") is add_followup. A month on its own means \
+the 1st of its next occurrence.
+- add_key_date's year is optional; omit it unless it was said.
+- Roster entries may list open follow-ups ("follow-up due …") and birthdays; \
+use them to answer "who do I owe a follow-up?" or "whose birthday is coming up?".
 - Propose at most ${MAX_ACTIONS_HINT} actions, and only what was actually \
 asked for. Recording a person you were only asked about is wrong.
 - A question is not an instruction. "who should I follow up with?" is answered \
@@ -157,7 +168,18 @@ function todayStamp(): string {
 }
 
 /** One roster line: everything worth matching on, nothing worth paying for. */
-function rosterLine(contact: Contact, index: number, tagMap: Map<string, Tag>): string {
+/** Open follow-ups and key dates by contact, for the roster. */
+export interface RosterReminders {
+  followUps: FollowUp[]
+  keyDates: KeyDate[]
+}
+
+function rosterLine(
+  contact: Contact,
+  index: number,
+  tagMap: Map<string, Tag>,
+  reminders?: RosterReminders,
+): string {
   const parts: string[] = [`${index}. ${fullName(contact)}`]
 
   const role = [contact.jobTitle, contact.company].filter(Boolean).join(' at ')
@@ -193,6 +215,15 @@ function rosterLine(contact: Contact, index: number, tagMap: Map<string, Tag>): 
     parts.push('never followed up')
   }
 
+  for (const f of reminders?.followUps ?? []) {
+    if (f.contactId !== contact.id || f.completedAt) continue
+    parts.push(`follow-up due ${f.dueDate}${f.note ? `: ${truncate(f.note, 60)}` : ''}`)
+  }
+  for (const k of reminders?.keyDates ?? []) {
+    if (k.contactId !== contact.id) continue
+    parts.push(`${k.label.toLowerCase()} ${MONTH_NAMES[k.month - 1]} ${k.day}`)
+  }
+
   const notes = truncate(
     [contact.howWeMet, contact.talkingPoints, contact.notes].filter(Boolean).join('. '),
     MAX_NOTE_CHARS,
@@ -206,6 +237,7 @@ function rosterLine(contact: Contact, index: number, tagMap: Map<string, Tag>): 
 export function buildRoster(
   contacts: Contact[],
   tagMap: Map<string, Tag>,
+  reminders?: RosterReminders,
 ): { text: string; included: Contact[] } {
   // Richest records first, so a cap trims the people we know least about.
   const ordered = [...contacts]
@@ -216,7 +248,7 @@ export function buildRoster(
   const included: Contact[] = []
   let size = 0
   for (const contact of ordered) {
-    const line = rosterLine(contact, included.length + 1, tagMap)
+    const line = rosterLine(contact, included.length + 1, tagMap, reminders)
     if (size + line.length > MAX_ROSTER_CHARS) break
     lines.push(line)
     included.push(contact)
@@ -264,6 +296,7 @@ export async function askNetwork(
   contacts: Contact[],
   tagMap: Map<string, Tag>,
   signal?: AbortSignal,
+  reminders?: RosterReminders,
 ): Promise<{ answer: NetworkAnswer; session: NetworkSession }> {
   const asked = truncate(question, 400)
 
@@ -272,7 +305,7 @@ export async function askNetwork(
   if (turns.length === 0) {
     // Build the roster now so it reflects the contacts as they are today,
     // not as they were when the dialog opened.
-    const built = buildRoster(contacts, tagMap)
+    const built = buildRoster(contacts, tagMap, reminders)
     roster = built.included
     turns = [
       {

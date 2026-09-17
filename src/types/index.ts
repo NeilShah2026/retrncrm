@@ -230,3 +230,41 @@ export interface OutreachTemplate {
   createdAt: string
   updatedAt: string
 }
+
+// ---------------------------------------------------------------------------
+// Follow-ups & key dates
+// ---------------------------------------------------------------------------
+
+/**
+ * A one-off promise to get back to someone on a date — "email her back in
+ * December". Not a cadence: `Contact.contactFrequencyGoal` is the standing
+ * "every month" goal; this is the single thing you said you'd do.
+ */
+export interface FollowUp {
+  id: string
+  contactId: string
+  /** ISO date (yyyy-mm-dd) it's due. */
+  dueDate: string
+  /** What to do — "Email back about the summer internship". */
+  note?: string
+  /** ISO datetime it was done; absent while open. */
+  completedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Something about a person that comes round every year. */
+export interface KeyDate {
+  id: string
+  contactId: string
+  /** "Birthday", "Work anniversary", or the user's own words. */
+  label: string
+  /** 1–12 */
+  month: number
+  /** 1–31 */
+  day: number
+  /** Optional — a birthday is usually known without one. */
+  year?: number
+  createdAt: string
+  updatedAt: string
+}

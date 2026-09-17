@@ -30,6 +30,7 @@ import { fullName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
 import type { ContactDraft } from '@/services/types'
+import { saveCaptureReminders } from '@/components/reminders/followUpActions'
 
 interface Props {
   open: boolean
@@ -205,6 +206,7 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
       }
       const tagIds = await resolveTags(parsed.tagNames)
       const created = await contactRepo.create(toDraft(parsed, tagIds))
+      await saveCaptureReminders(created.id, parsed)
       successFeedback()
       toast.success(`${fullName(created)} added`)
       onSaved?.(created)

@@ -85,10 +85,23 @@ export function PrivacyPolicyPage() {
               links, notes), outreach templates, and tags.
             </>,
             <>
+              <Strong>Follow-ups and key dates.</Strong> Reminders you set to get
+              back to someone (a due date and what to do) and yearly dates such as
+              a contact&rsquo;s birthday or work anniversary.
+            </>,
+            <>
               <Strong>Photos.</Strong> Images you take with your camera, choose
               from your photo library, or link by URL to use as a contact&rsquo;s
-              photo. We only access your camera or photo library when you choose
-              to add a photo, and only the image you select is uploaded.
+              photo, and photos of business cards you choose to scan. We only
+              access your camera or photo library when you choose to add or scan a
+              photo, and only the image you select is used. A business card photo
+              is used to read the card and is not stored (Section 4.1).
+            </>,
+            <>
+              <Strong>Contacts you import.</Strong> If you import from your
+              iPhone&rsquo;s Contacts or a contacts file, the people you choose and
+              their name, company, job title, email, phone, links, and birthday
+              (Section 4.3).
             </>,
             <>
               <Strong>Voice and typed input.</Strong> Sentences you speak or type
@@ -132,8 +145,9 @@ export function PrivacyPolicyPage() {
         <P>
           We do <Strong>not</Strong> use third-party analytics, advertising, or
           tracking SDKs, and we do not use cookies for advertising. We do not
-          collect your precise location, and we do not access your device&rsquo;s
-          address book, calendar, or health data.
+          collect your precise location, we do not access your device&rsquo;s
+          calendar or health data, and we only read your device&rsquo;s address
+          book when you choose to import from it.
         </P>
 
         <H3>2.3 Information from other sources</H3>
@@ -225,7 +239,8 @@ export function PrivacyPolicyPage() {
           items={[
             'What you typed or dictated, and your questions to the assistant',
             'Relevant details from your contacts (for example names, companies, roles, tags, notes, how you met, and last-contact dates)',
-            'Relevant upcoming meetings, pipeline opportunities, and templates',
+            'Relevant upcoming meetings, pipeline opportunities, templates, open follow-ups, and birthdays',
+            'A photo of a business card, when you choose to scan one',
             "Today's date, so relative dates like \"next Tuesday\" can be resolved",
           ]}
         />
@@ -243,6 +258,13 @@ export function PrivacyPolicyPage() {
           AI output can be wrong. Nothing an AI feature proposes is saved to your
           account until you review and confirm it, and AI features never send a
           message, email, or invitation on your behalf.
+        </P>
+        <P>
+          <Strong>Business card scanning.</Strong> When you scan a card, the photo
+          is resized on your device and sent once to our AI provider to read the
+          name, company, title, and contact details printed on it. The fields it
+          finds are filled into the contact form for you to review. Retrn does not
+          store the photo, and it is not saved as the contact&rsquo;s picture.
         </P>
 
         <H3>4.2 Voice input</H3>
@@ -276,6 +298,31 @@ export function PrivacyPolicyPage() {
           The transcribed text is treated like anything else you type: it is
           saved only if you save the contact, and it may be sent to our AI
           provider for smart capture as described above.
+        </P>
+
+        <H3>4.3 Importing contacts</H3>
+        <P>
+          In the iOS app you can import people from your iPhone&rsquo;s Contacts,
+          and on the web from a contacts (.vcf) file. Retrn asks for Contacts
+          permission only when you start an import. Your address book is read on
+          your device and shown as a list; <Strong>only the people you select are
+          uploaded</Strong> to your Retrn account, along with the name, company,
+          job title, email, phone, links, and birthday stored for them. Nothing
+          else from your address book leaves your device, and Retrn does not
+          re-read your contacts in the background. You can revoke Contacts access
+          at any time in iOS Settings.
+        </P>
+
+        <H3>4.4 Reminders and notifications</H3>
+        <P>
+          If you allow notifications in the iOS app, Retrn schedules reminders for
+          your follow-ups and key dates <Strong>on your device</Strong>, using
+          iOS local notifications. There is no push notification server: the
+          reminder is created by the app from data already on your phone, and no
+          device token is sent to us or to anyone else. A notification shows the
+          contact&rsquo;s name and your follow-up note, so it may be visible on
+          your lock screen depending on your iOS settings. Signing out removes
+          all scheduled reminders from the device.
         </P>
       </Section>
 
@@ -482,16 +529,18 @@ export function PrivacyPolicyPage() {
             </>,
             <>
               <Strong>Clear all data:</Strong> <em>Settings → Clear all data</em>{' '}
-              permanently deletes every contact, activity, tag, opportunity, and
-              template in your account while keeping your login.
+              permanently deletes every contact (with their follow-ups and key
+              dates), activity, tag, opportunity, and template in your account
+              while keeping your login.
             </>,
             <>
               <Strong>Deleting your account:</Strong>{' '}
               <em>Settings → Delete account</em> permanently deletes your account
               and everything in it, immediately and from inside the app — no
               request and no waiting period. When an account is deleted, all of
-              its contacts, meetings, opportunities, templates, tags, calendar
-              feed links, and verification records are deleted with it. If you
+              its contacts, follow-ups, key dates, meetings, opportunities,
+              templates, tags, calendar feed links, and verification records are
+              deleted with it. If you
               would rather we did it for you, email{' '}
               <Mail to={LEGAL.emails.privacy} /> from the address on your account
               and we will delete it within 30 days.
@@ -531,8 +580,8 @@ export function PrivacyPolicyPage() {
             </>,
             <>
               <Strong>Withdraw permissions</Strong> for the camera, photo library,
-              microphone, and speech recognition in your device settings. The rest
-              of Retrn keeps working.
+              contacts, microphone, speech recognition, and notifications in your
+              device settings. The rest of Retrn keeps working.
             </>,
             <>
               <Strong>Opt out</Strong> of marketing emails using the unsubscribe

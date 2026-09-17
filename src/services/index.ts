@@ -3,9 +3,15 @@ import { SupabaseTagRepository } from './supabaseTagRepository'
 import { SupabaseOpportunityRepository } from './supabaseOpportunityRepository'
 import { SupabaseTemplateRepository } from './supabaseTemplateRepository'
 import { SupabaseEventRepository } from './supabaseEventRepository'
+import {
+  SupabaseFollowUpRepository,
+  SupabaseKeyDateRepository,
+} from './supabaseReminderRepositories'
 import type {
   ContactRepository,
   EventRepository,
+  FollowUpRepository,
+  KeyDateRepository,
   OpportunityRepository,
   TagRepository,
   TemplateRepository,
@@ -24,5 +30,7 @@ export const opportunityRepo: OpportunityRepository =
   new SupabaseOpportunityRepository()
 export const templateRepo: TemplateRepository = new SupabaseTemplateRepository()
 export const eventRepo: EventRepository = new SupabaseEventRepository()
+export const followUpRepo: FollowUpRepository = new SupabaseFollowUpRepository()
+export const keyDateRepo: KeyDateRepository = new SupabaseKeyDateRepository()
 
 export * from './types'

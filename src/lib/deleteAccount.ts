@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { postApi } from '@/lib/apiFetch'
 import { clearSubscriptionCache } from '@/lib/billing/store'
+import { clearReminders } from '@/lib/reminderNotifications'
 
 /**
  * Delete this account for good.
@@ -27,5 +28,6 @@ export async function deleteAccount(): Promise<void> {
   }
 
   await clearSubscriptionCache()
+  await clearReminders()
   await supabase.auth.signOut().catch(() => {})
 }
