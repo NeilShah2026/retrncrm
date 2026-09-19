@@ -45,6 +45,7 @@ import {
   useTemplates,
 } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useFeatureGate } from '@/hooks/useFeatureGate'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { deleteAccount } from '@/lib/deleteAccount'
 import { isNative } from '@/lib/platform'
@@ -74,6 +75,7 @@ import { isAdmin } from '@/lib/admin'
 
 export function SettingsPage() {
   const { openOnboarding, openImportContacts, openUpgrade } = useUI()
+  const gate = useFeatureGate()
   const { user, signOut } = useAuth()
   const { edu, label: planLabel, isPro } = useEntitlement()
   const isMobile = useIsMobile()
@@ -95,11 +97,13 @@ export function SettingsPage() {
   const [eduOpen, setEduOpen] = React.useState(false)
 
   function handleExportJson() {
+    if (!gate.require('export')) return
     exportJson(contacts, tags, opportunities, templates, followUps, keyDates)
     toast.success('Exported JSON backup')
   }
 
   function handleExportCsv() {
+    if (!gate.require('export')) return
     if (contacts.length === 0) {
       toast.error('No contacts to export.')
       return
@@ -245,12 +249,14 @@ export function SettingsPage() {
           />
         </InsetGroup>
 
-        <InsetGroup title="Babson">
+        <InsetGroup title="Student">
           <InsetRow
-            leading={<InsetRowIcon icon={edu.verified ? BadgeCheck : GraduationCap} />}
-            title={edu.verified ? 'Babson Student' : 'Verify School Email'}
-            subtitle={edu.verified ? edu.email : 'Free with an @babson.edu address'}
-            detail={edu.verified ? 'Free' : undefined}
+            leading={<InsetRowIcon icon={edu.student ? BadgeCheck : GraduationCap} />}
+            title={edu.student ? 'School Email' : 'Verify School Email'}
+            subtitle={
+              edu.student ? edu.email : 'Unlocks Student pricing · free with @babson.edu'
+            }
+            detail={edu.verified ? 'Free' : edu.student ? 'Verified' : undefined}
             last
             onClick={() => setEduOpen(true)}
           />

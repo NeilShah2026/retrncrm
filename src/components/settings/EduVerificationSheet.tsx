@@ -15,9 +15,11 @@ import { BABSON_DOMAIN } from '@/lib/eduVerification'
 import { useEduVerification } from './useEduVerification'
 
 /**
- * Babson verification on a phone: the school address, then the link, as two
- * steps of one sheet. Accounts already signed in with a school address are
- * verified without any of this — the sheet just says so.
+ * School-email verification on a phone: the address, then the link, as two
+ * steps of one sheet. A verified .edu is what Student pricing is sold
+ * against; a verified @babson.edu makes everything free instead. Accounts
+ * already signed in with a school address need none of it — the sheet just
+ * says so.
  */
 export function EduVerificationSheet({
   open,
@@ -55,20 +57,22 @@ export function EduVerificationSheet({
                 <SheetBarButton close>Done</SheetBarButton>
               )
             }
-            title={edu.verified ? 'Babson Student' : 'Verify School Email'}
+            title={edu.student ? 'School Email' : 'Verify School Email'}
           />
         </DialogHeader>
 
         <div className="space-y-6 px-4 pb-6 pt-1">
-          {edu.verified ? (
+          {edu.student ? (
             <>
               <p className="text-ios-subhead px-1 text-muted-foreground">
-                <span className="text-foreground">{edu.email}</span> is verified, so every paid
-                feature is on for this account at no charge.
+                <span className="text-foreground">{edu.email}</span>{' '}
+                {edu.verified
+                  ? 'is verified, so every paid feature is on for this account at no charge.'
+                  : 'is verified, so you can subscribe at Student pricing.'}
               </p>
               {edu.via === 'account-email' ? (
                 <p className="text-ios-footnote px-1 text-muted-foreground">
-                  Verified automatically because you sign in with your Babson email.
+                  Verified automatically because you sign in with your school email.
                 </p>
               ) : (
                 <InsetGroup>
@@ -85,8 +89,10 @@ export function EduVerificationSheet({
           ) : step === 'idle' ? (
             <>
               <p className="text-ios-subhead px-1 text-muted-foreground">
-                Verify an <span className="text-foreground">@{BABSON_DOMAIN}</span> address and
-                Retrn is free — every paid feature, no card. You're signed in as{' '}
+                Verify a school email (one ending in{' '}
+                <span className="text-foreground">.edu</span>) to subscribe at Student pricing —
+                and an <span className="text-foreground">@{BABSON_DOMAIN}</span> address makes
+                every paid feature free instead. You're signed in as{' '}
                 <span className="break-all text-foreground">{user?.email}</span>, so we'll email
                 your school address to confirm it's yours.
               </p>
@@ -95,7 +101,7 @@ export function EduVerificationSheet({
                   label="School email"
                   value={email}
                   onChange={setEmail}
-                  placeholder={`you@${BABSON_DOMAIN}`}
+                  placeholder="you@school.edu"
                   type="email"
                   inputMode="email"
                   autoComplete="email"
@@ -130,7 +136,7 @@ export function EduVerificationSheet({
           )}
         </div>
 
-        {!edu.verified && (
+        {!edu.student && (
           <DialogFooter className="px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
             <Button
               className="text-ios-headline"
@@ -149,8 +155,8 @@ export function EduVerificationSheet({
         <ConfirmDialog
           open={confirmRemove}
           onOpenChange={setConfirmRemove}
-          title="Remove Babson verification?"
-          description="Your account keeps all its data, but it stops counting as a verified Babson student. You can verify the same address again later."
+          title="Remove this verification?"
+          description="Your account keeps all its data, but it stops counting as a verified student, so Student pricing and the Babson offer stop applying. You can verify the same address again later."
           confirmLabel="Remove"
           destructive
           onConfirm={remove}

@@ -121,8 +121,8 @@ export function VerifyEduPage() {
                 Verify your Babson email
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                <span className="break-all text-foreground">{state.email}</span> will unlock
-                every paid feature, free, on the Retrn account
+                <span className="break-all text-foreground">{state.email}</span> will be verified
+                on the Retrn account
                 {state.account ? (
                   <>
                     {' '}
@@ -152,9 +152,9 @@ export function VerifyEduPage() {
               <BadgeCheck className="h-6 w-6 text-success" />
               <h1 className="mt-4 text-2xl font-semibold tracking-[-0.02em]">You’re verified</h1>
               <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-                <span className="break-all text-foreground">{state.email}</span> is confirmed.
-                Retrn is free for you — head back to the app or the tab you started in and it
-                will update on its own.
+                <span className="break-all text-foreground">{state.email}</span> is confirmed —
+                an @babson.edu address makes Retrn free, and any other .edu unlocks Student
+                pricing. Head back to the app or the tab you started in; it updates on its own.
               </p>
               {user && (
                 <Button asChild className="mt-6 w-full">

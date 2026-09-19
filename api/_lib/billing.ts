@@ -51,6 +51,12 @@ interface SubscriptionRow {
   status: string | null
 }
 
+/** Has a school address been proven for this account? */
+function isVerifiedStudent(user: { app_metadata?: Record<string, unknown> }): boolean {
+  const meta = user.app_metadata ?? {}
+  return meta.edu_verified === true || meta.babson_verified === true
+}
+
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -133,6 +139,19 @@ async function handleBilling(req: Request): Promise<Response> {
 
     const price = stripeEnv().prices[plan][period]
     if (!price) return json({ error: 'That plan isn’t on sale yet.' }, 503)
+
+    // Student pricing is for students. The proof is a verified school email
+    // (see api/_lib/eduVerify.ts), stamped into app_metadata by the server —
+    // so it can't be faked from the browser.
+    if (plan === 'student' && !isVerifiedStudent(user)) {
+      return json(
+        {
+          error: 'Verify your school email to subscribe to the Student plan.',
+          code: 'EDU_REQUIRED',
+        },
+        403,
+      )
+    }
 
     // Already paying: send them to manage it rather than start a second one.
     if (row?.stripe_customer_id && row.status && LIVE_STATUSES.includes(row.status)) {

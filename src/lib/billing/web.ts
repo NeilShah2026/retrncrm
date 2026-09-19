@@ -66,6 +66,8 @@ interface SubscriptionRow {
 }
 
 export interface WebSubscription extends SubscriptionState {
+  /** Stripe's own status: active, trialing, past_due, canceled, incomplete… */
+  status: string | null
   cancelAtPeriodEnd: boolean
   discountEndsAt: string | null
   /** Has ever subscribed on the web — the intro offer is for first-timers. */
@@ -76,6 +78,7 @@ export interface WebSubscription extends SubscriptionState {
 
 export const NO_WEB_SUBSCRIPTION: WebSubscription = {
   ...NO_SUBSCRIPTION,
+  status: null,
   cancelAtPeriodEnd: false,
   discountEndsAt: null,
   hasSubscribedBefore: false,
@@ -98,6 +101,7 @@ function fromRow(row: SubscriptionRow | null): WebSubscription {
     inTrial: row.status === 'trialing',
     source: 'stripe',
     checkedAt: new Date().toISOString(),
+    status: row.status,
     cancelAtPeriodEnd: row.cancel_at_period_end,
     discountEndsAt: row.discount_ends_at,
     hasSubscribedBefore: Boolean(row.stripe_subscription_id),

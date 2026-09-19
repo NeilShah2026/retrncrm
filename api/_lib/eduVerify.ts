@@ -42,11 +42,19 @@ function env() {
 }
 
 /**
- * Domains that currently earn free access. There is a copy of this list in
+ * Domains that currently earn *free* access. There is a copy of this list in
  * src/lib/eduVerification.ts, but that one only decides what to *show* — this
  * is the rule that actually grants anything.
  */
 const FREE_DOMAINS = ['babson.edu'] as const
+
+/**
+ * What counts as a school address, and so who may buy the Student plan.
+ * Add a suffix here (and in the copy in src/lib/eduVerification.ts) to open
+ * student pricing to schools that don't use .edu — most universities outside
+ * the US don't.
+ */
+const EDU_SUFFIXES = ['.edu'] as const
 
 const MAX_BODY_BYTES = 4_000
 
@@ -79,6 +87,14 @@ function isFreeDomain(email: string): boolean {
   return FREE_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
 }
 
+/** True for any school address — what Student pricing is gated on. */
+function isEduDomain(email: string): boolean {
+  const at = email.lastIndexOf('@')
+  if (at < 0) return false
+  const domain = email.slice(at + 1).toLowerCase()
+  return EDU_SUFFIXES.some((suffix) => domain.endsWith(suffix))
+}
+
 function domainOf(email: string): string {
   return email.slice(email.lastIndexOf('@') + 1).toLowerCase()
 }
@@ -105,7 +121,7 @@ async function grant(admin: AdminClient, userId: string, email: string): Promise
 
   if (existing && (existing as { user_id: string }).user_id !== userId) {
     return json(
-      { error: 'That Babson email is already verified on another Retrn account.' },
+      { error: 'That school email is already verified on another Retrn account.' },
       409,
     )
   }
@@ -120,13 +136,22 @@ async function grant(admin: AdminClient, userId: string, email: string): Promise
     return json({ error: 'Could not record that verification.' }, 500)
   }
 
-  // The flag the app actually reads. app_metadata rides along in the JWT, so
-  // the browser sees it after one `refreshSession()`.
+  // The flags the app actually reads. app_metadata rides along in the JWT, so
+  // the browser sees them after one `refreshSession()`.
+  //
+  // Two separate things: `edu_verified` is any school address, and is what
+  // lets an account buy the Student plan at all; `babson_verified` is the
+  // Babson offer, which makes everything free.
+  const free = isFreeDomain(email)
   const { error: stampError } = await admin.auth.admin.updateUserById(userId, {
     app_metadata: {
-      babson_verified: true,
-      babson_email: email,
-      babson_verified_at: verifiedAt,
+      edu_verified: true,
+      edu_email: email,
+      edu_domain: domainOf(email),
+      edu_verified_at: verifiedAt,
+      babson_verified: free,
+      babson_email: free ? email : null,
+      babson_verified_at: free ? verifiedAt : null,
     },
   })
   if (stampError) {
@@ -153,8 +178,8 @@ async function handleClaim(
     return json({ error: 'That link has expired or was already used. Send a new one from Settings.' }, 401)
   }
   const email = proof.user.email.toLowerCase()
-  if (!isFreeDomain(email)) {
-    return json({ error: 'That link isn’t for a Babson address.' }, 400)
+  if (!isEduDomain(email)) {
+    return json({ error: 'That link isn’t for a school address.' }, 400)
   }
 
   const { data: request } = await admin
@@ -241,8 +266,8 @@ async function handle(req: Request): Promise<Response> {
   // --- Request (about to email a link to a school address) ----------------
   if (body.action === 'request') {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-    if (!isFreeDomain(email)) {
-      return json({ error: 'That is not a Babson address. Use your @babson.edu email.' }, 400)
+    if (!isEduDomain(email)) {
+      return json({ error: 'Use your school email address (one ending in .edu).' }, 400)
     }
     const { data: taken } = await admin
       .from('edu_verifications')
@@ -268,6 +293,10 @@ async function handle(req: Request): Promise<Response> {
     await admin.from('edu_verifications').delete().eq('user_id', userId)
     const { error } = await admin.auth.admin.updateUserById(userId, {
       app_metadata: {
+        edu_verified: false,
+        edu_email: null,
+        edu_domain: null,
+        edu_verified_at: null,
         babson_verified: false,
         babson_email: null,
         babson_verified_at: null,
@@ -304,9 +333,9 @@ async function handle(req: Request): Promise<Response> {
     via = 'account-email'
   }
 
-  if (!isFreeDomain(email)) {
+  if (!isEduDomain(email)) {
     return json(
-      { error: 'That is not a Babson address. Use your @babson.edu email.' },
+      { error: 'That is not a school address. Use your .edu email.' },
       400,
     )
   }

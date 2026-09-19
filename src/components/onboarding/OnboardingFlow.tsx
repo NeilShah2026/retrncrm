@@ -649,13 +649,16 @@ function Offer({
   onDone: () => void
   onSeeAllPlans: () => void
 }) {
-  const { isPro, edu } = useEntitlement()
+  const { isPro, isStudent, edu } = useEntitlement()
   const { canPurchase } = useSubscription()
   const [busy, setBusy] = React.useState(false)
   const [restoring, setRestoring] = React.useState(false)
 
   const student = planById('student')!
   const yearly = student.prices!.yearly
+  // Student pricing is only sold to a verified school email; everyone else is
+  // pointed at the full list rather than a price they can't buy.
+  const needsEdu = !isStudent
   const perMonth = monthlyEquivalent(yearly) ?? ''
 
   async function buy() {
@@ -727,11 +730,20 @@ function Offer({
           <CapsuleButton
             variant="dark"
             loading={busy}
-            disabled={busy || !canPurchase}
-            onClick={() => void buy()}
+            disabled={busy || (!canPurchase && !needsEdu)}
+            onClick={() => (needsEdu ? onSeeAllPlans() : void buy())}
           >
-            {canPurchase ? `Start Student — ${yearly.display}/year` : 'Available at launch'}
+            {needsEdu
+              ? 'See plans'
+              : canPurchase
+                ? `Start Student — ${yearly.display}/year`
+                : 'Available at launch'}
           </CapsuleButton>
+          {needsEdu && (
+            <p className="text-ios-caption px-4 text-center text-muted-foreground">
+              Student pricing is for verified students — verify a .edu email in Settings.
+            </p>
+          )}
           <div className="flex items-center justify-center gap-5">
             <button
               type="button"

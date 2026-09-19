@@ -64,7 +64,7 @@ const PERIODS: { value: BillingPeriod; label: string }[] = [
 export function SubscriptionPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const { plan: currentPlan, isPro, edu, label } = useEntitlement()
+  const { plan: currentPlan, isPro, isStudent, edu, label } = useEntitlement()
   const { subscription, web, canPurchase } = useSubscription()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -190,6 +190,7 @@ export function SubscriptionPage() {
           currentPlan={currentPlan}
           label={label}
           isPro={isPro}
+          isStudent={isStudent}
           eduVerified={edu.verified}
           expiresAt={subscription.expiresAt}
           inTrial={subscription.inTrial}
@@ -238,6 +239,8 @@ export function SubscriptionPage() {
                   key={p.id}
                   plan={p}
                   period={period}
+                  needsEdu={p.id === 'student' && !isStudent}
+                  onVerifyEdu={() => navigate(ROUTES.settings)}
                   current={p.id === currentPlan}
                   price={priceFor(
                     p.prices![period].appStoreProductId,
@@ -331,6 +334,7 @@ function DesktopSubscription({
   currentPlan,
   label,
   isPro,
+  isStudent,
   eduVerified,
   expiresAt,
   inTrial,
@@ -346,6 +350,7 @@ function DesktopSubscription({
   currentPlan: string
   label: string
   isPro: boolean
+  isStudent: boolean
   eduVerified: boolean
   expiresAt: string | null
   inTrial: boolean
@@ -360,7 +365,9 @@ function DesktopSubscription({
 }) {
   const [period, setPeriod] = React.useState<BillingPeriod>('monthly')
   const saving = yearlySavingPercent(PLANS.find((p) => p.prices)!)
-  const offerOpen = !isPro && !web.hasSubscribedBefore
+  // Student pricing — and so its intro offer — is only sold to a verified
+  // school address.
+  const offerOpen = !isPro && !web.hasSubscribedBefore && isStudent
   const paying = isPro && !eduVerified
 
   function statusLine(): string {
@@ -403,6 +410,25 @@ function DesktopSubscription({
           </Button>
         )}
       </Panel>
+
+      {!isPro && !isStudent && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border px-5 py-4">
+          <div className="flex items-start gap-3">
+            <GraduationCap className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="text-sm">
+              <p className="font-medium">Student pricing is for students</p>
+              <p className="text-muted-foreground">
+                Verify a school email (.edu) to unlock the Student plan and its{' '}
+                {INTRO_OFFER.display}/month intro offer. A verified @babson.edu address gets
+                everything free.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={onVerifyEdu}>
+            Verify school email
+          </Button>
+        </div>
+      )}
 
       {offerOpen && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-brand/30 bg-brand/[0.06] px-5 py-4">
@@ -471,6 +497,7 @@ function DesktopSubscription({
           const current = plan.id === currentPlan || (plan.id === 'free' && !isPro)
           const discounted =
             offerOpen && plan.id === INTRO_OFFER.plan && period === INTRO_OFFER.period
+          const needsEdu = plan.id === 'student' && !isStudent
           return (
             <div key={plan.id} className="flex flex-col bg-background p-6">
               <div className="flex items-center justify-between gap-2">
@@ -508,7 +535,7 @@ function DesktopSubscription({
               </div>
 
               <p className="mt-3 min-h-[2.5rem] text-sm leading-snug text-text-secondary">
-                {plan.tagline}
+                {plan.id === 'student' ? `${plan.tagline} Requires a verified .edu email.` : plan.tagline}
               </p>
 
               {!detail ? (
@@ -518,6 +545,11 @@ function DesktopSubscription({
               ) : current ? (
                 <Button variant="outline" className="mt-5 w-full" disabled>
                   Your current plan
+                </Button>
+              ) : needsEdu ? (
+                <Button variant="outline" className="mt-5 w-full" onClick={onVerifyEdu}>
+                  <GraduationCap />
+                  Verify .edu to unlock
                 </Button>
               ) : paying ? (
                 // Already subscribed: switching plans is Stripe's job, so it
@@ -561,7 +593,7 @@ function DesktopSubscription({
               <p className="font-medium">Babson student?</p>
               <p className="text-muted-foreground">
                 A verified @babson.edu address unlocks every paid feature at no charge — no card,
-                no subscription.
+                no subscription. Any other .edu unlocks Student pricing.
               </p>
             </div>
           </div>
@@ -644,6 +676,8 @@ function PlanCard({
   busy,
   disabled,
   canPurchase,
+  needsEdu,
+  onVerifyEdu,
   onPurchase,
 }: {
   plan: Plan
@@ -653,6 +687,9 @@ function PlanCard({
   busy: boolean
   disabled: boolean
   canPurchase: boolean
+  /** Student, without a verified school email yet. */
+  needsEdu: boolean
+  onVerifyEdu: () => void
   onPurchase: () => void
 }) {
   const detail = plan.prices![period]
@@ -688,14 +725,26 @@ function PlanCard({
         size="lg"
         variant={plan.badge ? 'default' : 'outline'}
         className="mt-4 h-11 w-full rounded-[12px] text-[17px]"
-        disabled={disabled || current}
-        onClick={onPurchase}
+        disabled={(disabled || current) && !needsEdu}
+        onClick={needsEdu ? onVerifyEdu : onPurchase}
       >
         {busy && <Loader2 className="animate-spin" />}
-        {current ? 'Your current plan' : canPurchase ? `Subscribe · ${price}` : 'Available at launch'}
+        {needsEdu
+          ? 'Verify .edu to Unlock'
+          : current
+            ? 'Your current plan'
+            : canPurchase
+              ? `Subscribe · ${price}`
+              : 'Available at launch'}
       </Button>
 
-      {!canPurchase && (
+      {needsEdu && (
+        <p className="text-ios-caption mt-2 text-center text-muted-foreground">
+          Student pricing needs a verified school email.
+        </p>
+      )}
+
+      {!needsEdu && !canPurchase && (
         <p className="text-ios-caption mt-2 text-center text-muted-foreground">
           {isPurchaseSurface()
             ? 'In-app purchases open when Retrn is live on the App Store.'

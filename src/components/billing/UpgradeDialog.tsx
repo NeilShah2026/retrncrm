@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { useSubscription } from '@/hooks/useSubscription'
 import { FREE_CONTACT_LIMIT, INTRO_OFFER, planById } from '@/lib/billing/plans'
+import { FEATURE_COPY, requiredPlan, type Feature } from '@/lib/billing/features'
 import { isWebBilling, startCheckout } from '@/lib/billing/web'
 import { ROUTES } from '@/lib/routes'
 
@@ -36,26 +37,34 @@ export function UpgradeDialog({
   open,
   onOpenChange,
   preview = false,
+  feature,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** Opened from Settings to check how it looks. Buttons still work. */
   preview?: boolean
+  /** The paid feature they reached, when that's what opened this. */
+  feature?: Feature
 }) {
   const navigate = useNavigate()
-  const { edu } = useEntitlement()
+  const { edu, isStudent } = useEntitlement()
   const { web } = useSubscription()
   const [busy, setBusy] = React.useState(false)
 
   const student = planById('student')!
+  const standard = planById('standard')!
   const regular = student.prices!.monthly.display
-  // The offer is for first-time subscribers; Stripe would refuse it anyway.
-  const offer = isWebBilling && !web.hasSubscribedBefore
+  const standardPrice = standard.prices!.monthly.display
+  // A Standard-only feature can't be answered with the Student plan.
+  const standardOnly = feature ? requiredPlan(feature) === 'standard' : false
+  // Student pricing is only sold to a verified school email, and the intro
+  // offer only to first-time subscribers (Stripe would refuse it anyway).
+  const offer = isWebBilling && isStudent && !web.hasSubscribedBefore && !standardOnly
 
-  async function claim() {
+  async function claim(plan: 'student' | 'standard' = INTRO_OFFER.plan) {
     setBusy(true)
     try {
-      await startCheckout(INTRO_OFFER.plan, INTRO_OFFER.period, { offer })
+      await startCheckout(plan, INTRO_OFFER.period, { offer: offer && plan === INTRO_OFFER.plan })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Couldn’t open checkout.')
       setBusy(false)
@@ -76,10 +85,13 @@ export function UpgradeDialog({
               Preview
             </span>
           )}
-          <DialogTitle>You’ve reached {FREE_CONTACT_LIMIT} contacts</DialogTitle>
+          <DialogTitle>
+            {feature ? FEATURE_COPY[feature].title : `You’ve reached ${FREE_CONTACT_LIMIT} contacts`}
+          </DialogTitle>
           <DialogDescription>
-            The free plan holds {FREE_CONTACT_LIMIT} people. Upgrade to keep adding everyone you
-            meet.
+            {feature
+              ? FEATURE_COPY[feature].description
+              : `The free plan holds ${FREE_CONTACT_LIMIT} people. Upgrade to keep adding everyone you meet.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,13 +113,34 @@ export function UpgradeDialog({
               Cancel anytime.
             </p>
           </div>
-        ) : (
+        ) : isStudent && !standardOnly ? (
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium">Student</p>
             <p className="mt-1 flex items-baseline gap-1.5">
               <span className="tnum text-2xl font-semibold tracking-[-0.02em]">{regular}</span>
               <span className="text-sm text-muted-foreground">/month</span>
             </p>
+          </div>
+        ) : (
+          // No school email on file: Standard is what they can actually buy,
+          // with the student route offered underneath.
+          <div className="rounded-lg border p-4">
+            <p className="text-sm font-medium">Standard</p>
+            <p className="mt-1 flex items-baseline gap-1.5">
+              <span className="tnum text-2xl font-semibold tracking-[-0.02em]">{standardPrice}</span>
+              <span className="text-sm text-muted-foreground">/month</span>
+            </p>
+            {!standardOnly && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                A student? Verify a .edu email for the Student plan at {regular}/month —{' '}
+                {INTRO_OFFER.display}/month for your first {INTRO_OFFER.months}.
+              </p>
+            )}
+            {standardOnly && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                This one is on Standard — the Student plan doesn’t include it.
+              </p>
+            )}
           </div>
         )}
 
@@ -121,11 +154,24 @@ export function UpgradeDialog({
         </ul>
 
         <div className="space-y-2 pt-1">
-          {isWebBilling ? (
+          {isWebBilling && isStudent && !standardOnly ? (
             <Button className="w-full" disabled={busy} onClick={() => void claim()}>
               {busy && <Loader2 className="animate-spin" />}
               {offer ? `Get Student for ${INTRO_OFFER.display}/month` : `Upgrade to Student — ${regular}/month`}
             </Button>
+          ) : isWebBilling ? (
+            <>
+              <Button className="w-full" disabled={busy} onClick={() => void claim('standard')}>
+                {busy && <Loader2 className="animate-spin" />}
+                Upgrade to Standard — {standardPrice}/month
+              </Button>
+              {!standardOnly && (
+                <Button variant="outline" className="w-full" onClick={() => go(ROUTES.settings)}>
+                  <GraduationCap />
+                  I’m a student — verify my .edu
+                </Button>
+              )}
+            </>
           ) : (
             <Button className="w-full" onClick={() => go(ROUTES.subscription)}>
               See plans
@@ -153,8 +199,8 @@ export function UpgradeDialog({
           >
             <GraduationCap className="mt-px h-3.5 w-3.5 shrink-0" />
             <span>
-              <span className="font-medium text-foreground">Babson student?</span> Verify your
-              @babson.edu email and every paid feature is free.
+              <span className="font-medium text-foreground">Babson student?</span> A verified
+              @babson.edu email makes every paid feature free.
             </span>
           </button>
         )}

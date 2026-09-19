@@ -37,6 +37,7 @@ import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { EventFormDialog } from '@/components/calendar/EventFormDialog'
 import { CalendarSyncDialog } from '@/components/calendar/CalendarSyncDialog'
+import { useFeatureGate } from '@/hooks/useFeatureGate'
 import {
   useContactMap,
   useEvents,
@@ -81,6 +82,7 @@ const MARKER_STYLE: Record<Marker['type'], { text: string; chip: string; icon: t
 }
 
 export function CalendarPage() {
+  const gate = useFeatureGate()
   const events = useEvents()
   const opportunities = useOpportunities()
   const followUps = useFollowUps()
@@ -220,7 +222,7 @@ export function CalendarPage() {
         toolbar: viewSwitch,
         trailing: (
           <>
-            <BarButton onClick={() => setSyncOpen(true)} aria-label="Subscribe to this calendar">
+            <BarButton onClick={() => gate.require('calendarSync') && setSyncOpen(true)} aria-label="Subscribe to this calendar">
               <CalendarCheck />
             </BarButton>
             <BarButton onClick={() => openNew()} aria-label="New meeting">
@@ -232,7 +234,7 @@ export function CalendarPage() {
       header={
         <PageHeader title="Calendar" description="Meetings with the people in your network.">
           <span className="hidden sm:block">{viewSwitch}</span>
-          <Button variant="outline" onClick={() => setSyncOpen(true)}>
+          <Button variant="outline" onClick={() => gate.require('calendarSync') && setSyncOpen(true)}>
             <CalendarCheck />
             <span className="hidden sm:inline">Subscribe</span>
           </Button>

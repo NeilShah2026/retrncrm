@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
+import { useFeatureGate } from '@/hooks/useFeatureGate'
 import { FollowUpDialog } from './FollowUpDialog'
 import { KeyDateDialog } from './KeyDateDialog'
 import { completeFollowUp, snoozeFollowUp } from './followUpActions'
@@ -42,6 +43,7 @@ export interface ReminderSheets {
 }
 
 function useSheets(contact: Contact) {
+  const gate = useFeatureGate()
   const [followUpOpen, setFollowUpOpen] = React.useState(false)
   const [editingFollowUp, setEditingFollowUp] = React.useState<FollowUp | null>(null)
   const [keyDateOpen, setKeyDateOpen] = React.useState(false)
@@ -74,9 +76,13 @@ function useSheets(contact: Contact) {
 
   return {
     sheets,
-    addFollowUp: () => setFollowUpOpen(true),
+    addFollowUp: () => {
+      if (gate.require('reminders')) setFollowUpOpen(true)
+    },
     editFollowUp: setEditingFollowUp,
-    addKeyDate: () => setKeyDateOpen(true),
+    addKeyDate: () => {
+      if (gate.require('reminders')) setKeyDateOpen(true)
+    },
     editKeyDate: setEditingKeyDate,
   }
 }

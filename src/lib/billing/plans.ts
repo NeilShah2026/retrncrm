@@ -69,14 +69,15 @@ export const PLANS: Plan[] = [
     features: [
       'Up to 30 contacts',
       'Tags, filters and last-contact tracking',
-      'Dashboard overview',
+      'Reconnect suggestions on the dashboard',
+      '25 AI requests a day',
       'Private and synced to your account',
     ],
   },
   {
     id: 'student',
     name: 'Student',
-    tagline: 'For students building a network before graduation',
+    tagline: 'For students, with a verified .edu email',
     badge: 'Best value',
     prices: {
       monthly: {
@@ -95,10 +96,11 @@ export const PLANS: Plan[] = [
     featuresLead: 'Everything in Free, plus',
     features: [
       'Unlimited contacts',
-      'Voice and photo capture',
-      'Recruiting pipeline and reminders',
-      'Reconnect suggestions',
+      'Voice, photo and one-line capture',
+      'Recruiting pipeline',
+      'Follow-ups and key-date reminders',
       'CSV and JSON export',
+      '250 AI requests a day',
     ],
   },
   {
@@ -121,9 +123,9 @@ export const PLANS: Plan[] = [
     },
     featuresLead: 'Everything in Student, plus',
     features: [
-      'Custom pipeline stages',
       'Calendar sync and auto-logged meetings',
-      'Priority assistant access',
+      '600 AI requests a day',
+      'No school email needed',
       'Everything first, as it ships',
     ],
   },

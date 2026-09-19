@@ -9,9 +9,11 @@ import { BABSON_DOMAIN } from '@/lib/eduVerification'
 import { useEduVerification } from './useEduVerification'
 
 /**
- * Babson verification, for accounts signed in with something other than a
- * school address. Signing in with @babson.edu needs none of this — the offer
- * is already on, and this card just says so.
+ * School-email verification, for accounts signed in with something other than
+ * a school address. Two things hang off it: a verified @babson.edu makes
+ * everything free, and any verified .edu is what the Student plan is sold
+ * against. Signing in with a school address needs none of this — it's already
+ * proven, and this card just says so.
  */
 export function EduVerificationCard() {
   const { user } = useAuth()
@@ -32,22 +34,25 @@ export function EduVerificationCard() {
   const [confirmRemove, setConfirmRemove] = React.useState(false)
 
   // --- Verified -------------------------------------------------------------
-  if (edu.verified) {
+  if (edu.student) {
     return (
       <Card>
         <CardContent className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <BadgeCheck className="h-4 w-4 text-success" />
-            <h2 className="font-semibold">Babson student — free</h2>
+            <h2 className="font-semibold">
+              {edu.verified ? 'Babson student — free' : 'School email verified'}
+            </h2>
           </div>
           <p className="text-sm text-muted-foreground">
             <span className="break-all font-medium text-foreground">{edu.email}</span>{' '}
-            is verified, so every paid feature is on for this account at no
-            charge.
+            {edu.verified
+              ? 'is verified, so every paid feature is on for this account at no charge.'
+              : 'is verified, so you can subscribe at Student pricing.'}
           </p>
           {edu.via === 'account-email' ? (
             <p className="mt-3 text-xs text-muted-foreground">
-              Verified automatically because you sign in with your Babson email.
+              Verified automatically because you sign in with your school email.
             </p>
           ) : (
             <Button
@@ -63,8 +68,8 @@ export function EduVerificationCard() {
           <ConfirmDialog
             open={confirmRemove}
             onOpenChange={setConfirmRemove}
-            title="Remove Babson verification?"
-            description="Your account keeps all its data, but it stops counting as a verified Babson student. You can verify the same address again later."
+            title="Remove this verification?"
+            description="Your account keeps all its data, but it stops counting as a verified student, so Student pricing and the Babson offer stop applying. You can verify the same address again later."
             confirmLabel="Remove"
             destructive
             onConfirm={remove}
@@ -80,11 +85,13 @@ export function EduVerificationCard() {
       <CardContent className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <GraduationCap className="h-4 w-4" />
-          <h2 className="font-semibold">Babson student?</h2>
+          <h2 className="font-semibold">Are you a student?</h2>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
-          Verify an <span className="text-foreground">@{BABSON_DOMAIN}</span> address
-          and Retrn is free — every paid feature, no card. You&apos;re signed in as{' '}
+          Verify a school email (one ending in <span className="text-foreground">.edu</span>) to
+          subscribe at Student pricing — and if it&apos;s an{' '}
+          <span className="text-foreground">@{BABSON_DOMAIN}</span> address, every paid feature is
+          free instead. You&apos;re signed in as{' '}
           <span className="break-all text-foreground">{user?.email}</span>, so we&apos;ll
           email your school address to confirm it&apos;s yours.
         </p>
@@ -101,7 +108,7 @@ export function EduVerificationCard() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={`you@${BABSON_DOMAIN}`}
+              placeholder="you@school.edu"
               autoComplete="email"
               required
             />

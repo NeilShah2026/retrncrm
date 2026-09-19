@@ -11,8 +11,11 @@ import { NO_SUBSCRIPTION, type SubscriptionState } from '@/lib/billing/store'
  * One place to ask "can they use this?", so paid features gate on
  * `useEntitlement().isPro` rather than each re-deriving the rules. There are
  * two routes to it and they are equal: a verified Babson email, or a live
- * App Store subscription. Anything that gates on `isPro` picks up a new route
- * the day it is added, without being touched.
+ * subscription (App Store or Stripe). Anything that gates on `isPro` picks up
+ * a new route the day it is added, without being touched.
+ *
+ * `isStudent` is a different question — not "what do they get" but "what may
+ * they buy": the Student plan is only sold to a verified school address.
  */
 export type Plan = 'free' | 'babson' | 'student' | 'standard'
 
@@ -20,6 +23,11 @@ export interface Entitlement {
   plan: Plan
   /** True when every paid feature is unlocked. */
   isPro: boolean
+  /**
+   * A school email has been verified, so the Student plan (and its intro
+   * offer) can be bought. Everyone else buys Standard.
+   */
+  isStudent: boolean
   /** How the Babson offer applies to this account, if at all. */
   edu: EduStatus
   /** The App Store subscription behind it, if that's what pays for it. */
@@ -43,6 +51,7 @@ export function entitlementFor(
   return {
     plan,
     isPro: edu.verified || subscription.active,
+    isStudent: edu.student,
     edu,
     subscription,
     label: PLAN_LABELS[plan],

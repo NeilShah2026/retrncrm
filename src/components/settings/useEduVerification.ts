@@ -37,7 +37,9 @@ export function useEduVerification() {
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  const waiting = step === 'code' && !edu.verified
+  // Done means "a school email is now proven" — which for a non-Babson
+  // address unlocks Student pricing rather than free access.
+  const waiting = step === 'code' && !edu.student
   React.useEffect(() => {
     if (!waiting) return
     const check = () => void supabase.auth.refreshSession()
@@ -55,16 +57,19 @@ export function useEduVerification() {
   // The link was opened (here or elsewhere) and the session caught up.
   const wasWaiting = React.useRef(false)
   React.useEffect(() => {
-    if (wasWaiting.current && edu.verified) {
-      toast.success(`${edu.email ?? 'Your school email'} verified — Retrn is free for you.`, {
-        id: 'edu-verified',
-      })
+    if (wasWaiting.current && edu.student) {
+      toast.success(
+        edu.verified
+          ? `${edu.email ?? 'Your school email'} verified — Retrn is free for you.`
+          : `${edu.email ?? 'Your school email'} verified — Student pricing is unlocked.`,
+        { id: 'edu-verified' },
+      )
       setStep('idle')
       setEmail('')
       setCode('')
     }
     wasWaiting.current = waiting
-  }, [waiting, edu.verified, edu.email])
+  }, [waiting, edu.student, edu.verified, edu.email])
 
   async function send(): Promise<void> {
     setError(null)
@@ -98,7 +103,7 @@ export function useEduVerification() {
       setStep('idle')
       setEmail('')
       setCode('')
-      toast.success(`${verified} verified — Retrn is free for you.`, { id: 'edu-verified' })
+      toast.success(`${verified} verified.`, { id: 'edu-verified' })
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That did not work — try a fresh email.')

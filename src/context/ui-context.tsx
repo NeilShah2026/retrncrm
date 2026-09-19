@@ -6,6 +6,9 @@ import { QuickAddSheet } from '@/components/contacts/QuickAddSheet'
 import { ImportContactsDialog } from '@/components/contacts/ImportContactsDialog'
 import { UpgradeDialog } from '@/components/billing/UpgradeDialog'
 import { onContactLimit } from '@/lib/billing/contactLimit'
+import { planAllows, type Feature } from '@/lib/billing/features'
+import { entitlementFor } from '@/hooks/useEntitlement'
+import { useSubscription } from '@/hooks/useSubscription'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useAuth } from '@/auth/AuthProvider'
@@ -32,10 +35,10 @@ interface UIContextValue {
   /** Bring people in from the phone's Contacts or a .vcf file. */
   openImportContacts: () => void
   /**
-   * The upgrade prompt a free account gets at the contact limit. Opens by
-   * itself when the limit is hit; `preview` is Settings' test button.
+   * The upgrade prompt: shown at the contact limit (by itself), when a paid
+   * feature is reached, or from Settings' test button (`preview`).
    */
-  openUpgrade: (options?: { preview?: boolean }) => void
+  openUpgrade: (options?: { preview?: boolean; feature?: Feature }) => void
 }
 
 const UIContext = React.createContext<UIContextValue | null>(null)
@@ -54,6 +57,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+  const { subscription } = useSubscription()
   const navigate = useNavigate()
   const { handOff } = useAssistant()
   const [formOpen, setFormOpen] = React.useState(false)
@@ -62,10 +66,11 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
   const [importOpen, setImportOpen] = React.useState(false)
-  const [upgrade, setUpgrade] = React.useState<{ open: boolean; preview: boolean }>({
-    open: false,
-    preview: false,
-  })
+  const [upgrade, setUpgrade] = React.useState<{
+    open: boolean
+    preview: boolean
+    feature?: Feature
+  }>({ open: false, preview: false })
   const isMobile = useIsMobile()
 
   const openNewContact = React.useCallback(() => {
@@ -85,7 +90,16 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     setFormOpen(true)
   }, [])
 
-  const openVoiceCapture = React.useCallback(() => setVoiceOpen(true), [])
+  // Capture is a paid feature, and this is the only door to it — the
+  // dashboard button, the tab bar, the "V" shortcut and the command palette
+  // all come through here.
+  const openVoiceCapture = React.useCallback(() => {
+    if (!planAllows(entitlementFor(user, subscription).plan, 'capture')) {
+      setUpgrade({ open: true, preview: false, feature: 'capture' })
+      return
+    }
+    setVoiceOpen(true)
+  }, [user, subscription])
   const openAssistant = React.useCallback(
     (question?: string) => {
       // Queue first, navigate second: the chat picks the message up as it
@@ -98,7 +112,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
   const openImportContacts = React.useCallback(() => setImportOpen(true), [])
   const openUpgrade = React.useCallback(
-    (options?: { preview?: boolean }) => setUpgrade({ open: true, preview: Boolean(options?.preview) }),
+    (options?: { preview?: boolean; feature?: Feature }) =>
+      setUpgrade({ open: true, preview: Boolean(options?.preview), feature: options?.feature }),
     [],
   )
 
@@ -111,7 +126,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         setFormOpen(false)
         setVoiceOpen(false)
         setImportOpen(false)
-        setUpgrade({ open: true, preview: false })
+        setUpgrade({ open: true, preview: false, feature: undefined })
       }),
     [],
   )
@@ -228,6 +243,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       <UpgradeDialog
         open={upgrade.open}
         preview={upgrade.preview}
+        feature={upgrade.feature}
         onOpenChange={(open) => setUpgrade((u) => ({ ...u, open }))}
       />
       <CommandPalette

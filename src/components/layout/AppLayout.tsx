@@ -32,6 +32,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { Logo } from './Logo'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
+import { BillingNotice } from '@/components/billing/BillingNotice'
 import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
@@ -303,6 +304,9 @@ export function AppLayout() {
 
       {/* Content column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* A card that failed, or a subscription running out: above every
+            page, because it is about to change what the app can do. */}
+        <BillingNotice />
         {/* Gives up its bottom edge to the keyboard as the keyboard rises,
             so every page shrinks with it instead of being covered. */}
         <main className="keyboard-inset flex min-h-0 flex-1 flex-col overflow-hidden">

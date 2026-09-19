@@ -28,8 +28,16 @@ function env() {
     supabaseUrl: process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
     supabaseAnonKey:
       process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   }
 }
+
+/**
+ * How many AI requests an account gets per day, by what it pays. Free is
+ * deliberately enough to see what the assistant is for (and to run a
+ * briefing and a few captures a day), not enough to run up a bill.
+ */
+const DAILY_LIMIT = { free: 25, student: 250, standard: 600 } as const
 
 /** Nothing we ask for needs a long answer; this is the hard ceiling. */
 const MAX_TOKENS_CAP = 1500
@@ -109,12 +117,18 @@ function imageCount(messages: ChatMessage[]): number {
   )
 }
 
+interface Caller {
+  id: string
+  /** The Babson offer: every paid feature, so the paid allowance too. */
+  free: boolean
+}
+
 /** The bearer token's owner, or null if it isn't a live Retrn session. */
 async function authenticate(
   req: Request,
   supabaseUrl: string,
   supabaseAnonKey: string,
-): Promise<string | null> {
+): Promise<Caller | null> {
   const header = req.headers.get('authorization') ?? ''
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
   if (!token) return null
@@ -124,14 +138,61 @@ async function authenticate(
   })
   const { data, error } = await supabase.auth.getUser(token)
   if (error || !data.user) return null
-  return data.user.id
+  return {
+    id: data.user.id,
+    free: (data.user.app_metadata as Record<string, unknown> | undefined)?.babson_verified === true,
+  }
+}
+
+/**
+ * Take one request off today's allowance, and say what's left.
+ *
+ * Fails open: if the quota can't be read or written (migration 0008 not run,
+ * a database hiccup), the request goes through. A broken counter should not
+ * take the assistant down — the token ceiling still caps what any one
+ * request can cost.
+ */
+async function claimQuota(
+  caller: Caller,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): Promise<{ allowed: boolean; limit: number }> {
+  if (!serviceRoleKey) return { allowed: true, limit: 0 }
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  let limit: number = DAILY_LIMIT.free
+  if (caller.free) {
+    limit = DAILY_LIMIT.student
+  } else {
+    const { data } = await admin
+      .from('subscriptions')
+      .select('plan, status')
+      .eq('user_id', caller.id)
+      .maybeSingle()
+    const row = data as { plan: string | null; status: string | null } | null
+    if (row?.status && ['active', 'trialing', 'past_due'].includes(row.status)) {
+      limit = row.plan === 'standard' ? DAILY_LIMIT.standard : DAILY_LIMIT.student
+    }
+  }
+
+  const { data: used, error } = await admin.rpc('use_ai_quota', {
+    uid: caller.id,
+    allowance: limit,
+  })
+  if (error) {
+    console.warn('[ai] could not count usage', error.message)
+    return { allowed: true, limit }
+  }
+  return { allowed: (used as number) !== -1, limit }
 }
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)
   }
-  const { gatewayUrl, gatewayKey, model, supabaseUrl, supabaseAnonKey } = env()
+  const { gatewayUrl, gatewayKey, model, supabaseUrl, supabaseAnonKey, serviceRoleKey } = env()
 
   if (!gatewayUrl || !gatewayKey) {
     // Every caller treats this as "AI is off" and falls back to its non-AI path.
@@ -146,9 +207,19 @@ async function handle(req: Request): Promise<Response> {
     return json({ error: 'That request is too large.' }, 413)
   }
 
-  const userId = await authenticate(req, supabaseUrl, supabaseAnonKey)
-  if (!userId) {
+  const caller = await authenticate(req, supabaseUrl, supabaseAnonKey)
+  if (!caller) {
     return json({ error: 'Sign in to use AI features.' }, 401)
+  }
+
+  const quota = await claimQuota(caller, supabaseUrl, serviceRoleKey)
+  if (!quota.allowed) {
+    return json(
+      {
+        error: `You've used today's ${quota.limit} AI requests. They reset tomorrow — or upgrade for a much larger daily allowance.`,
+      },
+      429,
+    )
   }
 
   let body: AiRequestBody

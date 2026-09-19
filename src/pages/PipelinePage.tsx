@@ -27,6 +27,7 @@ import {
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { OpportunityFormDialog } from '@/components/pipeline/OpportunityFormDialog'
+import { useFeatureGate } from '@/hooks/useFeatureGate'
 import { InsetGroup, InsetRow } from '@/components/ui/inset-list'
 import { useContactMap, useOpportunities } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -60,6 +61,7 @@ function deadlineChip(deadline?: string) {
 }
 
 export function PipelinePage() {
+  const gate = useFeatureGate()
   const opportunities = useOpportunities()
   const contactMap = useContactMap()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -99,6 +101,7 @@ export function PipelinePage() {
   }, [opportunities])
 
   function openNew(stage?: OpportunityStage) {
+    if (!gate.require('pipeline')) return
     setEditing(null)
     setAddStage(stage)
     setFormOpen(true)

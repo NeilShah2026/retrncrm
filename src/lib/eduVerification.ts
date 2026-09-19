@@ -35,21 +35,43 @@ import { ROUTES } from './routes'
 /** Domains that earn free access. The authoritative copy is in api/_lib/eduVerify.ts. */
 const FREE_DOMAINS = ['babson.edu'] as const
 
+/**
+ * What counts as a school address. Verifying one is what lets an account buy
+ * the Student plan — see `api/_lib/eduVerify.ts`, which holds the copy that
+ * actually decides, and add any extra suffix in both places.
+ */
+const EDU_SUFFIXES = ['.edu'] as const
+
 export const BABSON_DOMAIN = 'babson.edu'
+
+function domainOf(email: string): string {
+  return email.slice(email.lastIndexOf('@') + 1).toLowerCase().trim()
+}
 
 /** True for the domain itself and any subdomain of it (@mail.babson.edu). */
 export function isBabsonEmail(email: string | null | undefined): boolean {
-  if (!email) return false
-  const at = email.lastIndexOf('@')
-  if (at < 0) return false
-  const domain = email.slice(at + 1).toLowerCase().trim()
+  if (!email || !email.includes('@')) return false
+  const domain = domainOf(email)
   return FREE_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
+}
+
+/** True for any school address: @babson.edu, @mit.edu, @mail.utexas.edu… */
+export function isEduEmail(email: string | null | undefined): boolean {
+  if (!email || !email.includes('@')) return false
+  const domain = domainOf(email)
+  return EDU_SUFFIXES.some((suffix) => domain.endsWith(suffix))
 }
 
 export interface EduStatus {
   /** Whether this account has free access through the Babson offer. */
   verified: boolean
-  /** The Babson address behind it, if any. */
+  /**
+   * Whether a school address has been proven at all — what Student pricing
+   * is sold against. Every Babson-verified account is also a student; the
+   * reverse isn't true.
+   */
+  student: boolean
+  /** The school address behind it, if any. */
   email: string | null
   /**
    * How it was earned. `account-email` means they signed in with the Babson
@@ -68,24 +90,38 @@ export interface EduStatus {
  * Supabase's own JWT claims, so it is just as trustworthy.
  */
 export function readEduStatus(user: User | null | undefined): EduStatus {
-  if (!user) return { verified: false, email: null, via: null }
+  const none: EduStatus = { verified: false, student: false, email: null, via: null }
+  if (!user) return none
 
   const meta = (user.app_metadata ?? {}) as Record<string, unknown>
-  if (meta.babson_verified === true) {
-    const stamped = typeof meta.babson_email === 'string' ? meta.babson_email : null
+  const stamped =
+    (typeof meta.edu_email === 'string' ? meta.edu_email : null) ??
+    (typeof meta.babson_email === 'string' ? meta.babson_email : null)
+
+  if (meta.edu_verified === true || meta.babson_verified === true) {
     const isOwnEmail = Boolean(stamped && stamped === user.email?.toLowerCase())
     return {
-      verified: true,
+      // Only the Babson offer makes it free; any school address makes it
+      // Student-eligible.
+      verified: meta.babson_verified === true,
+      student: true,
       email: stamped ?? user.email ?? null,
       via: isOwnEmail ? 'account-email' : 'verified-email',
     }
   }
 
-  if (isBabsonEmail(user.email) && user.email_confirmed_at) {
-    return { verified: true, email: user.email?.toLowerCase() ?? null, via: 'account-email' }
+  // Signing in with a confirmed school address proves the same thing, from
+  // Supabase's own claims, before `syncAccountEmail` has round-tripped.
+  if (isEduEmail(user.email) && user.email_confirmed_at) {
+    return {
+      verified: isBabsonEmail(user.email),
+      student: true,
+      email: user.email?.toLowerCase() ?? null,
+      via: 'account-email',
+    }
   }
 
-  return { verified: false, email: null, via: null }
+  return none
 }
 
 // --- Talking to the endpoint ------------------------------------------------
@@ -232,8 +268,8 @@ export function parseVerificationInput(raw: string): VerificationInput | null {
 /** Email a verification link to `email`. Throws a showable message. */
 export async function startVerification(email: string): Promise<void> {
   const address = email.trim().toLowerCase()
-  if (!isBabsonEmail(address)) {
-    throw new Error(`Enter your @${BABSON_DOMAIN} address.`)
+  if (!isEduEmail(address)) {
+    throw new Error('Enter your school email address (one ending in .edu).')
   }
 
   // Record which account is asking first, so the link can be matched back to
@@ -350,9 +386,9 @@ export async function confirmVerification(email: string, entry: string): Promise
   // is not necessarily the one typed into the form. Check what was actually
   // proven before treating it as this student's school address.
   const proven = data.user?.email?.toLowerCase() ?? null
-  if (!isBabsonEmail(proven)) {
+  if (!isEduEmail(proven)) {
     await client.auth.signOut({ scope: 'local' })
-    throw new Error(`That link isn't for an @${BABSON_DOMAIN} address.`)
+    throw new Error('That link isn’t for a school address.')
   }
 
   try {
@@ -373,8 +409,9 @@ export async function removeVerification(): Promise<void> {
 }
 
 /**
- * Record the offer for someone whose account email *is* a Babson address, so
- * the badge and the `edu_verifications` row exist without them doing anything.
+ * Record verification for someone whose account email *is* a school address,
+ * so the badge and the `edu_verifications` row exist without them doing
+ * anything.
  * Safe to call repeatedly; failures are silent because `readEduStatus` already
  * grants access from the confirmed account email alone.
  */
@@ -382,10 +419,10 @@ const synced = new Set<string>()
 
 export async function syncAccountEmail(user: User): Promise<void> {
   if (synced.has(user.id)) return
-  if ((user.app_metadata as Record<string, unknown> | undefined)?.babson_verified === true) {
+  if ((user.app_metadata as Record<string, unknown> | undefined)?.edu_verified === true) {
     return
   }
-  if (!isBabsonEmail(user.email) || !user.email_confirmed_at) return
+  if (!isEduEmail(user.email) || !user.email_confirmed_at) return
 
   synced.add(user.id)
   try {
