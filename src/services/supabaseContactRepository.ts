@@ -1,6 +1,7 @@
 import { getCurrentUserId, supabase } from '@/lib/supabase'
 import { contactToRow, rowToContact } from './supabaseMappers'
 import { contactLimitReached, isContactLimitDbError } from '@/lib/billing/contactLimit'
+import { track } from '@/lib/analytics'
 import { createId } from '@/lib/utils'
 import type { Contact, Interaction } from '@/types'
 import type { ContactDraft, ContactPatch, ContactRepository } from './types'
@@ -51,6 +52,7 @@ export class SupabaseContactRepository implements ContactRepository {
       .from('contacts')
       .insert(contactToRow(userId, contact))
     if (error) throw isContactLimitDbError(error) ? contactLimitReached() : error
+    track('contact_created', { count: 1 })
     return contact
   }
 
@@ -73,6 +75,7 @@ export class SupabaseContactRepository implements ContactRepository {
         .insert(contacts.slice(i, i + 200).map((c) => contactToRow(userId, c)))
       if (error) throw isContactLimitDbError(error) ? contactLimitReached() : error
     }
+    track('contact_created', { count: contacts.length, bulk: true })
     return contacts
   }
 

@@ -23,6 +23,7 @@ import {
 import { isWebBilling } from '@/lib/billing/web'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { ROUTES } from '@/lib/routes'
+import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 import type { Tag } from '@/types'
 
@@ -54,6 +55,9 @@ export function OnboardingDesktop() {
     readOnboardingAnswers(user),
   )
   const pane = PANES[index]
+  // Read inside `finish`, which must not be re-created as panes change.
+  const paneRef = React.useRef(pane)
+  paneRef.current = pane
 
   const go = React.useCallback((delta: number) => {
     setIndex((i) => Math.min(PANES.length - 1, Math.max(0, i + delta)))
@@ -67,6 +71,11 @@ export function OnboardingDesktop() {
    */
   const finish = React.useCallback(
     (prefs: OnboardingAnswers = {}, to: string = ROUTES.dashboard) => {
+      // "Completed" means they reached the end; leaving early is a skip, and
+      // both still count as onboarded.
+      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
+        pane: paneRef.current,
+      })
       void saveOnboarding({ ...prefs, onboarded: true, onboardedAt: new Date().toISOString() })
       navigate(to, { replace: true })
     },

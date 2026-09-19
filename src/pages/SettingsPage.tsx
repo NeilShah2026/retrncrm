@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { InsetGroup, InsetRow, InsetRowIcon } from '@/components/ui/inset-list'
+import { InsetGroup, InsetRow, InsetRowIcon, Switch } from '@/components/ui/inset-list'
 import {
   useContacts,
   useFollowUps,
@@ -72,6 +72,7 @@ import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
 import { isContactLimitError } from '@/lib/billing/contactLimit'
 import { isAdmin } from '@/lib/admin'
+import { isAnalyticsEnabled, isAnalyticsOptedOut, setAnalyticsOptOut } from '@/lib/analytics'
 
 export function SettingsPage() {
   const { openOnboarding, openImportContacts, openUpgrade } = useUI()
@@ -95,6 +96,14 @@ export function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [profileOpen, setProfileOpen] = React.useState(false)
   const [eduOpen, setEduOpen] = React.useState(false)
+  const [analyticsOff, setAnalyticsOff] = React.useState(isAnalyticsOptedOut)
+
+  function toggleAnalytics() {
+    const next = !analyticsOff
+    setAnalyticsOff(next)
+    setAnalyticsOptOut(next)
+    toast.success(next ? 'Usage analytics turned off' : 'Usage analytics turned on')
+  }
 
   function handleExportJson() {
     if (!gate.require('export')) return
@@ -279,6 +288,23 @@ export function SettingsPage() {
           <InsetRow title="Opportunities" detail={opportunities.length} chevron={false} />
           <InsetRow title="Templates" detail={templates.length} chevron={false} last />
         </InsetGroup>
+
+        {isAnalyticsEnabled() && (
+          <InsetGroup
+            title="Privacy"
+            footer="Anonymous counts of which features get used — never your contacts, notes or messages. Off applies to this device."
+          >
+            <InsetRow
+              title="Share Usage Analytics"
+              role="switch"
+              checked={!analyticsOff}
+              chevron={false}
+              accessory={<Switch checked={!analyticsOff} />}
+              last
+              onClick={toggleAnalytics}
+            />
+          </InsetGroup>
+        )}
 
         <InsetGroup
           title="Backup"
@@ -503,6 +529,24 @@ export function SettingsPage() {
               </Link>
             </PanelSection>
           </Panel>
+
+          {isAnalyticsEnabled() && (
+            <Panel>
+              <PanelHeader>Privacy</PanelHeader>
+              <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <p className="font-medium">Share usage analytics</p>
+                  <p className="text-muted-foreground">
+                    Anonymous counts of which features get used, so we know what to improve.
+                    Never your contacts, notes or messages. Applies to this device.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={toggleAnalytics} className="shrink-0">
+                  {analyticsOff ? 'Turn on' : 'Turn off'}
+                </Button>
+              </PanelSection>
+            </Panel>
+          )}
 
           <Panel>
             <PanelHeader>Backup</PanelHeader>

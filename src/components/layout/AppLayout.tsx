@@ -38,6 +38,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
 import { useReminderSync } from '@/hooks/useReminderSync'
 import { useInbox } from '@/lib/inbox'
+import { useAnalyticsIdentity } from '@/hooks/useAnalyticsIdentity'
 import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
@@ -228,6 +229,7 @@ export function AppLayout() {
 
   useAutoLogMeetings()
   useReminderSync()
+  useAnalyticsIdentity()
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">

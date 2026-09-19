@@ -4,7 +4,7 @@
  * Bump `effectiveDate` whenever either document changes materially.
  */
 export const LEGAL = {
-  effectiveDate: 'September 19, 2026',
+  effectiveDate: 'September 20, 2026',
   operator: 'Neil Shah',
   governingState: 'Massachusetts',
   site: 'retrncrm.com',

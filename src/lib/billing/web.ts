@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { postApi } from '@/lib/apiFetch'
 import { isNative } from '@/lib/platform'
+import { track } from '@/lib/analytics'
 import { NO_SUBSCRIPTION, type SubscriptionState } from './store'
 import type { BillingPeriod, PlanId } from './plans'
 
@@ -44,6 +45,7 @@ export async function startCheckout(
   { offer = false }: { offer?: boolean } = {},
 ): Promise<void> {
   const { url } = await callBilling({ action: 'checkout', plan, period, offer })
+  track('checkout_started', { plan, period, offer })
   window.location.assign(url)
 }
 
@@ -138,6 +140,10 @@ function startWatching(userId: string) {
   const load = () =>
     void fetchWebSubscription().then((state) => {
       if (!alive || !shared || shared.userId !== userId) return
+      const wasActive = shared.state?.active ?? false
+      if (state.active && !wasActive && shared.state !== null) {
+        track('subscription_active', { plan: state.plan, period: state.period ?? 'unknown' })
+      }
       shared.state = state
       lastKnown = { userId, state }
       shared.listeners.forEach((fn) => fn(state))

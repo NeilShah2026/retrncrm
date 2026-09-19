@@ -46,6 +46,7 @@
     "jsqr": "^1.4.0",
     "lucide-react": "^1.23.0",
     "marked": "^18.0.5",
+    "posthog-js": "^1.434.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

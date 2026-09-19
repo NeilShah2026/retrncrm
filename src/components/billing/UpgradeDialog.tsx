@@ -16,6 +16,7 @@ import { FREE_CONTACT_LIMIT, INTRO_OFFER, planById } from '@/lib/billing/plans'
 import { FEATURE_COPY, requiredPlan, type Feature } from '@/lib/billing/features'
 import { isWebBilling, startCheckout } from '@/lib/billing/web'
 import { ROUTES } from '@/lib/routes'
+import { track } from '@/lib/analytics'
 
 const PERKS = [
   'Unlimited contacts',
@@ -60,6 +61,11 @@ export function UpgradeDialog({
   // Student pricing is only sold to a verified school email, and the intro
   // offer only to first-time subscribers (Stripe would refuse it anyway).
   const offer = isWebBilling && isStudent && !web.hasSubscribedBefore && !standardOnly
+
+  React.useEffect(() => {
+    if (!open || preview) return
+    track('upgrade_prompt_shown', { reason: feature ?? 'contact_limit', is_student: isStudent })
+  }, [open, preview, feature, isStudent])
 
   async function claim(plan: 'student' | 'standard' = INTRO_OFFER.plan) {
     setBusy(true)

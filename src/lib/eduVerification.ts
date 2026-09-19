@@ -8,6 +8,7 @@ import { supabase } from './supabase'
 import { postApi } from './apiFetch'
 import { emailLinkOrigin } from './apiBase'
 import { ROUTES } from './routes'
+import { track } from '@/lib/analytics'
 
 /**
  * Babson free access: any student who proves control of a @babson.edu address
@@ -350,6 +351,7 @@ export async function previewLink(
 /** Verify the account that asked for this address. Needs no Retrn session. */
 export async function claimLink(proofToken: string): Promise<string> {
   const res = await postVerify({ action: 'claim', proofToken })
+  track('school_email_verified', { via: 'link' })
   // If the account that asked is signed in in this browser too, show it now.
   const { data } = await supabase.auth.getSession()
   if (data.session) await supabase.auth.refreshSession()

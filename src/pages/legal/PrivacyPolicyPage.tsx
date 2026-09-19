@@ -143,11 +143,24 @@ export function PrivacyPolicyPage() {
           ]}
         />
         <P>
-          We do <Strong>not</Strong> use third-party analytics, advertising, or
-          tracking SDKs, and we do not use cookies for advertising. We do not
-          collect your precise location, we do not access your device&rsquo;s
-          calendar or health data, and we only read your device&rsquo;s address
-          book when you choose to import from it.
+          <Strong>Product analytics.</Strong> We use PostHog to count how the
+          app itself is used — which screens are opened, which features are
+          reached, and where people get stuck — so we know what to fix. These
+          events carry your account&rsquo;s internal ID, your plan, and the name
+          of the thing you did. They never carry your contacts, your notes, your
+          messages, or anything you type into a record, and record IDs are
+          stripped out of page addresses before they are sent (so
+          &ldquo;/app/contacts/:id&rdquo;, never a real one). Autocapture and
+          session recording are switched off. You can turn this off for a device
+          in <em>Settings → Privacy → Share usage analytics</em>, and we honour
+          &ldquo;Do Not Track&rdquo; browser settings.
+        </P>
+        <P>
+          We do <Strong>not</Strong> use advertising or cross-site tracking SDKs,
+          and we do not use cookies for advertising. We do not collect your
+          precise location, we do not access your device&rsquo;s calendar or
+          health data, and we only read your device&rsquo;s address book when you
+          choose to import from it.
         </P>
 
         <H3>2.3 Information from other sources</H3>
@@ -433,6 +446,11 @@ export function PrivacyPolicyPage() {
               'Google Fonts',
               'Typeface delivery for the website and app',
               'IP address and browser information',
+            ],
+            [
+              'PostHog',
+              'Product analytics: which features are used, so we know what to improve',
+              'Account ID, plan, app events and masked page paths, device and browser information, IP address',
             ],
             [
               'Stripe',

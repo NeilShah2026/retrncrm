@@ -1,3 +1,4 @@
+import { track } from '@/lib/analytics'
 import { FREE_CONTACT_LIMIT } from './plans'
 
 /**
@@ -36,6 +37,7 @@ export function onContactLimit(fn: () => void): () => void {
 
 /** Announce the limit (opens the upgrade prompt) and return the error to throw. */
 export function contactLimitReached(): ContactLimitError {
+  track('contact_limit_reached', { limit: FREE_CONTACT_LIMIT })
   listeners.forEach((fn) => fn())
   return new ContactLimitError()
 }

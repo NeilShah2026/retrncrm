@@ -25,6 +25,7 @@ import type { Tag } from '@/types'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { selectionFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
+import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 import { isWebBilling } from '@/lib/billing/web'
 
@@ -71,6 +72,9 @@ function PhoneOnboarding() {
   )
 
   const pane = PANES[index]
+  // Read inside `finish`, which must not be re-created as panes change.
+  const paneRef = React.useRef(pane)
+  paneRef.current = pane
 
   const go = React.useCallback((delta: number) => {
     setBack(delta < 0)
@@ -85,6 +89,11 @@ function PhoneOnboarding() {
    */
   const finish = React.useCallback(
     (prefs: OnboardingAnswers = {}, to: string = ROUTES.dashboard) => {
+      // "Completed" means they reached the end; leaving early is a skip, and
+      // both still count as onboarded.
+      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
+        pane: paneRef.current,
+      })
       void saveOnboarding({ ...prefs, onboarded: true, onboardedAt: new Date().toISOString() })
       // `replace`, so the phone's back gesture from the app doesn't land
       // someone back at the welcome screen they just finished.

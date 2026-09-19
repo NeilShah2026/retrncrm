@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { forgetStoredSession, supabase } from '@/lib/supabase'
 import { clearBriefingCache } from '@/lib/ai/briefing'
 import { clearSkippedMeetingNotes } from '@/lib/inbox'
+import { resetAnalytics, track } from '@/lib/analytics'
 import { clearSubscriptionCache } from '@/lib/billing/store'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
 import { syncAccountEmail } from '@/lib/eduVerification'
@@ -167,6 +168,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // person to sign in on a shared phone starts clean.
     clearBriefingCache()
     clearSkippedMeetingNotes()
+    track('signed_out')
+    // Stop attributing whatever happens next to the account that just left.
+    resetAnalytics()
 
     // 'local' on purpose: signing out of this phone shouldn't end the
     // session on the laptop. Whatever the server says — including nothing at

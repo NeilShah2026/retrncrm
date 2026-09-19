@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import * as React from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ThemeProvider, useTheme } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -32,6 +33,20 @@ import { PrivacyPolicyPage } from '@/pages/legal/PrivacyPolicyPage'
 import { TermsPage } from '@/pages/legal/TermsPage'
 import { ROUTES } from '@/lib/routes'
 import { isNative } from '@/lib/platform'
+import { trackPageview } from '@/lib/analytics'
+
+/**
+ * One page view per route change, with record ids stripped out of the path
+ * (see `maskPath`). PostHog's own pageview capture is off for exactly this
+ * reason — it would send /app/contacts/<a real person's id>.
+ */
+function PageviewTracker() {
+  const { pathname } = useLocation()
+  React.useEffect(() => {
+    trackPageview(pathname)
+  }, [pathname])
+  return null
+}
 
 function ThemedToaster() {
   const { resolvedTheme } = useTheme()
@@ -90,6 +105,7 @@ export default function App() {
       <TooltipProvider delayDuration={200}>
         <AuthProvider>
           <BrowserRouter>
+            <PageviewTracker />
             {/* On a phone, on the app-only hosts, everything but the QR
                 landing page and the legal pages gives way to "the app is
                 coming". See MobileWebGate. */}

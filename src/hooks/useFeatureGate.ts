@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { useUI } from '@/context/ui-context'
 import { planAllows, type Feature } from '@/lib/billing/features'
+import { track } from '@/lib/analytics'
 
 /**
  * "May they use this, and if not, say so."
@@ -22,10 +23,11 @@ export function useFeatureGate(): {
   const require = React.useCallback(
     (feature: Feature) => {
       if (can(feature)) return true
+      track('feature_blocked', { feature, plan })
       openUpgrade({ feature })
       return false
     },
-    [can, openUpgrade],
+    [can, openUpgrade, plan],
   )
 
   return { can, require }
