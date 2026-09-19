@@ -1,6 +1,8 @@
 import * as React from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { forgetStoredSession, supabase } from '@/lib/supabase'
+import { clearBriefingCache } from '@/lib/ai/briefing'
+import { clearSkippedMeetingNotes } from '@/lib/inbox'
 import { clearSubscriptionCache } from '@/lib/billing/store'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
 import { syncAccountEmail } from '@/lib/eduVerification'
@@ -160,7 +162,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Reminders are scheduled on the phone itself, so they'd otherwise keep
     // firing for this account after someone else signs in.
     await clearReminders()
-    await supabase.auth.signOut()
+
+    // Caches that belong to the account rather than the device, so the next
+    // person to sign in on a shared phone starts clean.
+    clearBriefingCache()
+    clearSkippedMeetingNotes()
+
+    // 'local' on purpose: signing out of this phone shouldn't end the
+    // session on the laptop. Whatever the server says — including nothing at
+    // all, offline — the session goes from this device.
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) {
+      console.warn('[auth] sign-out call failed; clearing locally', error.message)
+      await forgetStoredSession()
+    }
+    // supabase-js only emits SIGNED_OUT when its own call succeeded, so the
+    // screen is sent back to sign-in from here rather than from the listener.
+    setSession(null)
   }, [])
 
   const updateName = React.useCallback(async (name: string): Promise<AuthResult> => {

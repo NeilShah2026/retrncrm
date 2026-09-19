@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupportedStorage } from '@supabase/supabase-js'
 import type { Database } from './database.types'
 import { isNative } from './platform'
 import { ROUTES } from './routes'
@@ -14,6 +14,12 @@ if (!url || !anonKey) {
       'project (Project Settings → API).',
   )
 }
+
+/**
+ * Where the session is kept. Derived exactly as supabase-js derives it, so
+ * `forgetStoredSession()` below clears the same key the client wrote.
+ */
+export const AUTH_STORAGE_KEY = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`
 
 export const supabase = createClient<Database>(url, anonKey, {
   auth: {
@@ -43,4 +49,26 @@ export async function getCurrentUserId(): Promise<string> {
     throw new Error('Not signed in.')
   }
   return data.user.id
+}
+
+/**
+ * Throw the stored session away without asking the server first.
+ *
+ * `supabase.auth.signOut()` posts to /logout and, if that post fails for any
+ * reason other than an expired token, returns the error *without* clearing
+ * anything locally — so the person taps "Sign out", nothing happens, and
+ * nothing says why. On a phone that is a common case: patchy signal, or a
+ * refresh token that went stale while the app sat unopened. Signing out is a
+ * local act as far as the person is concerned, so this makes sure it happens.
+ */
+export async function forgetStoredSession(): Promise<void> {
+  const storage: SupportedStorage = isNative ? capacitorPreferencesStorage : window.localStorage
+  for (const key of [AUTH_STORAGE_KEY, `${AUTH_STORAGE_KEY}-code-verifier`]) {
+    try {
+      await storage.removeItem(key)
+    } catch {
+      // Nothing to remove, or storage is unavailable. Either way the
+      // in-memory session is dropped by the caller.
+    }
+  }
 }

@@ -69,6 +69,16 @@ export function skipMeetingNotes(eventId: string): void {
   skippedListeners.forEach((fn) => fn())
 }
 
+/** Forget which meetings were skipped — on sign-out; they're per account. */
+export function clearSkippedMeetingNotes(): void {
+  try {
+    localStorage.removeItem(SKIPPED_KEY)
+  } catch {
+    // Nothing stored, or storage is unavailable.
+  }
+  skippedListeners.forEach((fn) => fn())
+}
+
 function useSkipped(): Set<string> {
   const [skipped, setSkipped] = React.useState(readSkipped)
   React.useEffect(() => {

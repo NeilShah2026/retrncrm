@@ -1,45 +1,32 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft } from 'lucide-react'
-import { toast } from 'sonner'
 import { AppMark, CapsuleButton } from '@/components/ui/capsule'
 import { SubscriptionLegal } from '@/components/billing/SubscriptionLegal'
+import { SetupLine, Stage } from '@/components/onboarding/panes'
 import {
-  CaptureVignette,
-  PipelineVignette,
-  ReconnectVignette,
-  SetupLine,
-  Stage,
-} from '@/components/onboarding/panes'
+  FEATURES,
+  PANES,
+  QUESTION_PANES,
+  useOfferActions,
+  useTailoringRun,
+} from '@/components/onboarding/shared'
+import { OnboardingDesktop } from '@/components/onboarding/OnboardingDesktop'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { useAuth } from '@/auth/AuthProvider'
-import { useEntitlement } from '@/hooks/useEntitlement'
-import { useSubscription } from '@/hooks/useSubscription'
-import { tagRepo } from '@/services'
 import { useTags } from '@/hooks/useData'
 import {
-  CADENCE_QUESTION,
-  FOCUS_QUESTION,
-  PLACE_QUESTION,
-  STAGE_QUESTION,
   cadenceLabel,
   readOnboardingAnswers,
-  tagsToCreate,
   type OnboardingAnswers,
   type OnboardingQuestion,
 } from '@/lib/onboarding'
-import { planById, monthlyEquivalent } from '@/lib/billing/plans'
 import type { Tag } from '@/types'
-import type { TagDraft } from '@/services/types'
-import {
-  BillingUnavailableError,
-  isPurchaseSurface,
-  purchase,
-  restorePurchases,
-} from '@/lib/billing/store'
-import { errorFeedback, selectionFeedback, successFeedback } from '@/lib/haptics'
+import { isPurchaseSurface } from '@/lib/billing/store'
+import { selectionFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
-import { isWebBilling, startCheckout } from '@/lib/billing/web'
+import { isWebBilling } from '@/lib/billing/web'
 
 /**
  * Onboarding: what Retrn is, four questions, and the offer.
@@ -64,63 +51,15 @@ import { isWebBilling, startCheckout } from '@/lib/billing/web'
  * fastest way to teach someone that the rest of the app is also theatre.
  */
 
-type PaneId =
-  | 'welcome'
-  | 'capture'
-  | 'reconnect'
-  | 'pipeline'
-  | 'focus'
-  | 'stage'
-  | 'place'
-  | 'cadence'
-  | 'tailoring'
-  | 'offer'
-
-const PANES: PaneId[] = [
-  'welcome',
-  'capture',
-  'reconnect',
-  'pipeline',
-  'focus',
-  'stage',
-  'place',
-  'cadence',
-  'tailoring',
-  'offer',
-]
-
-const QUESTION_PANES: Partial<Record<PaneId, OnboardingQuestion<never>>> = {
-  focus: FOCUS_QUESTION as OnboardingQuestion<never>,
-  stage: STAGE_QUESTION as OnboardingQuestion<never>,
-  place: PLACE_QUESTION as OnboardingQuestion<never>,
-  cadence: CADENCE_QUESTION as OnboardingQuestion<never>,
-}
-
-const FEATURES: Record<
-  'capture' | 'reconnect' | 'pipeline',
-  { eyebrow: string; title: string; body: string; visual: React.ReactNode }
-> = {
-  capture: {
-    eyebrow: 'Capture',
-    title: 'One line is the whole ask.',
-    body: 'Type or say who you met. Retrn turns it into a real record — name, company, where you met, and what to do next.',
-    visual: <CaptureVignette />,
-  },
-  reconnect: {
-    eyebrow: 'Follow up',
-    title: 'The follow-up is the whole game.',
-    body: 'Put a reconnect goal on anyone. Retrn tells you who is slipping, and reminds you what you last talked about before you reach out.',
-    visual: <ReconnectVignette />,
-  },
-  pipeline: {
-    eyebrow: 'Follow through',
-    title: 'From coffee chat to offer.',
-    body: 'Track every application on a board, and link the people who can move it forward. The network and the search stop being two separate things.',
-    visual: <PipelineVignette />,
-  },
-}
-
 export function OnboardingFlow() {
+  const isMobile = useIsMobile()
+  // A laptop gets a flow built for a laptop — same panes, same writes, a
+  // layout that isn't a phone screen stretched across a monitor.
+  if (!isMobile) return <OnboardingDesktop />
+  return <PhoneOnboarding />
+}
+
+function PhoneOnboarding() {
   const navigate = useNavigate()
   const { user, saveOnboarding } = useAuth()
   const tags = useTags()
@@ -467,17 +406,7 @@ function Question({
   )
 }
 
-type StepState = 'pending' | 'running' | 'done' | 'failed'
-
-/**
- * Where the four answers stop being a survey.
- *
- * Both steps are real writes, awaited in order, and the line only ticks when
- * its own write has returned. If one fails it says so and the flow continues
- * — a tag that didn't get created is not a reason to trap someone on a setup
- * screen, and silently showing a checkmark over a failure would be worse than
- * either.
- */
+/** The phone's setup screen. The work it reports on lives in `shared.tsx`. */
 function Tailoring({
   answers,
   existingTags,
@@ -485,109 +414,15 @@ function Tailoring({
   onDone,
 }: {
   answers: OnboardingAnswers
-  /** `undefined` until the account's tags have loaded — see the guard below. */
   existingTags: Tag[] | undefined
   onSave: (prefs: OnboardingAnswers & { onboarded: boolean }) => Promise<{ error: string | null }>
   onDone: () => void
 }) {
-  const [saveState, setSaveState] = React.useState<StepState>('pending')
-  const [tagState, setTagState] = React.useState<StepState>('pending')
-  const [created, setCreated] = React.useState<string[]>([])
-  const finished =
-    saveState !== 'pending' && saveState !== 'running' && tagState !== 'pending' && tagState !== 'running'
-
-  const draftsRef = React.useRef<TagDraft[] | null>(null)
-  const ranRef = React.useRef(false)
-
-  /**
-   * Whether this component is on screen — as opposed to whether *an effect
-   * run* is still current.
-   *
-   * These are not the same thing, and conflating them is what used to wedge
-   * this screen. The work below must start exactly once (it writes rows), so
-   * it is latched behind `ranRef`. But a plain `let alive` in the same effect
-   * is cancelled by any *re-run* of that effect — StrictMode's remount in
-   * development, or simply a parent re-render in production — and the latch
-   * then stops the re-run from starting replacement work. The result was an
-   * account that saved correctly behind a screen that said "Setting up…"
-   * forever, with its Continue button disabled.
-   *
-   * A ref tied to mount/unmount only, declared before the effect that reads
-   * it, survives a re-run and is restored by a remount.
-   */
-  const mountedRef = React.useRef(true)
-  React.useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
-
-  // Props are read through refs so that neither a new `onSave` identity nor a
-  // new `answers` object can re-trigger (or cancel) work that runs once.
-  const answersRef = React.useRef(answers)
-  answersRef.current = answers
-  const onSaveRef = React.useRef(onSave)
-  onSaveRef.current = onSave
-  const tagsRef = React.useRef(existingTags)
-  tagsRef.current = existingTags
-
-  /**
-   * Knowing the existing tags is worth a short wait — it is what stops a
-   * second run through onboarding re-creating the first run's tags — but it
-   * is not worth blocking on. A tag load that fails stays `undefined` for
-   * good (see useData), so waiting for it unconditionally is another way to
-   * hang this screen. After a moment, go ahead without it: the worst case is
-   * a duplicate tag, which is a great deal better than a dead screen.
-   */
-  const [waitedForTags, setWaitedForTags] = React.useState(false)
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setWaitedForTags(true), 2500)
-    return () => window.clearTimeout(timer)
-  }, [])
-  const ready = existingTags !== undefined || waitedForTags
-
-  React.useEffect(() => {
-    if (!ready || ranRef.current) return
-    // Creating a person's tags twice is duplicate rows in their account, so
-    // the run-once latch is real code, not a development workaround.
-    ranRef.current = true
-
-    const answersNow = answersRef.current
-    draftsRef.current = tagsToCreate(answersNow, tagsRef.current ?? [])
-
-    void (async () => {
-      setSaveState('running')
-      const { error } = await onSaveRef.current({ ...answersNow, onboarded: true })
-      if (!mountedRef.current) return
-      setSaveState(error ? 'failed' : 'done')
-
-      setTagState('running')
-      const made: string[] = []
-      let failed = false
-      for (const draft of draftsRef.current ?? []) {
-        try {
-          await tagRepo.create(draft)
-          made.push(draft.name)
-        } catch {
-          failed = true
-        }
-      }
-      if (!mountedRef.current) return
-      setCreated(made)
-      setTagState(failed && made.length === 0 ? 'failed' : 'done')
-    })()
-  }, [ready])
-
-  const drafts = draftsRef.current ?? []
-  const tagLabel =
-    tagState === 'done' && created.length === 0
-      ? 'Your tags were already set up'
-      : created.length > 0
-        ? `Added ${created.length} ${created.length === 1 ? 'tag' : 'tags'}: ${created.join(', ')}`
-        : drafts.length > 0
-          ? `Adding ${drafts.length} tags`
-          : 'Checking your tags'
+  const { saveState, tagState, finished, failed, tagLabel } = useTailoringRun({
+    answers,
+    existingTags,
+    onSave,
+  })
 
   return (
     <Pane
@@ -599,12 +434,14 @@ function Tailoring({
       }
     >
       <h2 className="text-ios-title leading-[1.15]">
-        {finished ? 'Retrn is set up.' : 'Setting up Retrn.'}
+        {!finished ? 'Setting up Retrn.' : failed ? 'That didn’t save.' : 'Retrn is set up.'}
       </h2>
       <p className="text-ios-subhead mt-3 text-text-secondary">
-        {finished
-          ? 'Everything below is already in your account. All of it is editable later.'
-          : 'One moment — this is writing to your account, not pretending to.'}
+        {!finished
+          ? 'One moment — this is writing to your account, not pretending to.'
+          : failed
+            ? 'Nothing was written. Carry on — you can set all of this from Settings, and running onboarding again will retry it.'
+            : 'Everything below is already in your account. All of it is editable later.'}
       </p>
 
       <div className="mt-6 divide-y divide-border/50 rounded-[14px] bg-bg-sunken px-4 py-1">
@@ -618,7 +455,7 @@ function Tailoring({
         />
       </div>
 
-      {finished && (
+      {finished && !failed && (
         <div className="turn-in mt-3 rounded-[14px] bg-bg-sunken p-4">
           <p className="text-ios-footnote text-muted-foreground">From here on</p>
           <p className="text-ios-subhead mt-1 leading-snug text-foreground">
@@ -649,61 +486,19 @@ function Offer({
   onDone: () => void
   onSeeAllPlans: () => void
 }) {
-  const { isPro, isStudent, edu } = useEntitlement()
-  const { canPurchase } = useSubscription()
-  const [busy, setBusy] = React.useState(false)
-  const [restoring, setRestoring] = React.useState(false)
-
-  const student = planById('student')!
-  const yearly = student.prices!.yearly
-  // Student pricing is only sold to a verified school email; everyone else is
-  // pointed at the full list rather than a price they can't buy.
-  const needsEdu = !isStudent
-  const perMonth = monthlyEquivalent(yearly) ?? ''
-
-  async function buy() {
-    setBusy(true)
-    try {
-      if (isWebBilling) {
-        // On to Stripe Checkout; the page leaves, so there's nothing after.
-        await startCheckout('student', 'yearly')
-        return
-      }
-      await purchase(yearly.appStoreProductId!)
-      successFeedback()
-      toast.success('You’re subscribed. Everything is on.')
-      onDone()
-    } catch (err) {
-      if (err instanceof BillingUnavailableError) {
-        toast.info('Subscriptions open when Retrn lands on the App Store.')
-      } else if (isWebBilling) {
-        toast.error(err instanceof Error ? err.message : 'Couldn’t open checkout.')
-      } else if (!String(err).toLowerCase().includes('cancel')) {
-        errorFeedback()
-        toast.error('That purchase didn’t go through.')
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function restore() {
-    setRestoring(true)
-    try {
-      const state = await restorePurchases()
-      if (state.active) {
-        successFeedback()
-        toast.success('Subscription restored.')
-        onDone()
-      } else {
-        toast.info('No previous purchase found for this Apple ID.')
-      }
-    } catch {
-      toast.info('Nothing to restore yet.')
-    } finally {
-      setRestoring(false)
-    }
-  }
+  const {
+    isPro,
+    needsEdu,
+    edu,
+    canPurchase,
+    student,
+    yearly,
+    perMonth,
+    busy,
+    restoring,
+    buy,
+    restore,
+  } = useOfferActions(onDone)
 
   // Someone the Babson offer already covers must not be sold to. Showing a
   // price to a person who has been told they pay nothing is how you lose them.

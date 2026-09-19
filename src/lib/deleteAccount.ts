@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { forgetStoredSession, supabase } from '@/lib/supabase'
 import { postApi } from '@/lib/apiFetch'
 import { clearSubscriptionCache } from '@/lib/billing/store'
 import { clearReminders } from '@/lib/reminderNotifications'
@@ -29,5 +29,8 @@ export async function deleteAccount(): Promise<void> {
 
   await clearSubscriptionCache()
   await clearReminders()
-  await supabase.auth.signOut().catch(() => {})
+  // The account is gone, so the server call may well fail; the session must
+  // go from this device either way.
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+  await forgetStoredSession()
 }

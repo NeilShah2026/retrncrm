@@ -317,6 +317,15 @@ export function snapshotFingerprint(snapshot: NetworkSnapshot): string {
   return hash.toString(36)
 }
 
+/** Drop the cached briefing — on sign-out, so it can't leak across accounts. */
+export function clearBriefingCache(): void {
+  try {
+    sessionStorage.removeItem(CACHE_KEY)
+  } catch {
+    // Nothing cached, or storage is unavailable.
+  }
+}
+
 function readCache(fingerprint: string): RawBriefing | null {
   try {
     const stored = sessionStorage.getItem(CACHE_KEY)
