@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { BadgeCheck, GraduationCap, Mail } from 'lucide-react'
+import { BadgeCheck, GraduationCap, Loader2, Mail } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -108,7 +108,7 @@ export function EduVerificationCard() {
             {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" disabled={busy} className="gap-2">
               <Mail className="h-4 w-4" />
-              {busy ? 'Sending…' : 'Send verification email'}
+              {busy ? 'Sending…' : 'Email me a link'}
             </Button>
           </form>
         ) : (
@@ -119,33 +119,30 @@ export function EduVerificationCard() {
             }}
             className="space-y-3"
           >
-            <p className="text-sm text-muted-foreground">
-              Check{' '}
-              <span className="break-all text-foreground">
-                {email.trim().toLowerCase()}
-              </span>
-              . Enter the code from that email — or paste the whole link, if that&apos;s
-              what it contains.
+            <div className="flex items-start gap-2.5 rounded-md bg-bg-sunken px-3 py-2.5 text-sm">
+              <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+              <p className="text-text-secondary">
+                We emailed a link to{' '}
+                <span className="break-all text-foreground">{email.trim().toLowerCase()}</span>.
+                Open it — on this computer or your phone — and tap Verify. This page updates on
+                its own.
+              </p>
+            </div>
+            <p className="pt-1 text-xs text-muted-foreground">
+              Link won&apos;t open? Copy it from the email and paste it here instead.
             </p>
             {/* No `maxLength` and no numeric input mode: either would quietly
-                mangle a pasted verification link, which is the other half of
-                what this field legitimately accepts. */}
+                mangle a pasted verification link. */}
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="123456 or paste the link"
-              autoComplete="one-time-code"
-              required
-              autoFocus
+              placeholder="Paste the link from the email"
+              autoComplete="off"
             />
-            <p className="text-xs text-muted-foreground">
-              Paste the link rather than opening it — opening it signs you in as your
-              school account instead of verifying this one.
-            </p>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={busy}>
-                {busy ? 'Verifying…' : 'Verify'}
+              <Button type="submit" variant="outline" disabled={busy || !code.trim()}>
+                {busy ? 'Verifying…' : 'Verify pasted link'}
               </Button>
               <Button
                 type="button"

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Inbox,
   Users,
   Tag as TagIcon,
   Settings,
@@ -35,6 +36,7 @@ import { useUI } from '@/context/ui-context'
 import { useAuth } from '@/auth/AuthProvider'
 import { useAutoLogMeetings } from '@/hooks/useAutoLogMeetings'
 import { useReminderSync } from '@/hooks/useReminderSync'
+import { useInbox } from '@/lib/inbox'
 import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
@@ -44,15 +46,17 @@ export { Logo }
 
 const PRIMARY_NAV = [
   { to: ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: ROUTES.inbox, label: 'Inbox', icon: Inbox, end: false },
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
   { to: ROUTES.college, label: 'College', icon: GraduationCap, end: false },
   { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare, end: false },
   { to: ROUTES.assistant, label: 'Assistant', icon: MessageSquare, end: false },
 ]
 
-/** The phone's tab bar: four destinations plus More, which is a screen too. */
+/** The phone's tab bar: five destinations plus More, which is a screen too. */
 const TAB_NAV = [
   { to: ROUTES.dashboard, label: 'Home', icon: LayoutDashboard, end: true },
+  { to: ROUTES.inbox, label: 'Inbox', icon: Inbox, end: false },
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
   { to: ROUTES.assistant, label: 'Assistant', icon: MessageSquare, end: false },
   { to: ROUTES.calendar, label: 'Calendar', icon: CalendarDays, end: false },
@@ -80,11 +84,13 @@ function TabItem({
   label,
   icon: Icon,
   end,
+  badge,
 }: {
   to: string
   label: string
   icon: typeof Users
   end: boolean
+  badge?: number
 }) {
   return (
     <NavLink
@@ -97,7 +103,15 @@ function TabItem({
       }
     >
       {({ isActive }) => (
-        <Icon className="relative h-6 w-6" strokeWidth={isActive ? 2.4 : 1.9} />
+        <>
+          <Icon className="relative h-6 w-6" strokeWidth={isActive ? 2.4 : 1.9} />
+          {Boolean(badge) && (
+            <span
+              aria-hidden
+              className="absolute right-[calc(50%-15px)] top-2 h-2 w-2 rounded-full bg-danger"
+            />
+          )}
+        </>
       )}
     </NavLink>
   )
@@ -114,6 +128,7 @@ function TabItem({
  */
 function PhoneTabBar() {
   const { pathname } = useLocation()
+  const { count } = useInbox()
   const activeIndex = TAB_NAV.findIndex((item) =>
     item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`),
   )
@@ -134,7 +149,7 @@ function PhoneTabBar() {
       )}
     >
       {/* A capsule, per DESIGN.md's `pill: full` — not an arbitrary radius. */}
-      <div className="glass glass-floating pointer-events-auto relative flex w-full max-w-[288px] items-stretch rounded-full p-1">
+      <div className="glass glass-floating pointer-events-auto relative flex w-full max-w-[336px] items-stretch rounded-full p-1">
         <span
           aria-hidden
           className={cn(
@@ -149,7 +164,7 @@ function PhoneTabBar() {
         />
 
         {TAB_NAV.map((item) => (
-          <TabItem key={item.to} {...item} />
+          <TabItem key={item.to} {...item} badge={item.to === ROUTES.inbox ? count : undefined} />
         ))}
       </div>
     </nav>
@@ -207,6 +222,7 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
  */
 export function AppLayout() {
   const { openNewContact, openVoiceCapture, openSearch } = useUI()
+  const { count: inboxCount } = useInbox()
   const [shareOpen, setShareOpen] = React.useState(false)
 
   useAutoLogMeetings()
@@ -252,7 +268,12 @@ export function AppLayout() {
           {PRIMARY_NAV.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               <item.icon className="h-4 w-4 text-muted-foreground" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.to === ROUTES.inbox && inboxCount > 0 && (
+                <span className="tnum rounded-full bg-bg-sunken px-1.5 text-xs font-medium text-text-secondary">
+                  {inboxCount}
+                </span>
+              )}
             </NavLink>
           ))}
           <div className="text-label px-2 pb-1 pt-4 text-muted-foreground">Toolkit</div>

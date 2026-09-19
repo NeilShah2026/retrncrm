@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useEvents } from './useData'
 import { contactRepo, eventRepo } from '@/services'
+import { meetingLogDate, meetingSummary } from '@/lib/meetingNotes'
 
 /**
  * Once a scheduled meeting's end time has passed, log it to each linked
@@ -27,9 +28,9 @@ export function useAutoLogMeetings() {
         for (const contactId of e.contactIds) {
           try {
             await contactRepo.addInteraction(contactId, {
-              date: e.startsAt.slice(0, 10),
+              date: meetingLogDate(e),
               type: 'meeting',
-              summary: e.title,
+              summary: meetingSummary(e.title, e.notes),
             })
           } catch (err) {
             // A deleted contact shouldn't block the rest of the batch.

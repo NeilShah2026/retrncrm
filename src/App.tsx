@@ -9,6 +9,7 @@ import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { MobileWebGate } from '@/components/layout/MobileWebGate'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { InboxPage } from '@/pages/InboxPage'
 import { AssistantPage } from '@/pages/AssistantPage'
 import { ContactsPage } from '@/pages/ContactsPage'
 import { ContactDetailPage } from '@/pages/ContactDetailPage'
@@ -24,6 +25,7 @@ import { QrPage } from '@/pages/QrPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
+import { VerifyEduPage } from '@/pages/auth/VerifyEduPage'
 import { AddContactPage } from '@/pages/AddContactPage'
 import { PrivacyPolicyPage } from '@/pages/legal/PrivacyPolicyPage'
 import { TermsPage } from '@/pages/legal/TermsPage'
@@ -59,6 +61,7 @@ function AppEntry() {
             <Route path="welcome" element={<OnboardingPage />} />
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="inbox" element={<InboxPage />} />
               <Route path="assistant" element={<AssistantPage />} />
               <Route path="contacts" element={<ContactsPage />} />
               <Route path="contacts/:id" element={<ContactDetailPage />} />
@@ -101,6 +104,7 @@ export default function App() {
                 />
                 <Route path={ROUTES.login} element={<LoginPage />} />
                 <Route path={ROUTES.add} element={<AddContactPage />} />
+                <Route path={ROUTES.verifyEdu} element={<VerifyEduPage />} />
                 <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />
                 <Route path={ROUTES.terms} element={<TermsPage />} />
                 <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />

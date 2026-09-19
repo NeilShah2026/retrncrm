@@ -204,6 +204,8 @@ export interface CalendarEvent {
   contactIds: string[]
   /** True once the past meeting has been logged to those contacts' timelines. */
   logged: boolean
+  /** Post-meeting notes: what was said, next steps. `description` is the prep. */
+  notes?: string
   createdAt: string
   updatedAt: string
 }

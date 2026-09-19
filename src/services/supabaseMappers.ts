@@ -209,6 +209,7 @@ export function rowToEvent(row: EventRow): CalendarEvent {
     allDay: row.all_day,
     contactIds: row.contact_ids ?? [],
     logged: row.logged,
+    notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -229,6 +230,9 @@ export function eventToRow(
     all_day: e.allDay ?? false,
     contact_ids: e.contactIds ?? [],
     logged: e.logged ?? false,
+    // Only sent when there is something to say (or clear), so meetings still
+    // save on a database that hasn't had 0006_meeting_notes.sql run yet.
+    ...(e.notes !== undefined && { notes: e.notes || null }),
     created_at: e.createdAt,
     updated_at: e.updatedAt,
   }

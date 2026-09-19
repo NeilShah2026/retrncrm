@@ -6,6 +6,8 @@ import {
 } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { postApi } from './apiFetch'
+import { apiOrigin } from './apiBase'
+import { ROUTES } from './routes'
 
 /**
  * Babson free access: any student who proves control of a @babson.edu address
@@ -20,9 +22,11 @@ import { postApi } from './apiFetch'
  *     so there is nothing more to ask for. `syncAccountEmail()` records it.
  *
  *  2. **Verify it in Settings.** For people whose Retrn account is a personal
- *     address. `startVerification()` sends a code to the Babson address and
- *     `confirmVerification()` checks it, without disturbing the session they
- *     are signed in with — see `otpClient()` below.
+ *     address. `startVerification()` records the request server-side and
+ *     emails a magic link to the Babson address. Opening that link — on any
+ *     device — lands on /verify-edu, which hands the proof to `claimLink()`.
+ *     Pasting the link (or a code, if the email template has one) into
+ *     Settings via `confirmVerification()` still works as a fallback.
  *
  * Nothing here is trusted on its own: the flag this module reads is written by
  * the service role and travels in the JWT, so a user cannot set it themselves.
@@ -92,12 +96,24 @@ interface VerifyResponse {
   error?: string
 }
 
-async function callVerifyEndpoint(body: Record<string, unknown>): Promise<VerifyResponse> {
+async function callVerifyEndpoint(
+  body: Record<string, unknown>,
+  { refresh = true }: { refresh?: boolean } = {},
+): Promise<VerifyResponse> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error('Sign in first.')
 
-  const res = await postApi('/api/verify-edu', body, { token })
+  const payload = await postVerify(body, token)
+
+  // `app_metadata` rides in the JWT, so the change is invisible until the
+  // session is re-minted. Everything reading `readEduStatus` updates on this.
+  if (refresh) await supabase.auth.refreshSession()
+  return payload
+}
+
+async function postVerify(body: Record<string, unknown>, token?: string): Promise<VerifyResponse> {
+  const res = await postApi('/api/verify-edu', body, token ? { token } : {})
 
   let payload: VerifyResponse = {}
   try {
@@ -108,10 +124,6 @@ async function callVerifyEndpoint(body: Record<string, unknown>): Promise<Verify
   if (!res.ok) {
     throw new Error(payload.error ?? 'Verification failed. Try again in a moment.')
   }
-
-  // `app_metadata` rides in the JWT, so the change is invisible until the
-  // session is re-minted. Everything reading `readEduStatus` updates on this.
-  await supabase.auth.refreshSession()
   return payload
 }
 
@@ -135,6 +147,10 @@ function otpClient(): SupabaseClient {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
   otp = createClient(url, anonKey, {
     auth: {
+      // Implicit, not PKCE: the link has to carry the session itself in its
+      // #fragment, because it may be opened on a device that never held a
+      // PKCE verifier (and this client keeps nothing between page loads).
+      flowType: 'implicit',
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
@@ -213,21 +229,79 @@ export function parseVerificationInput(raw: string): VerificationInput | null {
   return null
 }
 
-/** Email a verification code (or link) to `email`. Throws a showable message. */
+/** Email a verification link to `email`. Throws a showable message. */
 export async function startVerification(email: string): Promise<void> {
   const address = email.trim().toLowerCase()
   if (!isBabsonEmail(address)) {
     throw new Error(`Enter your @${BABSON_DOMAIN} address.`)
   }
 
+  // Record which account is asking first, so the link can be matched back to
+  // it wherever it's opened.
+  await callVerifyEndpoint({ action: 'request', email: address }, { refresh: false })
+
   const { error } = await otpClient().auth.signInWithOtp({
     email: address,
-    // Babson students verifying from a personal account usually have no Retrn
-    // account under their school address, so one has to be creatable for the
-    // code to be sent at all.
-    options: { shouldCreateUser: true },
+    options: {
+      // Babson students verifying from a personal account usually have no
+      // Retrn account under their school address, so one has to be creatable
+      // for the email to be sent at all.
+      shouldCreateUser: true,
+      // An absolute web URL even from the iPhone app: the link opens in the
+      // browser, which is where /verify-edu lives. Must be in the Supabase
+      // project's Redirect URLs, or Supabase falls back to the Site URL.
+      emailRedirectTo: `${apiOrigin()}${ROUTES.verifyEdu}`,
+    },
   })
   if (error) throw new Error(error.message)
+}
+
+/**
+ * What /verify-edu found in its URL: the school account's access token (the
+ * default magic link), or a token hash to exchange for one (a customised
+ * email template linking straight here).
+ */
+export async function proofFromLandingUrl(url: URL): Promise<string> {
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''))
+  const failure = hash.get('error_description') ?? url.searchParams.get('error_description')
+  if (failure) throw new Error(failure.replace(/\+/g, ' '))
+
+  const accessToken = hash.get('access_token')
+  if (accessToken) return accessToken
+
+  const tokenHash = url.searchParams.get('token_hash')
+  if (tokenHash) {
+    const client = otpClient()
+    const { data, error } = await client.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: otpTypeFrom(url.searchParams.get('type')),
+    })
+    if (error) throw new Error(error.message)
+    const token = data.session?.access_token
+    if (token) return token
+  }
+
+  throw new Error('This link is incomplete. Open it straight from the email, or send a new one.')
+}
+
+/** Which Retrn account a link would verify, before committing to it. */
+export async function previewLink(
+  proofToken: string,
+): Promise<{ email: string; account: string | null }> {
+  const res = (await postVerify({ action: 'claim', proofToken, preview: true })) as {
+    email?: string
+    account?: string | null
+  }
+  return { email: res.email ?? '', account: res.account ?? null }
+}
+
+/** Verify the account that asked for this address. Needs no Retrn session. */
+export async function claimLink(proofToken: string): Promise<string> {
+  const res = await postVerify({ action: 'claim', proofToken })
+  // If the account that asked is signed in in this browser too, show it now.
+  const { data } = await supabase.auth.getSession()
+  if (data.session) await supabase.auth.refreshSession()
+  return res.email ?? ''
 }
 
 /**
@@ -239,7 +313,7 @@ export async function confirmVerification(email: string, entry: string): Promise
   const address = email.trim().toLowerCase()
   const input = parseVerificationInput(entry)
   if (!input) {
-    throw new Error('Enter the code from the email, or paste the whole link.')
+    throw new Error('Paste the whole link from the email.')
   }
 
   const client = otpClient()

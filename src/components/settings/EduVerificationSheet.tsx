@@ -15,7 +15,7 @@ import { BABSON_DOMAIN } from '@/lib/eduVerification'
 import { useEduVerification } from './useEduVerification'
 
 /**
- * Babson verification on a phone: the school address, then the code, as two
+ * Babson verification on a phone: the school address, then the link, as two
  * steps of one sheet. Accounts already signed in with a school address are
  * verified without any of this — the sheet just says so.
  */
@@ -108,26 +108,19 @@ export function EduVerificationSheet({
           ) : (
             <>
               <p className="text-ios-subhead px-1 text-muted-foreground">
-                Check{' '}
+                We emailed a link to{' '}
                 <span className="break-all text-foreground">{email.trim().toLowerCase()}</span>.
-                Enter the code from that email — or paste the whole link, if that's what it
-                contains.
+                Open it and tap Verify — this screen updates on its own.
               </p>
               <InsetGroup
-                footer={
-                  error ?? (
-                    // Tapping the link signs this device in *as the school
-                    // account*, which is not what they came here to do.
-                    'Paste the link rather than tapping it — tapping signs you in as your school account instead of verifying this one.'
-                  )
-                }
+                footer={error ?? 'Link won’t open? Copy it from the email and paste it here.'}
               >
                 <InsetInputRow
-                  label="Code"
+                  label="Link"
                   value={code}
                   onChange={setCode}
-                  placeholder="123456 or paste the link"
-                  autoComplete="one-time-code"
+                  placeholder="Paste the link"
+                  autoComplete="off"
                   enterKeyHint="done"
                   onEnter={() => void confirm()}
                   last
@@ -148,7 +141,7 @@ export function EduVerificationSheet({
                 else void confirm()
               }}
             >
-              {step === 'idle' ? 'Send Email' : 'Verify'}
+              {step === 'idle' ? 'Email Me a Link' : 'Verify Pasted Link'}
             </Button>
           </DialogFooter>
         )}

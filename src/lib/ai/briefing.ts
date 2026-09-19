@@ -1,3 +1,4 @@
+import { differenceInCalendarDays, format } from 'date-fns'
 import { askClaudeJson, truncate } from './client'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { CONNECTION_TYPES, OPPORTUNITY_STAGES } from '@/lib/constants'
@@ -48,18 +49,37 @@ export interface NetworkSnapshot {
   empty: boolean
 }
 
-const MAX_PEOPLE = 18
-const MAX_MEETINGS = 8
-const MAX_OPPS = 8
-const MAX_ACTIONS = 5
+const MAX_PEOPLE = 12
+const MAX_MEETINGS = 6
+const MAX_OPPS = 5
+/** A short list is the point — three things you'll actually do. */
+const MAX_ACTIONS = 3
+/** However many applications are in flight, one of them is enough for today. */
+const MAX_PIPELINE_ACTIONS = 1
 /** Meetings this far out are "coming up"; past that they aren't today's problem. */
 const MEETING_HORIZON_DAYS = 14
 const DEADLINE_HORIZON_DAYS = 30
 
-/** Days from now until an ISO date (negative = already past). */
+/**
+ * Calendar days from today until an ISO date or datetime, in the user's own
+ * timezone (negative = already past). "Today" means the same date on the
+ * wall calendar — not "less than 24 hours away", which called a meeting at
+ * 5pm "tomorrow" at 3pm, and a bare yyyy-mm-dd read as UTC midnight lands on
+ * the previous day anywhere west of London.
+ */
 export function daysUntil(iso?: string | null): number | null {
-  const past = daysSince(iso)
-  return past === null ? null : -past
+  if (!iso) return null
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  return differenceInCalendarDays(date, new Date())
+}
+
+/** A meeting counts until it has ended — not once it has merely started. */
+function isOver(event: CalendarEvent, now = Date.now()): boolean {
+  return new Date(event.endsAt).getTime() <= now
 }
 
 function whenPhrase(days: number): string {
@@ -90,7 +110,9 @@ export function buildSnapshot(
 ): NetworkSnapshot {
   const contactMap = new Map(contacts.map((c) => [c.id, c]))
 
+  const now = Date.now()
   const meetings = events
+    .filter((event) => !isOver(event, now))
     .map((event) => ({ event, days: daysUntil(event.startsAt) ?? 999 }))
     .filter(({ days }) => days >= 0 && days <= MEETING_HORIZON_DAYS)
     .sort((a, b) => a.event.startsAt.localeCompare(b.event.startsAt))
@@ -186,7 +208,11 @@ function meetingLine(
   index: number,
 ): string {
   const parts: string[] = [`M${index}. "${truncate(event.title, 80)}"`]
-  parts.push(whenPhrase(daysUntil(event.startsAt) ?? 0))
+  // The exact local day and time as well as the relative phrase, so the model
+  // never has to work out which day "in 2 days" is.
+  const start = new Date(event.startsAt)
+  const when = event.allDay ? format(start, 'EEE MMM d') : format(start, 'EEE MMM d, h:mm a')
+  parts.push(`${when} (${whenPhrase(daysUntil(event.startsAt) ?? 0)})`)
   if (attendees.length) parts.push(`with ${attendees.map(fullName).join(', ')}`)
   if (event.location) parts.push(truncate(event.location, 60))
 
@@ -234,14 +260,17 @@ a meeting, or a company, and never reference the same one twice.
 - "kind" is one of: "prep" (get ready for a meeting), "reconnect" (reach out \
 to someone who has gone quiet), "draft" (write a specific message), \
 "pipeline" (act on an application).
-- At most ${MAX_ACTIONS} actions, most urgent first. Fewer is better than \
-padding — only include something genuinely worth doing this week.
-- "do" is an imperative under 10 words: "Prep for coffee with Dana Cruz".
-- "why" is one line under 20 words citing the specific fact that made it \
-urgent — the date, the deadline, how long it has been. Never restate "do".
-- A meeting in the next two days outranks anything else.
-- "headline" states the shape of the day in one sentence. No greeting, no \
-pep talk, no exclamation marks.
+- At most ${MAX_ACTIONS} actions, most urgent first, and at most \
+${MAX_PIPELINE_ACTIONS} "pipeline" action. Fewer is better than padding — one \
+or two is a fine answer. Only include what is genuinely worth doing today or \
+tomorrow.
+- "do" is an imperative under 8 words: "Prep for coffee with Dana Cruz".
+- "why" is under 12 words citing the one fact that made it urgent. Never \
+restate "do". For a meeting, use the day exactly as given in the list \
+("today", "tomorrow", "Tue Sep 22") — never work out a day yourself.
+- A meeting today or tomorrow outranks anything else.
+- "headline" is under 12 words and states the shape of the day. No \
+greeting, no pep talk, no exclamation marks.
 - These records are all you know. Do not use outside knowledge about any \
 company or person.`
 
@@ -315,6 +344,7 @@ function writeCache(fingerprint: string, raw: RawBriefing): void {
 function resolve(raw: RawBriefing, snapshot: NetworkSnapshot): Briefing {
   const actions: BriefingAction[] = []
   const seen = new Set<string>()
+  let pipeline = 0
 
   for (const entry of Array.isArray(raw.actions) ? raw.actions : []) {
     if (typeof entry !== 'object' || entry === null) continue
@@ -345,9 +375,10 @@ function resolve(raw: RawBriefing, snapshot: NetworkSnapshot): Briefing {
       if (action.kind === 'reconnect') action.kind = 'prep'
     } else {
       const entry = snapshot.opportunities[index]
-      if (!entry) continue
+      if (!entry || pipeline >= MAX_PIPELINE_ACTIONS) continue
       action.opportunity = entry.opp
       action.kind = 'pipeline'
+      pipeline++
     }
 
     seen.add(ref.toUpperCase())
@@ -403,11 +434,12 @@ export async function generateBriefing(
     )
   }
 
+  const now = format(new Date(), "EEEE, MMM d, h:mm a")
   const raw = await askClaudeJson<RawBriefing>({
     system: SYSTEM,
-    maxTokens: 800,
+    maxTokens: 500,
     signal: options.signal,
-    messages: [{ role: 'user', content: sections.join('\n\n') }],
+    messages: [{ role: 'user', content: `It is now ${now}.\n\n${sections.join('\n\n')}` }],
   })
 
   writeCache(fingerprint, raw)
@@ -434,7 +466,7 @@ export function pruneBriefing(briefing: Briefing, snapshot: NetworkSnapshot): Br
   const actions = briefing.actions.flatMap((action): BriefingAction[] => {
     if (action.event) {
       const event = meetings.get(action.event.id)
-      if (!event) return []
+      if (!event || isOver(event)) return []
       const contact = action.contact
         ? (attendees.get(action.contact.id) ?? action.contact)
         : undefined
@@ -470,7 +502,7 @@ export function localBriefing(snapshot: NetworkSnapshot): Briefing {
   for (const { event, attendees } of snapshot.meetings) {
     if (actions.length >= MAX_ACTIONS) break
     const days = daysUntil(event.startsAt) ?? 0
-    if (days > 3) break
+    if (days > 1) break
     const who = attendees.length ? fullName(attendees[0]) : null
     const unprepared = attendees.length && !attendees.some((c) => c.talkingPoints?.trim())
     actions.push({
@@ -484,6 +516,7 @@ export function localBriefing(snapshot: NetworkSnapshot): Briefing {
 
   for (const { opp } of snapshot.opportunities) {
     if (actions.length >= MAX_ACTIONS) break
+    if (actions.some((a) => a.kind === 'pipeline')) break
     const days = daysUntil(opp.deadline)
     if (days === null || days > 7) continue
     actions.push({

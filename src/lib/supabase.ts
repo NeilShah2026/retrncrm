@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
 import { isNative } from './platform'
+import { ROUTES } from './routes'
 import { capacitorPreferencesStorage } from './nativeStorage'
 
 const url = import.meta.env.VITE_SUPABASE_URL
@@ -21,7 +22,11 @@ export const supabase = createClient<Database>(url, anonKey, {
     // The native app completes auth via a custom-scheme redirect handled
     // by src/lib/nativeAuth.ts, not by Supabase reading `window.location` —
     // and there is no meaningful URL to detect a session in there anyway.
-    detectSessionInUrl: !isNative,
+    //
+    // Never on /verify-edu: the tokens there belong to a *school* address
+    // being verified for this account, and picking them up would sign the
+    // browser in as that address instead. That page reads them itself.
+    detectSessionInUrl: isNative ? false : (url) => url.pathname !== ROUTES.verifyEdu,
     ...(isNative && { storage: capacitorPreferencesStorage }),
   },
 })

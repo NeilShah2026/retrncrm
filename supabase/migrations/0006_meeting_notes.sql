@@ -1,0 +1,11 @@
+-- ---------------------------------------------------------------------------
+-- Post-meeting notes.
+--
+-- `description` is what you walk in with (agenda, what to ask); `notes` is
+-- what you walk out with — what was said, next steps. Kept apart so the
+-- prep never gets overwritten by the write-up.
+--
+-- Run in the Supabase Dashboard → SQL Editor. Until it has run the app keeps
+-- working; saving notes on a meeting just fails with a message.
+-- ---------------------------------------------------------------------------
+alter table public.events add column if not exists notes text;

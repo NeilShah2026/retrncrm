@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { toast } from 'sonner'
 import { useEntitlement } from '@/hooks/useEntitlement'
+import { supabase } from '@/lib/supabase'
 import {
   BABSON_DOMAIN,
   confirmVerification,
@@ -12,14 +13,21 @@ import {
 
 export type EduStep = 'idle' | 'code'
 
+/** How often to look for the link having been opened elsewhere. */
+const POLL_MS = 5_000
+/** Stop looking after this long; focusing the window still checks. */
+const POLL_FOR_MS = 15 * 60_000
+
 /**
- * Babson verification: email a school address, then confirm what came back.
- * Shared by the desktop card and the phone's sheet so both behave the same.
+ * Babson verification: email a school address a magic link, then wait for it
+ * to be opened. Shared by the desktop card and the phone's sheet so both
+ * behave the same.
  *
- * "What came back" is deliberately loose: the email's contents are decided by
- * a Supabase template that also serves the login page's magic link, so it may
- * hold a code, a link, or both. Either is accepted — see
- * `parseVerificationInput`.
+ * Opening the link finishes verification server-side (see /verify-edu), often
+ * on another device — so while waiting, this re-mints the session now and then
+ * and whenever the window regains focus, and the verified flag shows up in the
+ * JWT on its own. Pasting the link (or a code, if the email template has one)
+ * is kept as a fallback — see `parseVerificationInput`.
  */
 export function useEduVerification() {
   const { edu } = useEntitlement()
@@ -28,6 +36,35 @@ export function useEduVerification() {
   const [code, setCode] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+
+  const waiting = step === 'code' && !edu.verified
+  React.useEffect(() => {
+    if (!waiting) return
+    const check = () => void supabase.auth.refreshSession()
+    const until = Date.now() + POLL_FOR_MS
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && Date.now() < until) check()
+    }, POLL_MS)
+    window.addEventListener('focus', check)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
+  }, [waiting])
+
+  // The link was opened (here or elsewhere) and the session caught up.
+  const wasWaiting = React.useRef(false)
+  React.useEffect(() => {
+    if (wasWaiting.current && edu.verified) {
+      toast.success(`${edu.email ?? 'Your school email'} verified — Retrn is free for you.`, {
+        id: 'edu-verified',
+      })
+      setStep('idle')
+      setEmail('')
+      setCode('')
+    }
+    wasWaiting.current = waiting
+  }, [waiting, edu.verified, edu.email])
 
   async function send(): Promise<void> {
     setError(null)
@@ -39,7 +76,7 @@ export function useEduVerification() {
     try {
       await startVerification(email)
       setStep('code')
-      toast.success(`Email sent to ${email.trim().toLowerCase()}`)
+      toast.success(`Link sent to ${email.trim().toLowerCase()}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send that email.')
     } finally {
@@ -52,7 +89,7 @@ export function useEduVerification() {
     setError(null)
     // Say what is wrong with the entry before spending a round trip on it.
     if (!parseVerificationInput(code)) {
-      setError('Enter the code from the email, or paste the whole link.')
+      setError('Paste the whole link from the email.')
       return false
     }
     setBusy(true)
@@ -61,7 +98,7 @@ export function useEduVerification() {
       setStep('idle')
       setEmail('')
       setCode('')
-      toast.success(`${verified} verified — Retrn is free for you.`)
+      toast.success(`${verified} verified — Retrn is free for you.`, { id: 'edu-verified' })
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That did not work — try a fresh email.')

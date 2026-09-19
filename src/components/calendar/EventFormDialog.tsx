@@ -29,6 +29,7 @@ import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { useContacts } from '@/hooks/useData'
 import { eventRepo } from '@/services'
 import { fullName } from '@/lib/format'
+import { hasStarted, saveMeetingNotes } from '@/lib/meetingNotes'
 import type { CalendarEvent } from '@/types'
 
 interface Props {
@@ -80,6 +81,7 @@ export function EventFormDialog({
   const [allDay, setAllDay] = React.useState(false)
   const [location, setLocation] = React.useState('')
   const [description, setDescription] = React.useState('')
+  const [notes, setNotes] = React.useState('')
   const [contactIds, setContactIds] = React.useState<string[]>([])
   const [query, setQuery] = React.useState('')
   const [saving, setSaving] = React.useState(false)
@@ -96,6 +98,7 @@ export function EventFormDialog({
       setAllDay(event.allDay)
       setLocation(event.location ?? '')
       setDescription(event.description ?? '')
+      setNotes(event.notes ?? '')
       setContactIds(event.contactIds)
     } else {
       setTitle('')
@@ -105,12 +108,15 @@ export function EventFormDialog({
       setAllDay(false)
       setLocation('')
       setDescription('')
+      setNotes('')
       setContactIds(defaultContactId ? [defaultContactId] : [])
     }
     setQuery('')
   }, [open, event, defaultDate, defaultContactId])
 
   const isMobile = useIsMobile()
+  // Post-meeting notes only make sense once the meeting has happened.
+  const showNotes = Boolean(event && hasStarted(event))
 
   const selected = contactIds
     .map((id) => contacts.find((c) => c.id === id))
@@ -140,6 +146,9 @@ export function EventFormDialog({
         allDay,
         contactIds,
         logged: event?.logged ?? false,
+      }
+      if (event && notes.trim() !== (event.notes ?? '')) {
+        await saveMeetingNotes(event, notes, contacts)
       }
       if (event) await eventRepo.update(event.id, draft)
       else await eventRepo.create(draft)
@@ -262,7 +271,19 @@ export function EventFormDialog({
             ))}
           </InsetGroup>
 
-          <InsetGroup title="Notes">
+          {showNotes && (
+            <InsetGroup title="Meeting notes" footer="How it went. Also added to their timelines.">
+              <InsetTextareaRow
+                value={notes}
+                onChange={setNotes}
+                placeholder="What you talked about, next steps…"
+                rows={5}
+                last
+              />
+            </InsetGroup>
+          )}
+
+          <InsetGroup title="Agenda">
             <InsetTextareaRow
               value={description}
               onChange={setDescription}
@@ -424,8 +445,21 @@ export function EventFormDialog({
             )}
           </div>
 
+          {showNotes && (
+            <div className="space-y-1.5">
+              <Label htmlFor="ev-notes">Meeting notes</Label>
+              <Textarea
+                id="ev-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="What you talked about, next steps…"
+                rows={4}
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
-            <Label htmlFor="ev-desc">Notes</Label>
+            <Label htmlFor="ev-desc">Agenda</Label>
             <Textarea
               id="ev-desc"
               value={description}

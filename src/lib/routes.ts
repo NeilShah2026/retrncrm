@@ -9,8 +9,12 @@ export const ROUTES = {
   add: '/add',
   privacy: '/privacy',
   terms: '/terms',
+  /** Where the Babson verification email's link lands. Public on purpose. */
+  verifyEdu: '/verify-edu',
   app: '/app',
   dashboard: '/app',
+  /** Everything waiting on you: follow-ups due, meetings to write up… */
+  inbox: '/app/inbox',
   contacts: '/app/contacts',
   contact: (id: string) => `/app/contacts/${id}`,
   contactsSearch: (q: string) => `/app/contacts?q=${encodeURIComponent(q)}`,

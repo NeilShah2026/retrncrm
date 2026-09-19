@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { withCors } from './cors.js'
 
 /**
@@ -50,10 +50,19 @@ const FREE_DOMAINS = ['babson.edu'] as const
 
 const MAX_BODY_BYTES = 4_000
 
+/** How long an emailed link stays good for matching back to an account. */
+const REQUEST_TTL_MS = 24 * 60 * 60 * 1000
+
 interface RequestBody {
   action?: unknown
   proofToken?: unknown
+  email?: unknown
+  /** With `claim`: only say which account the link would verify. */
+  preview?: unknown
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminClient = SupabaseClient<any, 'public', 'public', any, any>
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -72,6 +81,108 @@ function isFreeDomain(email: string): boolean {
 
 function domainOf(email: string): string {
   return email.slice(email.lastIndexOf('@') + 1).toLowerCase()
+}
+
+/** "neil@gmail.com" → "n***@gmail.com": enough to recognise, not to harvest. */
+function maskEmail(email: string | undefined): string | null {
+  if (!email) return null
+  const at = email.lastIndexOf('@')
+  if (at < 1) return null
+  return `${email[0]}***${email.slice(at)}`
+}
+
+/**
+ * Tie `email` to `userId`: the `edu_verifications` row plus the JWT flag.
+ * Returns an error response, or null on success.
+ */
+async function grant(admin: AdminClient, userId: string, email: string): Promise<Response | null> {
+  // One address unlocks one account.
+  const { data: existing } = await admin
+    .from('edu_verifications')
+    .select('user_id')
+    .ilike('email', email)
+    .maybeSingle()
+
+  if (existing && (existing as { user_id: string }).user_id !== userId) {
+    return json(
+      { error: 'That Babson email is already verified on another Retrn account.' },
+      409,
+    )
+  }
+
+  const verifiedAt = new Date().toISOString()
+
+  const { error: rowError } = await admin.from('edu_verifications').upsert(
+    { user_id: userId, email, domain: domainOf(email), verified_at: verifiedAt },
+    { onConflict: 'user_id' },
+  )
+  if (rowError) {
+    return json({ error: 'Could not record that verification.' }, 500)
+  }
+
+  // The flag the app actually reads. app_metadata rides along in the JWT, so
+  // the browser sees it after one `refreshSession()`.
+  const { error: stampError } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: {
+      babson_verified: true,
+      babson_email: email,
+      babson_verified_at: verifiedAt,
+    },
+  })
+  if (stampError) {
+    return json({ error: 'Could not update your account.' }, 500)
+  }
+  return null
+}
+
+/**
+ * The emailed link was opened: `proofToken` is the session Supabase minted for
+ * the school address. Find the account that asked for that address and verify
+ * it. Needs no Retrn session — the link may be opened on a different device.
+ */
+async function handleClaim(
+  reader: AdminClient,
+  admin: AdminClient,
+  body: RequestBody,
+): Promise<Response> {
+  if (typeof body.proofToken !== 'string' || !body.proofToken.trim()) {
+    return json({ error: 'That link is missing its verification token.' }, 400)
+  }
+  const { data: proof, error: proofError } = await reader.auth.getUser(body.proofToken.trim())
+  if (proofError || !proof.user?.email || !proof.user.email_confirmed_at) {
+    return json({ error: 'That link has expired or was already used. Send a new one from Settings.' }, 401)
+  }
+  const email = proof.user.email.toLowerCase()
+  if (!isFreeDomain(email)) {
+    return json({ error: 'That link isn’t for a Babson address.' }, 400)
+  }
+
+  const { data: request } = await admin
+    .from('edu_verification_requests')
+    .select('user_id, requested_at')
+    .ilike('email', email)
+    .order('requested_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const pending = request as { user_id: string; requested_at: string } | null
+  if (!pending || Date.now() - new Date(pending.requested_at).getTime() > REQUEST_TTL_MS) {
+    return json(
+      { error: 'No Retrn account is waiting on this address. Start again from Settings.' },
+      404,
+    )
+  }
+
+  if (body.preview === true) {
+    const { data: account } = await admin.auth.admin.getUserById(pending.user_id)
+    return json({ email, account: maskEmail(account.user?.email) }, 200)
+  }
+
+  const failed = await grant(admin, pending.user_id, email)
+  if (failed) return failed
+
+  await admin.from('edu_verification_requests').delete().eq('user_id', pending.user_id)
+  return json({ verified: true, email, via: 'verified-email' }, 200)
 }
 
 async function handle(req: Request): Promise<Response> {
@@ -108,6 +219,13 @@ async function handle(req: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  // --- Claim (the emailed link was opened, maybe on another device) --------
+  if (body.action === 'claim') return handleClaim(reader, admin, body)
+
   const header = req.headers.get('authorization') ?? ''
   const accessToken = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
   if (!accessToken) {
@@ -120,9 +238,30 @@ async function handle(req: Request): Promise<Response> {
   }
   const userId = caller.user.id
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  // --- Request (about to email a link to a school address) ----------------
+  if (body.action === 'request') {
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!isFreeDomain(email)) {
+      return json({ error: 'That is not a Babson address. Use your @babson.edu email.' }, 400)
+    }
+    const { data: taken } = await admin
+      .from('edu_verifications')
+      .select('user_id')
+      .ilike('email', email)
+      .maybeSingle()
+    if (taken && (taken as { user_id: string }).user_id !== userId) {
+      return json(
+        { error: 'That Babson email is already verified on another Retrn account.' },
+        409,
+      )
+    }
+    const { error } = await admin.from('edu_verification_requests').upsert(
+      { user_id: userId, email, requested_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    )
+    if (error) return json({ error: 'Could not start verification. Try again in a moment.' }, 500)
+    return json({ requested: true }, 200)
+  }
 
   // --- Remove -------------------------------------------------------------
   if (body.action === 'remove') {
@@ -172,42 +311,8 @@ async function handle(req: Request): Promise<Response> {
     )
   }
 
-  // --- One address unlocks one account ------------------------------------
-  const { data: existing } = await admin
-    .from('edu_verifications')
-    .select('user_id')
-    .ilike('email', email)
-    .maybeSingle()
-
-  if (existing && existing.user_id !== userId) {
-    return json(
-      { error: 'That Babson email is already verified on another Retrn account.' },
-      409,
-    )
-  }
-
-  const verifiedAt = new Date().toISOString()
-
-  const { error: rowError } = await admin.from('edu_verifications').upsert(
-    { user_id: userId, email, domain: domainOf(email), verified_at: verifiedAt },
-    { onConflict: 'user_id' },
-  )
-  if (rowError) {
-    return json({ error: 'Could not record that verification.' }, 500)
-  }
-
-  // The flag the app actually reads. app_metadata rides along in the JWT, so
-  // the browser sees it after one `refreshSession()`.
-  const { error: stampError } = await admin.auth.admin.updateUserById(userId, {
-    app_metadata: {
-      babson_verified: true,
-      babson_email: email,
-      babson_verified_at: verifiedAt,
-    },
-  })
-  if (stampError) {
-    return json({ error: 'Could not update your account.' }, 500)
-  }
+  const failed = await grant(admin, userId, email)
+  if (failed) return failed
 
   return json({ verified: true, email, via }, 200)
 }

@@ -63,9 +63,18 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
   const navigate = useNavigate()
   const { openAssistant } = useUI()
 
+  // Meetings drop off the list the moment they end, so the snapshot has to be
+  // rebuilt as time passes, not only when the records change.
+  const [minute, setMinute] = React.useState(0)
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setMinute((m) => m + 1), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   const snapshot = React.useMemo(
     () => buildSnapshot(contacts, opportunities, events),
-    [contacts, opportunities, events],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `minute` is the clock
+    [contacts, opportunities, events, minute],
   )
   const fingerprint = React.useMemo(() => snapshotFingerprint(snapshot), [snapshot])
 

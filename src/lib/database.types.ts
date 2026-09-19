@@ -134,6 +134,7 @@ export interface Database {
           all_day: boolean
           contact_ids: string[]
           logged: boolean
+          notes: string | null
           created_at: string
           updated_at: string
         }

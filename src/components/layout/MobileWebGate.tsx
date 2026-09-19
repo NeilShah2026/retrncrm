@@ -8,18 +8,19 @@ import { ROUTES } from '@/lib/routes'
  * Hosts where the phone web app is closed in favour of the iPhone app.
  *
  * Deliberately a list of exact hostnames rather than "any production host":
- * retrncrm.com keeps working on a phone browser, and so does every preview
- * deployment and localhost, so this can never lock development out.
+ * every preview deployment and localhost keeps working on a phone browser, so
+ * this can never lock development out.
  */
-const APP_ONLY_HOSTS = ['retrnapp.com', 'www.retrnapp.com']
+const APP_ONLY_HOSTS = ['retrnapp.com', 'www.retrnapp.com', 'retrncrm.com', 'www.retrncrm.com']
 
 /**
  * Paths that must keep working on a phone browser whatever the host:
  * /add is where a scanned QR code lands (the whole point of it is that a
- * stranger opens it on their phone), and the legal pages have to be
- * reachable from anywhere — the app stores require it.
+ * stranger opens it on their phone), /verify-edu is where the school-email
+ * link lands (and school inboxes live on phones), and the legal pages have to
+ * be reachable from anywhere — the app stores require it.
  */
-const ALWAYS_OPEN = [ROUTES.add, ROUTES.privacy, ROUTES.terms]
+const ALWAYS_OPEN = [ROUTES.add, ROUTES.verifyEdu, ROUTES.privacy, ROUTES.terms]
 
 /** A phone, not a narrow desktop window: small *and* touch-first. */
 function useIsPhoneBrowser(): boolean {
@@ -39,8 +40,8 @@ function useIsPhoneBrowser(): boolean {
 
 /**
  * On a phone, on the hosts listed above, Retrn is an app you install — not a
- * website. Until that app ships, this says so instead of handing someone the
- * desktop product shrunk onto a phone.
+ * website. This says so instead of handing someone the desktop product shrunk
+ * onto a phone.
  */
 export function MobileWebGate({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
@@ -59,15 +60,15 @@ export function MobileWebGate({ children }: { children: React.ReactNode }) {
       <Logo />
 
       <div className="mt-auto">
-        <p className="text-label text-muted-foreground">iPhone app</p>
-        <h1 className="text-display mt-3 text-[2.25rem]">Coming soon.</h1>
+        <p className="text-label text-muted-foreground">On your phone</p>
+        <h1 className="text-display mt-3 text-[2.25rem]">Open Retrn in the app.</h1>
         <p className="mt-4 text-base leading-relaxed text-text-secondary">
-          On a phone, Retrn is an app rather than a website — so there's nothing to sign into
-          here yet. It's close; the app is what this page becomes.
+          On a phone, Retrn only works as the iPhone app — the website isn't available in a
+          mobile browser. Open the Retrn app and sign in there with the same account.
         </p>
         <p className="mt-4 text-base leading-relaxed text-text-secondary">
-          In the meantime, open <span className="text-foreground">retrnapp.com</span> on a
-          computer to add contacts, log emails and keep up with your network.
+          On a computer? Visit <span className="text-foreground">{window.location.hostname.replace(/^www\./, '')}</span>{' '}
+          in your browser to use the full website.
         </p>
       </div>
 
