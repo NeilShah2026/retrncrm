@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { BadgeCheck, Check, CreditCard, GraduationCap, Loader2 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { BadgeCheck, Check, CreditCard, ExternalLink, GraduationCap, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageShell } from '@/components/layout/PageShell'
 import { SubscriptionLegal } from '@/components/billing/SubscriptionLegal'
@@ -13,6 +13,13 @@ import { useEntitlement } from '@/hooks/useEntitlement'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSubscription } from '@/hooks/useSubscription'
 import {
+  isWebBilling,
+  openBillingPortal,
+  refreshWebSubscription,
+  startCheckout,
+  type WebSubscription,
+} from '@/lib/billing/web'
+import {
   BillingUnavailableError,
   getProducts,
   isPurchaseSurface,
@@ -22,8 +29,10 @@ import {
   type StoreProduct,
 } from '@/lib/billing/store'
 import {
+  INTRO_OFFER,
   PLANS,
   monthlyEquivalent,
+  planById,
   yearlySavingPercent,
   type BillingPeriod,
   type Plan,
@@ -56,7 +65,8 @@ export function SubscriptionPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { plan: currentPlan, isPro, edu, label } = useEntitlement()
-  const { subscription, canPurchase } = useSubscription()
+  const { subscription, web, canPurchase } = useSubscription()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [period, setPeriod] = React.useState<BillingPeriod>('yearly')
   const [products, setProducts] = React.useState<StoreProduct[]>([])
@@ -81,10 +91,38 @@ export function SubscriptionPage() {
     [products],
   )
 
-  async function handlePurchase(productId: string) {
+  // Back from Stripe Checkout. The webhook may land a second or two after the
+  // redirect, so ask again rather than trusting the first read.
+  React.useEffect(() => {
+    const result = searchParams.get('checkout')
+    if (!result) return
+    if (result === 'success') {
+      toast.success('You’re subscribed. Everything is unlocked.')
+      refreshWebSubscription()
+      const retry = window.setTimeout(refreshWebSubscription, 3000)
+      setSearchParams({}, { replace: true })
+      return () => window.clearTimeout(retry)
+    }
+    if (result === 'cancelled') toast.info('Checkout cancelled — nothing was charged.')
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  /**
+   * Buy a plan: Stripe Checkout on the website, the App Store in the app.
+   * `productId` is the App Store product; the busy spinner keys off it too.
+   */
+  async function handlePurchase(plan: Plan, billing: BillingPeriod) {
+    const productId = plan.prices![billing].appStoreProductId!
     tapFeedback()
     setBusyProductId(productId)
     try {
+      if (isWebBilling) {
+        const offer =
+          plan.id === INTRO_OFFER.plan && billing === INTRO_OFFER.period && !web.hasSubscribedBefore
+        // Stripe's page takes over from here; leave the spinner running.
+        await startCheckout(plan.id as 'student' | 'standard', billing, { offer })
+        return
+      }
       await purchase(productId)
       successFeedback()
       toast.success('You’re subscribed. Everything is unlocked.')
@@ -95,9 +133,22 @@ export function SubscriptionPage() {
         errorFeedback()
         toast.error(err instanceof Error ? err.message : 'That purchase didn’t go through.')
       }
-    } finally {
       setBusyProductId(null)
+      return
     }
+    setBusyProductId(null)
+  }
+
+  async function handleManage() {
+    if (subscription.source === 'stripe') {
+      try {
+        await openBillingPortal()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Couldn’t open billing.')
+      }
+      return
+    }
+    await openManageSubscriptions()
   }
 
   async function handleRestore() {
@@ -145,7 +196,10 @@ export function SubscriptionPage() {
           canPurchase={canPurchase}
           priceFor={priceFor}
           busyProductId={busyProductId}
-          onPurchase={(id) => void handlePurchase(id)}
+          onPurchase={(plan, billing) => void handlePurchase(plan, billing)}
+          onManage={() => void handleManage()}
+          web={web}
+          source={subscription.source}
           onVerifyEdu={() => navigate(ROUTES.settings)}
         />
       </PageShell>
@@ -192,7 +246,7 @@ export function SubscriptionPage() {
                   busy={busyProductId === p.prices![period].appStoreProductId}
                   disabled={busyProductId !== null || !canPurchase}
                   canPurchase={canPurchase}
-                  onPurchase={() => void handlePurchase(p.prices![period].appStoreProductId!)}
+                  onPurchase={() => void handlePurchase(p, period)}
                 />
               ))}
             </div>
@@ -215,21 +269,41 @@ export function SubscriptionPage() {
         )}
 
         <InsetGroup>
-          <InsetRow
-            title="Restore Purchases"
-            subtitle="Already subscribed on another device?"
-            chevron={false}
-            disabled={restoring}
-            accessory={restoring ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : undefined}
-            onClick={() => void handleRestore()}
-          />
-          {subscription.active && (
+          {!isWebBilling && (
+            <InsetRow
+              title="Restore Purchases"
+              subtitle="Already subscribed on another device?"
+              chevron={false}
+              disabled={restoring}
+              accessory={restoring ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : undefined}
+              onClick={() => void handleRestore()}
+            />
+          )}
+          {subscription.active && subscription.source === 'app-store' && (
             <InsetRow
               title="Manage Subscription"
               subtitle="Change plan or cancel in the App Store"
               chevron={false}
               onClick={() => void openManageSubscriptions()}
             />
+          )}
+          {/* A website subscription is managed on the website. In the iPhone
+              app that can only be said, not linked (Guideline 3.1.3(b)). */}
+          {subscription.active && subscription.source === 'stripe' && (
+            isWebBilling ? (
+              <InsetRow
+                title="Manage Billing"
+                subtitle="Change plan, update your card or cancel"
+                chevron={false}
+                onClick={() => void handleManage()}
+              />
+            ) : (
+              <InsetRow
+                title="Billed on the Retrn website"
+                subtitle="Manage it from Settings on a computer"
+                chevron={false}
+              />
+            )
           )}
           <InsetRow
             title="Terms of Use"
@@ -249,10 +323,9 @@ export function SubscriptionPage() {
 }
 
 /**
- * The web paywall. Purchases only happen in the iPhone app (App Store rules
- * forbid pointing to a web checkout from it, and there's no web billing), so
- * this is a comparison page: what you're on, what each tier adds, and where
- * to go to buy it.
+ * The website's paywall: every tier side by side, bought through Stripe
+ * Checkout and managed in Stripe's billing portal. (The iPhone app sells
+ * through the App Store instead — see the phone layout above.)
  */
 function DesktopSubscription({
   currentPlan,
@@ -265,6 +338,9 @@ function DesktopSubscription({
   priceFor,
   busyProductId,
   onPurchase,
+  onManage,
+  web,
+  source,
   onVerifyEdu,
 }: {
   currentPlan: string
@@ -276,11 +352,29 @@ function DesktopSubscription({
   canPurchase: boolean
   priceFor: (productId: string | null, fallback: string) => string
   busyProductId: string | null
-  onPurchase: (productId: string) => void
+  onPurchase: (plan: Plan, period: BillingPeriod) => void
+  onManage: () => void
+  web: WebSubscription
+  source: 'app-store' | 'stripe' | 'none'
   onVerifyEdu: () => void
 }) {
-  const [period, setPeriod] = React.useState<BillingPeriod>('yearly')
+  const [period, setPeriod] = React.useState<BillingPeriod>('monthly')
   const saving = yearlySavingPercent(PLANS.find((p) => p.prices)!)
+  const offerOpen = !isPro && !web.hasSubscribedBefore
+  const paying = isPro && !eduVerified
+
+  function statusLine(): string {
+    if (eduVerified) return 'Every paid feature, free, through the Babson offer.'
+    if (!isPro) return 'Up to 30 contacts and the basics. Upgrade for the rest.'
+    if (source === 'stripe' && web.cancelAtPeriodEnd && expiresAt) {
+      return `Cancelled — access until ${formatDate(expiresAt)}.`
+    }
+    if (source === 'stripe' && web.discountEndsAt) {
+      return `${INTRO_OFFER.display}/month until ${formatDate(web.discountEndsAt)}. ${renewalLine(expiresAt, inTrial)}`
+    }
+    if (source === 'app-store') return 'Billed through the App Store on your iPhone.'
+    return renewalLine(expiresAt, inTrial)
+  }
 
   return (
     <div className="space-y-6">
@@ -297,24 +391,48 @@ function DesktopSubscription({
           <div>
             <p className="text-xs text-muted-foreground">Your plan</p>
             <p className="text-base font-semibold">{label}</p>
+            <p className="text-sm text-muted-foreground">{statusLine()}</p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {eduVerified
-            ? 'Every paid feature, free, through the Babson offer.'
-            : isPro
-              ? renewalLine(expiresAt, inTrial)
-              : 'Up to 30 contacts and the basics. Upgrade for the rest.'}
-        </p>
+        {/* Card, plan changes, cancelling and invoices all live in Stripe's
+            portal — anyone who has ever had a checkout can reach it. */}
+        {source !== 'app-store' && web.hasBillingAccount && (
+          <Button variant="outline" size="sm" onClick={onManage}>
+            <ExternalLink />
+            Manage billing
+          </Button>
+        )}
       </Panel>
+
+      {offerOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-brand/30 bg-brand/[0.06] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+            <div className="text-sm">
+              <p className="font-medium">
+                Student for {INTRO_OFFER.display}/month for your first {INTRO_OFFER.months} months
+              </p>
+              <p className="text-muted-foreground">
+                Then {planById('student')!.prices!.monthly.display}/month. Applied automatically at
+                checkout on the monthly Student plan.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            disabled={busyProductId !== null}
+            onClick={() => onPurchase(planById('student')!, 'monthly')}
+          >
+            Claim offer
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">Plans</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {canPurchase
-              ? 'Pick a plan to subscribe.'
-              : 'Subscriptions are bought in the Retrn iPhone app and unlock everything here too.'}
+            Secure checkout by Stripe. A subscription here unlocks the iPhone app too.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -350,7 +468,9 @@ function DesktopSubscription({
           const detail = plan.prices?.[period]
           const productId = detail?.appStoreProductId ?? null
           const price = detail ? priceFor(productId, detail.display) : '$0'
-          const current = plan.id === currentPlan
+          const current = plan.id === currentPlan || (plan.id === 'free' && !isPro)
+          const discounted =
+            offerOpen && plan.id === INTRO_OFFER.plan && period === INTRO_OFFER.period
           return (
             <div key={plan.id} className="flex flex-col bg-background p-6">
               <div className="flex items-center justify-between gap-2">
@@ -369,32 +489,51 @@ function DesktopSubscription({
               </div>
 
               <div className="mt-4 flex items-baseline gap-1">
-                <span className="tnum text-3xl font-semibold tracking-[-0.02em]">{price}</span>
+                <span className="tnum text-3xl font-semibold tracking-[-0.02em]">
+                  {discounted ? INTRO_OFFER.display : price}
+                </span>
                 <span className="text-sm text-muted-foreground">
                   {detail ? (period === 'yearly' ? '/yr' : '/mo') : 'forever'}
                 </span>
+                {discounted && (
+                  <span className="tnum ml-1 text-sm text-muted-foreground line-through">{price}</span>
+                )}
               </div>
               <div className="mt-1 h-4 text-xs text-muted-foreground">
-                {detail ? (monthlyEquivalent(detail) ?? 'Billed monthly, auto-renewing') : ''}
+                {discounted
+                  ? `For ${INTRO_OFFER.months} months, then ${price}/mo`
+                  : detail
+                    ? (monthlyEquivalent(detail) ?? 'Billed monthly, auto-renewing')
+                    : ''}
               </div>
 
               <p className="mt-3 min-h-[2.5rem] text-sm leading-snug text-text-secondary">
                 {plan.tagline}
               </p>
 
-              {productId && canPurchase ? (
+              {!detail ? (
+                <Button variant="outline" className="mt-5 w-full" disabled>
+                  {current ? 'Your current plan' : 'Included'}
+                </Button>
+              ) : current ? (
+                <Button variant="outline" className="mt-5 w-full" disabled>
+                  Your current plan
+                </Button>
+              ) : paying ? (
+                // Already subscribed: switching plans is Stripe's job, so it
+                // prorates properly rather than double-billing.
+                <Button variant="outline" className="mt-5 w-full" onClick={onManage}>
+                  Switch in billing
+                </Button>
+              ) : (
                 <Button
                   variant={plan.badge ? 'default' : 'outline'}
                   className="mt-5 w-full"
-                  disabled={current || busyProductId !== null}
-                  onClick={() => onPurchase(productId)}
+                  disabled={!canPurchase || busyProductId !== null || eduVerified}
+                  onClick={() => onPurchase(plan, period)}
                 >
                   {busyProductId === productId && <Loader2 className="animate-spin" />}
-                  {current ? 'Your current plan' : `Subscribe · ${price}`}
-                </Button>
-              ) : (
-                <Button variant="outline" className="mt-5 w-full" disabled>
-                  {current ? 'Your current plan' : detail ? 'Subscribe in the iPhone app' : 'Included'}
+                  {eduVerified ? 'Free for you' : `Subscribe · ${discounted ? INTRO_OFFER.display : price}`}
                 </Button>
               )}
 
@@ -435,6 +574,10 @@ function DesktopSubscription({
       <SubscriptionLegal className="max-w-3xl text-xs" />
     </div>
   )
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 /** What this account is on today, before any of it is for sale. */

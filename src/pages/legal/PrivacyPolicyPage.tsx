@@ -435,6 +435,11 @@ export function PrivacyPolicyPage() {
               'IP address and browser information',
             ],
             [
+              'Stripe',
+              'Payment processing for subscriptions bought on the website',
+              'Name, email, billing address and payment card details (entered directly with Stripe), and subscription and payment history',
+            ],
+            [
               'Google, Apple',
               'Optional sign-in with Google / Sign in with Apple',
               'Identity information described in Section 2',
@@ -442,11 +447,12 @@ export function PrivacyPolicyPage() {
           ]}
         />
         <P>
-          If we introduce paid plans, payments will be handled by Apple (for
-          purchases made in the iOS app) or by a payment processor for purchases
-          made on the web. Your full card number will never be stored by Retrn. We
-          will update this policy to name any new provider before it receives
-          your data.
+          Payments are handled by Apple for purchases made in the iOS app, and by
+          Stripe for purchases made on the website. You enter your card details
+          with Stripe directly; Retrn never receives or stores your full card
+          number. We keep only what we need to know what you&rsquo;ve paid for: your
+          plan, its status and renewal date, and Stripe&rsquo;s customer and
+          subscription IDs.
         </P>
 
         <H3>7.2 When you choose to share</H3>

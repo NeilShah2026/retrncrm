@@ -63,7 +63,7 @@ export interface SubscriptionState {
   /** True while the subscription is in its introductory/free trial period. */
   inTrial: boolean
   /** Where this came from, for support and for the Settings row's subtitle. */
-  source: 'app-store' | 'none'
+  source: 'app-store' | 'stripe' | 'none'
   /** When this cache was last refreshed from the store. */
   checkedAt: string | null
 }

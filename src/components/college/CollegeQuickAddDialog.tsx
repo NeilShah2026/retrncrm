@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { contactRepo } from '@/services'
 import { cn } from '@/lib/utils'
 import type { ConnectionType } from '@/types'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 type Role = 'professor' | 'alumni' | 'student'
 
@@ -93,6 +94,8 @@ export function CollegeQuickAddDialog({
       toast.success(`Added ${firstName.trim()} to ${college}`)
       onOpenChange(false)
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Could not add this person.')
     } finally {

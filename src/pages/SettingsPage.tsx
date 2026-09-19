@@ -19,6 +19,7 @@ import {
   LifeBuoy,
   BookUser,
   Bell,
+  Sparkles,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -68,9 +69,11 @@ import { displayName, initialFor } from '@/lib/displayName'
 import { exportCsv, exportJson, parseImportBundle, type ParsedImport } from '@/lib/exchange'
 import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
+import { isAdmin } from '@/lib/admin'
 
 export function SettingsPage() {
-  const { openOnboarding, openImportContacts } = useUI()
+  const { openOnboarding, openImportContacts, openUpgrade } = useUI()
   const { user, signOut } = useAuth()
   const { edu, label: planLabel, isPro } = useEntitlement()
   const isMobile = useIsMobile()
@@ -149,6 +152,7 @@ export function SettingsPage() {
       }
       toast.success(`Imported ${pendingImport.contacts.length} contacts (${mode})`)
     } catch (err) {
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Import failed while writing data.')
     } finally {
@@ -351,6 +355,18 @@ export function SettingsPage() {
           />
         </InsetGroup>
 
+        {isAdmin(user) && (
+          <InsetGroup title="Testing" footer="Only visible to admins. Buttons in the preview still work.">
+            <InsetRow
+              leading={<InsetRowIcon icon={Sparkles} />}
+              title="Preview Upgrade Popup"
+              subtitle="What free accounts see at 30 contacts"
+              last
+              onClick={() => openUpgrade({ preview: true })}
+            />
+          </InsetGroup>
+        )}
+
         <InsetGroup footer="Neither can be undone — export a backup first.">
           <InsetRow
             leading={<InsetRowIcon icon={RotateCcw} tone="danger" />}
@@ -541,6 +557,25 @@ export function SettingsPage() {
               </Button>
             </PanelSection>
           </Panel>
+
+          {isAdmin(user) && (
+            <Panel>
+              <PanelHeader>Testing</PanelHeader>
+              <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <p className="font-medium">Upgrade popup</p>
+                  <p className="text-muted-foreground">
+                    What a free account sees on reaching 30 contacts. Only admins see this; the
+                    buttons in the preview still work.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => openUpgrade({ preview: true })} className="shrink-0">
+                  <Sparkles />
+                  Preview
+                </Button>
+              </PanelSection>
+            </Panel>
+          )}
 
           <Panel className="border-danger/40">
             <PanelHeader className="text-danger">Danger zone</PanelHeader>

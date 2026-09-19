@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
 import type { ContactDraft } from '@/services/types'
 import { saveCaptureReminders } from '@/components/reminders/followUpActions'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 interface Props {
   open: boolean
@@ -220,6 +221,8 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
         onOpenChange(false)
       }
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Could not save that contact.')
     } finally {

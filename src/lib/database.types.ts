@@ -1,5 +1,5 @@
 /**
- * Hand-written to match supabase/migrations/ (0001–0004), in the same shape
+ * Hand-written to match supabase/migrations/ (0001–0007), in the same shape
  * `supabase gen types typescript` produces. Once the project is connected via
  * the CLI, regenerate the canonical version with:
  *   npx supabase gen types typescript --project-id <ref> > src/lib/database.types.ts
@@ -212,6 +212,26 @@ export interface Database {
           domain: string
         }
         Update: Partial<Database['public']['Tables']['edu_verifications']['Row']>
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          user_id: string
+          provider: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          plan: string | null
+          period: string | null
+          status: string | null
+          current_period_end: string | null
+          cancel_at_period_end: boolean
+          discount_ends_at: string | null
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['subscriptions']['Row']> & {
+          user_id: string
+        }
+        Update: Partial<Database['public']['Tables']['subscriptions']['Row']>
         Relationships: []
       }
     }

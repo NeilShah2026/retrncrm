@@ -23,6 +23,7 @@ import {
   type ShareProfile,
 } from '@/lib/shareProfile'
 import { cn } from '@/lib/utils'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 type Mode = 'mine' | 'scan'
 
@@ -75,6 +76,8 @@ export function QrPage() {
       toast.success(`Added ${scanned.name}`)
       navigate(ROUTES.contact(created.id))
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Could not add this person.')
     } finally {

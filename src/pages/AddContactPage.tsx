@@ -10,6 +10,7 @@ import { decodeProfile, profileToContactDraft, type ShareProfile } from '@/lib/s
 import { avatarColor } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 function initialsOf(name: string) {
   return name
@@ -46,6 +47,8 @@ export function AddContactPage() {
       toast.success(`Added ${profile.name}`)
       navigate(ROUTES.contact(created.id))
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Could not add this person.')
     } finally {

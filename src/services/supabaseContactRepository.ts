@@ -1,5 +1,6 @@
 import { getCurrentUserId, supabase } from '@/lib/supabase'
 import { contactToRow, rowToContact } from './supabaseMappers'
+import { contactLimitReached, isContactLimitDbError } from '@/lib/billing/contactLimit'
 import { createId } from '@/lib/utils'
 import type { Contact, Interaction } from '@/types'
 import type { ContactDraft, ContactPatch, ContactRepository } from './types'
@@ -49,7 +50,7 @@ export class SupabaseContactRepository implements ContactRepository {
     const { error } = await supabase
       .from('contacts')
       .insert(contactToRow(userId, contact))
-    if (error) throw error
+    if (error) throw isContactLimitDbError(error) ? contactLimitReached() : error
     return contact
   }
 
@@ -70,7 +71,7 @@ export class SupabaseContactRepository implements ContactRepository {
       const { error } = await supabase
         .from('contacts')
         .insert(contacts.slice(i, i + 200).map((c) => contactToRow(userId, c)))
-      if (error) throw error
+      if (error) throw isContactLimitDbError(error) ? contactLimitReached() : error
     }
     return contacts
   }
@@ -173,7 +174,7 @@ export class SupabaseContactRepository implements ContactRepository {
     const { error } = await supabase
       .from('contacts')
       .insert(contacts.map((c) => contactToRow(userId, c)))
-    if (error) throw error
+    if (error) throw isContactLimitDbError(error) ? contactLimitReached() : error
   }
 
   async clear(): Promise<void> {

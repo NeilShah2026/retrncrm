@@ -17,6 +17,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { useContacts } from '@/hooks/useData'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useEntitlement } from '@/hooks/useEntitlement'
+import { contactLimitReached, isContactLimitError } from '@/lib/billing/contactLimit'
+import { FREE_CONTACT_LIMIT } from '@/lib/billing/plans'
 import {
   AddressBookError,
   canReadPhoneContacts,
@@ -48,6 +51,7 @@ type Stage = 'intro' | 'loading' | 'pick' | 'saving'
 export function ImportContactsDialog({ open, onOpenChange }: Props) {
   const isMobile = useIsMobile()
   const contacts = useContacts() ?? []
+  const { isPro } = useEntitlement()
   const fileRef = React.useRef<HTMLInputElement>(null)
 
   const [stage, setStage] = React.useState<Stage>('intro')
@@ -136,6 +140,17 @@ export function ImportContactsDialog({ open, onOpenChange }: Props) {
   async function save() {
     const chosen = candidates.filter((c) => selected.has(c.key) && !c.existingId)
     if (chosen.length === 0) return
+    // Say so up front rather than importing some and failing the rest.
+    if (!isPro && contacts.length + chosen.length > FREE_CONTACT_LIMIT) {
+      const room = Math.max(FREE_CONTACT_LIMIT - contacts.length, 0)
+      toast.info(
+        room > 0
+          ? `The free plan has room for ${room} more — pick fewer, or upgrade for unlimited.`
+          : `The free plan holds ${FREE_CONTACT_LIMIT} contacts.`,
+      )
+      contactLimitReached()
+      return
+    }
     setStage('saving')
     try {
       const added = await importCandidates(chosen)
@@ -148,9 +163,10 @@ export function ImportContactsDialog({ open, onOpenChange }: Props) {
       )
       onOpenChange(false)
     } catch (err) {
+      setStage('pick')
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Import failed. Nothing was added.')
-      setStage('pick')
     }
   }
 

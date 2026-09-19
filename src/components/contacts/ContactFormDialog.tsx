@@ -82,6 +82,7 @@ import type {
   OtherLink,
 } from '@/types'
 import { cn } from '@/lib/utils'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 /** A field the sheet can be opened straight onto. */
 export type ContactField =
@@ -463,6 +464,8 @@ export function ContactFormDialog({
       onSaved?.(result)
       onOpenChange(false)
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Something went wrong while saving.')
     } finally {

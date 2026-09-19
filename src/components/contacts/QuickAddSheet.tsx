@@ -24,6 +24,7 @@ import { impactFeedback, successFeedback } from '@/lib/haptics'
 import { isNative } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import type { Contact } from '@/types'
+import { isContactLimitError } from '@/lib/billing/contactLimit'
 
 interface Props {
   open: boolean
@@ -156,6 +157,8 @@ export function QuickAddSheet({ open, onOpenChange, onSaved, onCardScanned }: Pr
       onSaved?.(created)
       onOpenChange(false)
     } catch (err) {
+      // The upgrade prompt is already up; a second error would just be noise.
+      if (isContactLimitError(err)) return
       console.error(err)
       toast.error('Couldn’t add them. Try again.')
     } finally {

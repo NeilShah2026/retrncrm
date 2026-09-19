@@ -197,6 +197,14 @@ export function TermsPage() {
           You can cancel at any time. Cancellation stops future renewals, and you
           keep paid access through the end of the period you already paid for.
         </P>
+        <P>
+          <Strong>Introductory offers.</Strong> If you subscribe at an introductory
+          price (for example, a discounted monthly rate for your first six months),
+          that price applies only for the stated term. After it, the subscription
+          renews at the regular price unless you cancel first. Introductory offers
+          are for first-time subscribers and may be changed or withdrawn for new
+          subscriptions at any time.
+        </P>
         <H3>9.2 Where you subscribe matters</H3>
         <UL
           items={[
@@ -214,8 +222,10 @@ export function TermsPage() {
               .
             </>,
             <>
-              <Strong>On the web:</Strong> purchases are processed by our payment
-              processor. You can cancel from your account settings or by emailing{' '}
+              <Strong>On the web:</Strong> purchases are processed by Stripe, our
+              payment processor; we never see or store your full card number. You
+              can change plan, update your card or cancel from{' '}
+              <em>Settings → Subscription → Manage billing</em>, or by emailing{' '}
               <Mail to={LEGAL.emails.billing} />.
             </>,
           ]}

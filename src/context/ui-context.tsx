@@ -4,6 +4,8 @@ import { ContactFormDialog } from '@/components/contacts/ContactFormDialog'
 import { VoiceCaptureDialog } from '@/components/contacts/VoiceCaptureDialog'
 import { QuickAddSheet } from '@/components/contacts/QuickAddSheet'
 import { ImportContactsDialog } from '@/components/contacts/ImportContactsDialog'
+import { UpgradeDialog } from '@/components/billing/UpgradeDialog'
+import { onContactLimit } from '@/lib/billing/contactLimit'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useAuth } from '@/auth/AuthProvider'
@@ -29,6 +31,11 @@ interface UIContextValue {
   openOnboarding: () => void
   /** Bring people in from the phone's Contacts or a .vcf file. */
   openImportContacts: () => void
+  /**
+   * The upgrade prompt a free account gets at the contact limit. Opens by
+   * itself when the limit is hit; `preview` is Settings' test button.
+   */
+  openUpgrade: (options?: { preview?: boolean }) => void
 }
 
 const UIContext = React.createContext<UIContextValue | null>(null)
@@ -55,6 +62,10 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [voiceOpen, setVoiceOpen] = React.useState(false)
   const [importOpen, setImportOpen] = React.useState(false)
+  const [upgrade, setUpgrade] = React.useState<{ open: boolean; preview: boolean }>({
+    open: false,
+    preview: false,
+  })
   const isMobile = useIsMobile()
 
   const openNewContact = React.useCallback(() => {
@@ -86,6 +97,24 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   )
   const openSearch = React.useCallback(() => setSearchOpen(true), [])
   const openImportContacts = React.useCallback(() => setImportOpen(true), [])
+  const openUpgrade = React.useCallback(
+    (options?: { preview?: boolean }) => setUpgrade({ open: true, preview: Boolean(options?.preview) }),
+    [],
+  )
+
+  // Any add that the free plan refuses — from any dialog, import or the
+  // assistant — lands here. Whatever form was open closes first, so the
+  // prompt isn't stacked on top of it.
+  React.useEffect(
+    () =>
+      onContactLimit(() => {
+        setFormOpen(false)
+        setVoiceOpen(false)
+        setImportOpen(false)
+        setUpgrade({ open: true, preview: false })
+      }),
+    [],
+  )
   const openOnboarding = React.useCallback(
     () => navigate(ROUTES.onboarding),
     [navigate],
@@ -157,8 +186,10 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       openAssistant,
       openOnboarding,
       openImportContacts,
+      openUpgrade,
     }),
     [
+      openUpgrade,
       openNewContact,
       openNewContactWith,
       openVoiceCapture,
@@ -194,6 +225,11 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         <VoiceCaptureDialog open={voiceOpen} onOpenChange={setVoiceOpen} />
       )}
       <ImportContactsDialog open={importOpen} onOpenChange={setImportOpen} />
+      <UpgradeDialog
+        open={upgrade.open}
+        preview={upgrade.preview}
+        onOpenChange={(open) => setUpgrade((u) => ({ ...u, open }))}
+      />
       <CommandPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}

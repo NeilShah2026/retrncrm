@@ -274,7 +274,13 @@ export async function createContact(
     })
     .select(COLS)
     .single()
-  if (error) throw error
+  if (error) {
+    // The database refuses a free account's 31st contact (0007_billing.sql).
+    if (error.message?.includes('FREE_CONTACT_LIMIT')) {
+      throw new Error('Your free plan is full (30 contacts). Upgrade in Retrn → Subscription to add more.')
+    }
+    throw error
+  }
   const contact = data as Contact
   return { contact, undo: { kind: 'created', contactId: contact.id } }
 }

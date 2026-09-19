@@ -166,3 +166,27 @@ export function yearlySavingPercent(plan: Plan): number | null {
   if (yearOfMonthly <= 0) return null
   return Math.round((1 - plan.prices.yearly.cents / yearOfMonthly) * 100)
 }
+
+// ---------------------------------------------------------------------------
+// The free tier's limit, and the offer shown when someone reaches it
+// ---------------------------------------------------------------------------
+
+/**
+ * How many contacts a free account holds. The database enforces the same
+ * number (`enforce_free_contact_limit` in 0007_billing.sql) — keep them equal.
+ */
+export const FREE_CONTACT_LIMIT = 30
+
+/**
+ * The upgrade offer: Student at $3/month for the first six months, then the
+ * normal monthly price. On the web it is a Stripe coupon (STRIPE_OFFER_COUPON,
+ * created by scripts/stripe-setup.mjs) applied at checkout, and only to
+ * accounts that have never subscribed before.
+ */
+export const INTRO_OFFER = {
+  plan: 'student' as const,
+  period: 'monthly' as const,
+  display: '$3',
+  cents: 300,
+  months: 6,
+}

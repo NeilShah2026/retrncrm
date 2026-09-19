@@ -39,6 +39,7 @@ import {
 import { errorFeedback, selectionFeedback, successFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
+import { isWebBilling, startCheckout } from '@/lib/billing/web'
 
 /**
  * Onboarding: what Retrn is, four questions, and the offer.
@@ -660,6 +661,11 @@ function Offer({
   async function buy() {
     setBusy(true)
     try {
+      if (isWebBilling) {
+        // On to Stripe Checkout; the page leaves, so there's nothing after.
+        await startCheckout('student', 'yearly')
+        return
+      }
       await purchase(yearly.appStoreProductId!)
       successFeedback()
       toast.success('You’re subscribed. Everything is on.')
@@ -667,6 +673,8 @@ function Offer({
     } catch (err) {
       if (err instanceof BillingUnavailableError) {
         toast.info('Subscriptions open when Retrn lands on the App Store.')
+      } else if (isWebBilling) {
+        toast.error(err instanceof Error ? err.message : 'Couldn’t open checkout.')
       } else if (!String(err).toLowerCase().includes('cancel')) {
         errorFeedback()
         toast.error('That purchase didn’t go through.')
@@ -732,14 +740,18 @@ function Offer({
             >
               See all plans
             </button>
-            <button
-              type="button"
-              onClick={() => void restore()}
-              disabled={restoring}
-              className="press text-ios-subhead py-2 text-brand disabled:opacity-50"
-            >
-              Restore
-            </button>
+            {/* Restoring is an App Store idea; a web subscription is simply
+                on the account wherever you sign in. */}
+            {!isWebBilling && (
+              <button
+                type="button"
+                onClick={() => void restore()}
+                disabled={restoring}
+                className="press text-ios-subhead py-2 text-brand disabled:opacity-50"
+              >
+                Restore
+              </button>
+            )}
             <button
               type="button"
               onClick={onDone}
