@@ -6,7 +6,7 @@ import {
 } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { postApi } from './apiFetch'
-import { apiOrigin } from './apiBase'
+import { emailLinkOrigin } from './apiBase'
 import { ROUTES } from './routes'
 
 /**
@@ -250,38 +250,54 @@ export async function startVerification(email: string): Promise<void> {
       // An absolute web URL even from the iPhone app: the link opens in the
       // browser, which is where /verify-edu lives. Must be in the Supabase
       // project's Redirect URLs, or Supabase falls back to the Site URL.
-      emailRedirectTo: `${apiOrigin()}${ROUTES.verifyEdu}`,
+      emailRedirectTo: `${emailLinkOrigin()}${ROUTES.verifyEdu}`,
     },
   })
   if (error) throw new Error(error.message)
 }
 
 /**
- * What /verify-edu found in its URL: the school account's access token (the
- * default magic link), or a token hash to exchange for one (a customised
- * email template linking straight here).
+ * What /verify-edu found in its URL.
+ *
+ * `hash` is the normal case: the email template links straight here with a
+ * token hash, and nothing is spent until the student presses the button.
+ * That matters because school mail (Babson is on Microsoft 365) runs every
+ * link through a scanner that opens it first — a link that verifies on open
+ * gets used up by the scanner, and the student's own click then reads
+ * "invalid or expired". `token` is the stock Supabase link, which verifies on
+ * open and hands over a session in the #fragment.
  */
-export async function proofFromLandingUrl(url: URL): Promise<string> {
+export type LandingLink =
+  | { kind: 'hash'; tokenHash: string; type: EmailOtpType }
+  | { kind: 'token'; accessToken: string }
+
+export function readLandingUrl(url: URL): LandingLink {
   const hash = new URLSearchParams(url.hash.replace(/^#/, ''))
   const failure = hash.get('error_description') ?? url.searchParams.get('error_description')
   if (failure) throw new Error(failure.replace(/\+/g, ' '))
 
-  const accessToken = hash.get('access_token')
-  if (accessToken) return accessToken
-
   const tokenHash = url.searchParams.get('token_hash')
   if (tokenHash) {
-    const client = otpClient()
-    const { data, error } = await client.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: otpTypeFrom(url.searchParams.get('type')),
-    })
-    if (error) throw new Error(error.message)
-    const token = data.session?.access_token
-    if (token) return token
+    return { kind: 'hash', tokenHash, type: otpTypeFrom(url.searchParams.get('type')) }
   }
 
+  const accessToken = hash.get('access_token')
+  if (accessToken) return { kind: 'token', accessToken }
+
   throw new Error('This link is incomplete. Open it straight from the email, or send a new one.')
+}
+
+/** Spend the link: the school account's access token, as proof for the server. */
+export async function proofFromLanding(link: LandingLink): Promise<string> {
+  if (link.kind === 'token') return link.accessToken
+  const { data, error } = await otpClient().auth.verifyOtp({
+    token_hash: link.tokenHash,
+    type: link.type,
+  })
+  if (error) throw new Error(error.message)
+  const token = data.session?.access_token
+  if (!token) throw new Error('That link could not be confirmed. Send a new one from Settings.')
+  return token
 }
 
 /** Which Retrn account a link would verify, before committing to it. */

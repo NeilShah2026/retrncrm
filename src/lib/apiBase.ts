@@ -31,3 +31,16 @@ export function apiUrl(path: `/api/${string}`): string {
 export function apiOrigin(): string {
   return isNative ? PRODUCTION_ORIGIN : window.location.origin
 }
+
+/**
+ * The origin for links that leave the app in an email. Always the canonical
+ * production host — except in local development, so those links can be tested
+ * against `vite dev`. The Supabase email template recognises the verification
+ * link by this exact origin.
+ */
+export function emailLinkOrigin(): string {
+  if (!isNative && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    return window.location.origin
+  }
+  return PRODUCTION_ORIGIN
+}

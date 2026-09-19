@@ -26,6 +26,7 @@ import { TemplatesPage } from '@/pages/TemplatesPage'
 import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { VerifyEduPage } from '@/pages/auth/VerifyEduPage'
+import { AuthConfirmPage } from '@/pages/auth/AuthConfirmPage'
 import { AddContactPage } from '@/pages/AddContactPage'
 import { PrivacyPolicyPage } from '@/pages/legal/PrivacyPolicyPage'
 import { TermsPage } from '@/pages/legal/TermsPage'
@@ -105,6 +106,7 @@ export default function App() {
                 <Route path={ROUTES.login} element={<LoginPage />} />
                 <Route path={ROUTES.add} element={<AddContactPage />} />
                 <Route path={ROUTES.verifyEdu} element={<VerifyEduPage />} />
+                <Route path={ROUTES.authConfirm} element={<AuthConfirmPage />} />
                 <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />
                 <Route path={ROUTES.terms} element={<TermsPage />} />
                 <Route path={`${ROUTES.app}/*`} element={<AppEntry />} />

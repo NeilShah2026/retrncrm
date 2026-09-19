@@ -1,3 +1,4 @@
+import type { EmailOtpType } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -33,6 +34,19 @@ export async function openNativeAuthUrl(url: string): Promise<void> {
  */
 async function completeSessionFromCallbackUrl(url: string): Promise<void> {
   const parsed = new URL(url)
+
+  // A scanner-proof email link: /auth/confirm hands the unspent token hash
+  // over when the person taps "Open in the Retrn app", and it's verified here.
+  const tokenHash = parsed.searchParams.get('token_hash')
+  if (tokenHash) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: (parsed.searchParams.get('type') as EmailOtpType | null) ?? 'email',
+    })
+    if (error) throw error
+    return
+  }
+
   const code = parsed.searchParams.get('code')
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)

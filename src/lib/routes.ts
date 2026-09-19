@@ -9,6 +9,11 @@ export const ROUTES = {
   add: '/add',
   privacy: '/privacy',
   terms: '/terms',
+  /**
+   * Where sign-in and sign-up confirmation email links land. Public, and
+   * spends the link only on a tap — see AuthConfirmPage.
+   */
+  authConfirm: '/auth/confirm',
   /** Where the Babson verification email's link lands. Public on purpose. */
   verifyEdu: '/verify-edu',
   app: '/app',

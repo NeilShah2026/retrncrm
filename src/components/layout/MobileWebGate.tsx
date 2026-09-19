@@ -14,13 +14,12 @@ import { ROUTES } from '@/lib/routes'
 const APP_ONLY_HOSTS = ['retrnapp.com', 'www.retrnapp.com', 'retrncrm.com', 'www.retrncrm.com']
 
 /**
- * Paths that must keep working on a phone browser whatever the host:
- * /add is where a scanned QR code lands (the whole point of it is that a
- * stranger opens it on their phone), /verify-edu is where the school-email
- * link lands (and school inboxes live on phones), and the legal pages have to
- * be reachable from anywhere — the app stores require it.
+ * The platform itself — signing in and everything under /app. Only these are
+ * closed on a phone browser; the marketing homepage, the QR landing page
+ * (/add), the school-email link (/verify-edu) and the legal pages all stay
+ * open, since people reach those from their phones on purpose.
  */
-const ALWAYS_OPEN = [ROUTES.add, ROUTES.verifyEdu, ROUTES.privacy, ROUTES.terms]
+const APP_ONLY_PATHS = [ROUTES.app, ROUTES.login]
 
 /** A phone, not a narrow desktop window: small *and* touch-first. */
 function useIsPhoneBrowser(): boolean {
@@ -39,9 +38,10 @@ function useIsPhoneBrowser(): boolean {
 }
 
 /**
- * On a phone, on the hosts listed above, Retrn is an app you install — not a
- * website. This says so instead of handing someone the desktop product shrunk
- * onto a phone.
+ * On a phone, on the hosts listed above, the Retrn platform is an app you
+ * install — not a website. The homepage is still browsable; trying to sign in
+ * or open the product says so instead of handing someone the desktop product
+ * shrunk onto a phone.
  */
 export function MobileWebGate({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
@@ -51,7 +51,7 @@ export function MobileWebGate({ children }: { children: React.ReactNode }) {
     !isNative &&
     isPhone &&
     APP_ONLY_HOSTS.includes(window.location.hostname) &&
-    !ALWAYS_OPEN.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+    APP_ONLY_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
   if (!gated) return <>{children}</>
 
@@ -63,8 +63,8 @@ export function MobileWebGate({ children }: { children: React.ReactNode }) {
         <p className="text-label text-muted-foreground">On your phone</p>
         <h1 className="text-display mt-3 text-[2.25rem]">Open Retrn in the app.</h1>
         <p className="mt-4 text-base leading-relaxed text-text-secondary">
-          On a phone, Retrn only works as the iPhone app — the website isn't available in a
-          mobile browser. Open the Retrn app and sign in there with the same account.
+          On a phone, Retrn works in the iPhone app — signing in from a mobile browser isn't
+          supported. Open the Retrn app and sign in there with the same account.
         </p>
         <p className="mt-4 text-base leading-relaxed text-text-secondary">
           On a computer? Visit <span className="text-foreground">{window.location.hostname.replace(/^www\./, '')}</span>{' '}
@@ -74,6 +74,10 @@ export function MobileWebGate({ children }: { children: React.ReactNode }) {
 
       <div className="mt-auto pt-10">
         <p className="text-xs text-muted-foreground">
+          <Link to={ROUTES.home} className="hover:text-foreground">
+            Back to homepage
+          </Link>
+          {' · '}
           <Link to={ROUTES.privacy} className="hover:text-foreground">
             Privacy
           </Link>
