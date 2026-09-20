@@ -29,7 +29,17 @@ import { isNative, nativePlatform } from '@/lib/platform'
  * queued, so the first page view of a cold start still counts.
  */
 
-const KEY = import.meta.env.VITE_POSTHOG_KEY ?? ''
+/**
+ * The public project key — the `phc_…` one. PostHog's own setup calls it both
+ * "project API key" and "project token", so both spellings are accepted here
+ * rather than making a name mismatch look like broken analytics.
+ *
+ * Never a personal API key (`phx_…`): everything with a VITE_ prefix is
+ * compiled into the bundle every visitor downloads, and a personal key can
+ * read and write the whole PostHog account.
+ */
+const KEY =
+  import.meta.env.VITE_POSTHOG_KEY ?? import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ?? ''
 const HOST = import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com'
 
 let started = false
@@ -71,6 +81,12 @@ export function analyticsStatus(): {
 }
 
 export function initAnalytics(): void {
+  if (KEY && !KEY.startsWith('phc_') && import.meta.env.DEV) {
+    console.warn(
+      '[analytics] The PostHog key should start with "phc_" (the public project key). ' +
+        'A "phx_" personal key must never be shipped to the browser.',
+    )
+  }
   if (!KEY) {
     // Silence is the correct behaviour, but not a helpful one to debug.
     if (import.meta.env.DEV) {
