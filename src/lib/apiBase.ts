@@ -16,7 +16,7 @@ import { isNative } from '@/lib/platform'
 // The canonical host, deliberately: the apex 308-redirects to www, and a
 // CORS preflight that gets a redirect fails outright — the real request is
 // then never sent at all.
-const PRODUCTION_ORIGIN = 'https://www.retrncrm.com'
+export const PRODUCTION_ORIGIN = 'https://www.retrncrm.com'
 
 export function apiUrl(path: `/api/${string}`): string {
   return isNative ? `${PRODUCTION_ORIGIN}${path}` : path

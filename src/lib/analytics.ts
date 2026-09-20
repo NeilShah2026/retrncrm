@@ -1,6 +1,7 @@
 import type { PostHog } from 'posthog-js'
 import type { User } from '@supabase/supabase-js'
 import { isNative, nativePlatform } from '@/lib/platform'
+import { PRODUCTION_ORIGIN } from '@/lib/apiBase'
 
 /**
  * Product analytics (PostHog).
@@ -30,6 +31,22 @@ import { isNative, nativePlatform } from '@/lib/platform'
  */
 
 /**
+ * The first of these that actually holds something.
+ *
+ * A variable declared but left blank — `VITE_POSTHOG_HOST=` in a .env file, or
+ * an empty value saved in Vercel — is an empty string, not undefined, so `??`
+ * would happily take it and leave the app pointing at nowhere. Treat blank as
+ * "not set", which is what anyone writing it meant.
+ */
+function firstSet(...values: (string | undefined)[]): string {
+  for (const value of values) {
+    const trimmed = value?.trim()
+    if (trimmed) return trimmed
+  }
+  return ''
+}
+
+/**
  * The public project key — the `phc_…` one. PostHog's own setup calls it both
  * "project API key" and "project token", so both spellings are accepted here
  * rather than making a name mismatch look like broken analytics.
@@ -38,9 +55,31 @@ import { isNative, nativePlatform } from '@/lib/platform'
  * compiled into the bundle every visitor downloads, and a personal key can
  * read and write the whole PostHog account.
  */
-const KEY =
-  import.meta.env.VITE_POSTHOG_KEY ?? import.meta.env.VITE_POSTHOG_PROJECT_TOKEN ?? ''
-const HOST = import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com'
+const KEY = firstSet(
+  import.meta.env.VITE_POSTHOG_KEY,
+  import.meta.env.VITE_POSTHOG_PROJECT_TOKEN,
+)
+/**
+ * Where events are sent.
+ *
+ * By default, our own domain: `/ingest` is rewritten to PostHog by Vercel
+ * (see vercel.json) and by `vite dev`. That exists because ad blockers block
+ * posthog.com by name — a request to our own origin isn't on any blocklist,
+ * so the 10–30% of people running a blocker stop being invisible.
+ *
+ * The native app has no origin of its own (`capacitor://localhost`), so a
+ * relative path would go nowhere; it uses the production domain's proxy.
+ *
+ * VITE_POSTHOG_HOST overrides all of it — set it to https://us.i.posthog.com
+ * to bypass the proxy, or to the EU host if the project is EU-hosted (and
+ * change the two destinations in vercel.json to match).
+ */
+const HOST =
+  firstSet(import.meta.env.VITE_POSTHOG_HOST) ||
+  (isNative ? `${PRODUCTION_ORIGIN}/ingest` : '/ingest')
+
+/** Where PostHog itself lives, for links out of the toolbar. */
+const UI_HOST = 'https://us.posthog.com'
 
 let started = false
 let client: PostHog | null = null
@@ -99,6 +138,7 @@ export function initAnalytics(): void {
   void import('posthog-js').then(({ posthog }) => {
     posthog.init(KEY, {
       api_host: HOST,
+      ui_host: UI_HOST,
       // Everything that could carry someone else's data, off.
       autocapture: false,
       capture_pageview: false,

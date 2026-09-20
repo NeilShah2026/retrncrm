@@ -81,5 +81,27 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    server: {
+      /**
+       * Analytics go out through our own origin, so ad blockers (which block
+       * posthog.com by name) don't quietly delete a slice of the data. In
+       * production this is a rewrite in vercel.json; this is the same thing
+       * for `vite dev`, so the one code path works in both.
+       *
+       * Swap `us` for `eu` in both hosts if the PostHog project is EU-hosted.
+       */
+      proxy: {
+        '/ingest/static': {
+          target: 'https://us-assets.i.posthog.com',
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/ingest/, ''),
+        },
+        '/ingest': {
+          target: 'https://us.i.posthog.com',
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/ingest/, ''),
+        },
+      },
+    },
   }
 })
