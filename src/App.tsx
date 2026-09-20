@@ -28,7 +28,7 @@ import { LandingPage } from '@/pages/marketing/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { VerifyEduPage } from '@/pages/auth/VerifyEduPage'
 import { AuthConfirmPage } from '@/pages/auth/AuthConfirmPage'
-import { AddContactPage } from '@/pages/AddContactPage'
+import { ScanCardPage } from '@/pages/ScanCardPage'
 import { PrivacyPolicyPage } from '@/pages/legal/PrivacyPolicyPage'
 import { TermsPage } from '@/pages/legal/TermsPage'
 import { ROUTES } from '@/lib/routes'
@@ -120,7 +120,12 @@ export default function App() {
                   element={isNative ? <Navigate to={ROUTES.app} replace /> : <LandingPage />}
                 />
                 <Route path={ROUTES.login} element={<LoginPage />} />
-                <Route path={ROUTES.add} element={<AddContactPage />} />
+                {/* Both halves of a scanned card: the self-contained link
+                    (/add#<token>) and the published short link (/c/<slug>).
+                    Public on purpose — almost everyone who opens one has
+                    never heard of Retrn. */}
+                <Route path={ROUTES.add} element={<ScanCardPage />} />
+                <Route path="/c/:slug" element={<ScanCardPage />} />
                 <Route path={ROUTES.verifyEdu} element={<VerifyEduPage />} />
                 <Route path={ROUTES.authConfirm} element={<AuthConfirmPage />} />
                 <Route path={ROUTES.privacy} element={<PrivacyPolicyPage />} />

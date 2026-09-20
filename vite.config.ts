@@ -6,6 +6,7 @@ import { handleAiRequest } from './api/_lib/ai.ts'
 import { handleVerifyEduRequest } from './api/_lib/eduVerify.ts'
 import { handleDeleteAccountRequest } from './api/_lib/deleteAccount.ts'
 import { handleBillingRequest, handleStripeWebhook } from './api/_lib/billing.ts'
+import { handleCardRequest } from './api/_lib/card.ts'
 
 type EdgeHandler = (req: Request) => Promise<Response>
 
@@ -21,6 +22,7 @@ const DEV_ROUTES: Record<string, EdgeHandler> = {
   '/api/delete-account': handleDeleteAccountRequest,
   '/api/billing': handleBillingRequest,
   '/api/stripe-webhook': handleStripeWebhook,
+  '/api/card': handleCardRequest,
 }
 
 function devApi(): Plugin {

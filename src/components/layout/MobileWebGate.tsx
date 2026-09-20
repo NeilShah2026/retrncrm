@@ -15,11 +15,26 @@ const APP_ONLY_HOSTS = ['retrnapp.com', 'www.retrnapp.com', 'retrncrm.com', 'www
 
 /**
  * The platform itself — signing in and everything under /app. Only these are
- * closed on a phone browser; the marketing homepage, the QR landing page
- * (/add), the school-email link (/verify-edu) and the legal pages all stay
- * open, since people reach those from their phones on purpose.
+ * closed on a phone browser; the marketing homepage, the scanned-card pages
+ * (/add and /c/<slug>), the school-email link (/verify-edu) and the legal
+ * pages all stay open, since people reach those from their phones on purpose
+ * — a QR code is scanned with a phone or it is scanned with nothing.
  */
 const APP_ONLY_PATHS = [ROUTES.app, ROUTES.login]
+
+/**
+ * True where the product itself is closed on this device — a phone browser,
+ * on a host that expects the iPhone app.
+ *
+ * Exported because the gate is not the only screen that has to know. Anything
+ * offering to *open* Retrn from a public page (the scan page, after someone
+ * signs up from a QR card) would otherwise send them to a wall, which is a
+ * poor thank-you for having just made an account.
+ */
+export function useAppIsGatedHere(): boolean {
+  const isPhone = useIsPhoneBrowser()
+  return !isNative && isPhone && APP_ONLY_HOSTS.includes(window.location.hostname)
+}
 
 /** A phone, not a narrow desktop window: small *and* touch-first. */
 function useIsPhoneBrowser(): boolean {

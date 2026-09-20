@@ -6,6 +6,7 @@ import { clearSkippedMeetingNotes } from '@/lib/inbox'
 import { resetAnalytics, track } from '@/lib/analytics'
 import { clearSubscriptionCache } from '@/lib/billing/store'
 import { ensureUserSeeded } from '@/lib/seedNewUser'
+import { applyPendingScan } from '@/lib/pendingScan'
 import { syncAccountEmail } from '@/lib/eduVerification'
 import { profileToMetadata, type ShareProfile } from '@/lib/shareProfile'
 import type { OnboardingPrefs } from '@/lib/onboarding'
@@ -46,10 +47,15 @@ const AuthContext = React.createContext<AuthContextValue | null>(null)
  * initial session check and every later auth change funnel through here.
  * `syncAccountEmail` is a no-op unless the account email is a school address
  * that hasn't been recorded yet, so it costs nothing for everyone else.
+ *
+ * `applyPendingScan` is what finishes a sign-up that started on a scanned QR
+ * card: the person met is written into the network here, once there is a
+ * session to write it with. It too is a no-op for everyone else.
  */
 function onSignedIn(user: User): void {
   void ensureUserSeeded(user)
   void syncAccountEmail(user)
+  void applyPendingScan()
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

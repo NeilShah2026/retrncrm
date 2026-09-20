@@ -7,6 +7,12 @@ export const ROUTES = {
   home: '/',
   login: '/login',
   add: '/add',
+  /**
+   * A published QR card's short link — public, and the thing printed on a
+   * name badge. `/add#<token>` still works and carries the profile inside
+   * the link itself; this one resolves it from the server.
+   */
+  card: (slug: string) => `/c/${slug}`,
   privacy: '/privacy',
   terms: '/terms',
   /**

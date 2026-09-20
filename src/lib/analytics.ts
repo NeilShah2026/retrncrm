@@ -192,6 +192,8 @@ export function maskPath(input: string): string {
     .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:id')
     // The share/QR links carry an opaque token.
     .replace(/\/add\/[^/]+/, '/add/:token')
+    // A short card link is someone's name; the slug is the person.
+    .replace(/^\/c\/[^/]+/, '/c/:slug')
 }
 
 /** The events this app sends. One list, so they can't drift into free text. */
@@ -207,6 +209,14 @@ export type AnalyticsEvent =
   | 'checkout_started'
   | 'subscription_active'
   | 'school_email_verified'
+  /** The QR card funnel, from a stranger's scan to an account. */
+  | 'card_viewed'
+  | 'card_contact_saved'
+  | 'card_reminder_chosen'
+  | 'card_signup_completed'
+  | 'card_info_sent_back'
+  | 'card_published'
+  | 'card_handoff_accepted'
   /** Sent by hand from Settings, to prove the pipe works end to end. */
   | 'test_event'
 
