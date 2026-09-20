@@ -53,8 +53,32 @@ export function isAnalyticsEnabled(): boolean {
   return Boolean(KEY)
 }
 
+/**
+ * What the analytics are actually doing, for the status row in Settings.
+ *
+ * Without this, "no key" and "key fine, events failing" look identical from
+ * the outside — both are silence — and the first thing anyone does is go
+ * looking in PostHog for events that were never built into the bundle.
+ */
+export function analyticsStatus(): {
+  configured: boolean
+  host: string
+  /** The library has downloaded and initialised. */
+  loaded: boolean
+  optedOut: boolean
+} {
+  return { configured: Boolean(KEY), host: HOST, loaded: client !== null, optedOut: isAnalyticsOptedOut() }
+}
+
 export function initAnalytics(): void {
-  if (!KEY || started) return
+  if (!KEY) {
+    // Silence is the correct behaviour, but not a helpful one to debug.
+    if (import.meta.env.DEV) {
+      console.info('[analytics] VITE_POSTHOG_KEY is not set — analytics are off.')
+    }
+    return
+  }
+  if (started) return
   started = true
   void import('posthog-js').then(({ posthog }) => {
     posthog.init(KEY, {
@@ -68,6 +92,12 @@ export function initAnalytics(): void {
       // on the marketing site stay anonymous events.
       person_profiles: 'identified_only',
       respect_dnt: true,
+      // PostHog drops events from anything it thinks is a bot, which includes
+      // every headless browser — correct in production, and the reason an
+      // automated check sees no events. Only a local dev run may turn it off,
+      // so real bot traffic can never be counted.
+      opt_out_useragent_filter:
+        import.meta.env.DEV && import.meta.env.VITE_POSTHOG_ALLOW_BOTS === '1',
       // The native app has no cookie jar worth the name; localStorage is what
       // the WebView keeps.
       persistence: isNative ? 'localStorage' : 'localStorage+cookie',
@@ -121,6 +151,8 @@ export type AnalyticsEvent =
   | 'checkout_started'
   | 'subscription_active'
   | 'school_email_verified'
+  /** Sent by hand from Settings, to prove the pipe works end to end. */
+  | 'test_event'
 
 export function track(
   event: AnalyticsEvent,

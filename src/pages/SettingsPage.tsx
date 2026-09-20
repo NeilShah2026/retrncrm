@@ -72,7 +72,13 @@ import { ROUTES } from '@/lib/routes'
 import { toast } from 'sonner'
 import { isContactLimitError } from '@/lib/billing/contactLimit'
 import { isAdmin } from '@/lib/admin'
-import { isAnalyticsEnabled, isAnalyticsOptedOut, setAnalyticsOptOut } from '@/lib/analytics'
+import {
+  analyticsStatus,
+  isAnalyticsEnabled,
+  isAnalyticsOptedOut,
+  setAnalyticsOptOut,
+  track,
+} from '@/lib/analytics'
 
 export function SettingsPage() {
   const { openOnboarding, openImportContacts, openUpgrade } = useUI()
@@ -97,6 +103,20 @@ export function SettingsPage() {
   const [profileOpen, setProfileOpen] = React.useState(false)
   const [eduOpen, setEduOpen] = React.useState(false)
   const [analyticsOff, setAnalyticsOff] = React.useState(isAnalyticsOptedOut)
+
+  function sendTestEvent() {
+    const status = analyticsStatus()
+    if (!status.configured) {
+      toast.error('No PostHog key in this build. Set VITE_POSTHOG_KEY and redeploy.')
+      return
+    }
+    if (status.optedOut) {
+      toast.error('Analytics are switched off on this device — turn them on first.')
+      return
+    }
+    track('test_event')
+    toast.success('Sent. It shows in PostHog → Activity within a minute.')
+  }
 
   function toggleAnalytics() {
     const next = !analyticsOff
@@ -393,8 +413,20 @@ export function SettingsPage() {
               leading={<InsetRowIcon icon={Sparkles} />}
               title="Preview Upgrade Popup"
               subtitle="What free accounts see at 30 contacts"
-              last
               onClick={() => openUpgrade({ preview: true })}
+            />
+            <InsetRow
+              title="Analytics"
+              subtitle={analyticsDetail()}
+              detail={analyticsStatus().configured ? 'On' : 'Off'}
+              chevron={false}
+            />
+            <InsetRow
+              title="Send Test Event"
+              subtitle="Proves the key and the network path"
+              chevron={false}
+              last
+              onClick={sendTestEvent}
             />
           </InsetGroup>
         )}
@@ -624,6 +656,17 @@ export function SettingsPage() {
                   Preview
                 </Button>
               </PanelSection>
+              <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <p className="font-medium">
+                    Analytics · {analyticsStatus().configured ? 'on' : 'off'}
+                  </p>
+                  <p className="text-muted-foreground">{analyticsDetail()}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={sendTestEvent} className="shrink-0">
+                  Send test event
+                </Button>
+              </PanelSection>
             </Panel>
           )}
 
@@ -727,6 +770,14 @@ export function SettingsPage() {
       />
     </PageShell>
   )
+}
+
+/** One line explaining exactly why analytics are, or aren't, running. */
+function analyticsDetail(): string {
+  const { configured, host, loaded, optedOut } = analyticsStatus()
+  if (!configured) return 'No VITE_POSTHOG_KEY in this build — set it in Vercel and redeploy.'
+  if (optedOut) return 'Switched off on this device in Settings → Privacy.'
+  return `${loaded ? 'Connected to' : 'Connecting to'} ${host.replace('https://', '')}`
 }
 
 function Stat({ n, label }: { n: number; label: string }) {

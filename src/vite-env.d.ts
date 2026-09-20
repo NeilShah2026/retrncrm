@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_POSTHOG_KEY?: string
   /** PostHog host; defaults to https://us.i.posthog.com. */
   readonly VITE_POSTHOG_HOST?: string
+  /** Dev only: '1' lets a headless browser's events through, for smoke tests. */
+  readonly VITE_POSTHOG_ALLOW_BOTS?: string
 }
 
 interface ImportMeta {
