@@ -1,4 +1,4 @@
-import type { Session } from '@supabase/supabase-js'
+import type { EmailOtpType, Session } from '@supabase/supabase-js'
 import { APP_ORIGIN, RETRN_APP_URLS } from './config'
 import { LEGACY_SESSION_KEY, supabase } from './supabase'
 
@@ -13,10 +13,21 @@ import { LEGACY_SESSION_KEY, supabase } from './supabase'
  * refreshed second was signed out, and sometimes the whole session was
  * revoked, website included. A session of its own can't collide with anything.
  *
- * The link is requested with PKCE. Opening it redirects to the web app with a
- * `?code=` that only the verifier in the extension's storage can redeem; the
- * background worker spots that tab and redeems it (`completeMagicLink`). The
- * web app ignores a code it has no verifier for.
+ * Opening the emailed link lands on the web app's /auth/confirm, carrying an
+ * *unspent* `token_hash` — that page deliberately spends nothing until someone
+ * taps its button, so email scanners can't burn the link (see
+ * src/pages/auth/AuthConfirmPage.tsx). The background worker sees that tab
+ * first and redeems the token for the extension instead
+ * (`completeTokenSignIn`), then swaps the tab for the signed-in page.
+ *
+ * How it knows the link is *ours*: the extension is the only client on the
+ * project that asks with PKCE (the website and the iPhone app use the implicit
+ * flow), and Supabase prefixes a PKCE token hash with `pkce_`. A bare hash
+ * belongs to a website or phone sign-in and is left alone.
+ *
+ * The `?code=` branch below is the older shape, from when the Magic Link
+ * template used Supabase's own `{{ .ConfirmationURL }}`; it costs a few lines
+ * and means reverting the template can't break sign-in again.
  *
  * A link works however the account was created — Google, Apple, magic link or
  * password — because every account has a confirmed email.
@@ -62,7 +73,7 @@ export function authMessage(error: unknown): string {
     msg.includes('code challenge') ||
     (msg.includes('invalid') && (msg.includes('token') || msg.includes('link')))
   ) {
-    return 'That sign-in link has expired or was replaced by a newer one. Open the Retrn extension and send a new link.'
+    return 'That sign-in link has expired, was already used, or was replaced by a newer one. Open the Retrn extension and send a new link.'
   }
   if (msg.includes('invalid login credentials')) {
     return 'That email and password don’t match. If you sign in with Google or Apple, use an email link instead.'
@@ -87,8 +98,9 @@ export async function sendMagicLink(email: string): Promise<void> {
       // Sign-in only. Accounts are created on the website, where the terms and
       // the plan are.
       shouldCreateUser: false,
-      // The same place the website sends its own links, so it's already an
-      // allowed redirect. The code on the end is what the extension redeems.
+      // The Magic Link template builds its own URL from the Site URL, so this
+      // only matters if that template ever goes back to Supabase's
+      // `{{ .ConfirmationURL }}`. It's an allowed redirect either way.
       emailRedirectTo: `${APP_ORIGIN}/app`,
     },
   })
@@ -108,11 +120,30 @@ export async function clearPendingSignIn(): Promise<void> {
   await chrome.storage.local.remove(PENDING_KEY)
 }
 
+/** What a tab's URL means for a pending sign-in. */
+export type MagicLinkRedirect =
+  /** The current shape: an unspent token on the web app's /auth/confirm. */
+  | { kind: 'token'; tokenHash: string; type: EmailOtpType }
+  /** The older shape, from Supabase's own `{{ .ConfirmationURL }}`. */
+  | { kind: 'code'; code: string }
+  | { kind: 'error'; message: string }
+
+/** Where the emailed link lands. Must match ROUTES.authConfirm in the web app. */
+const CONFIRM_PATH = '/auth/confirm'
+
 /**
- * What a tab's URL means for a pending magic link: the code to redeem, the
- * error Supabase redirected with, or nothing to do with the extension.
+ * Supabase prefixes a token hash with this when the link was asked for with
+ * PKCE — which, on this project, only the extension does. It's what keeps the
+ * worker from stealing a link meant for the website or the phone app.
  */
-export function readMagicLinkRedirect(url: string): { code: string } | { error: string } | null {
+const EXTENSION_TOKEN_PREFIX = 'pkce_'
+
+/**
+ * What a tab's URL means for a pending magic link: the token or code to
+ * redeem, the error Supabase redirected with, or nothing to do with the
+ * extension.
+ */
+export function readMagicLinkRedirect(url: string): MagicLinkRedirect | null {
   let parsed: URL
   try {
     parsed = new URL(url)
@@ -122,8 +153,22 @@ export function readMagicLinkRedirect(url: string): { code: string } | { error: 
   const origins = RETRN_APP_URLS.map((u) => new URL(u).origin)
   if (!origins.includes(parsed.origin)) return null
 
+  if (parsed.pathname === CONFIRM_PATH) {
+    const tokenHash = parsed.searchParams.get('token_hash')
+    // A bare hash is somebody signing in to the website or the phone app.
+    if (tokenHash?.startsWith(EXTENSION_TOKEN_PREFIX)) {
+      return {
+        kind: 'token',
+        tokenHash,
+        // The template sends `email`, which Supabase accepts for both halves
+        // of a magic link; anything else it sends is passed through as-is.
+        type: (parsed.searchParams.get('type') as EmailOtpType | null) ?? 'email',
+      }
+    }
+  }
+
   const code = parsed.searchParams.get('code')
-  if (code) return { code }
+  if (code) return { kind: 'code', code }
 
   // Supabase puts errors in the query or the fragment depending on the flow.
   const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''))
@@ -132,7 +177,25 @@ export function readMagicLinkRedirect(url: string): { code: string } | { error: 
     hash.get('error_description') ??
     parsed.searchParams.get('error_code') ??
     hash.get('error_code')
-  return error ? { error } : null
+  return error ? { kind: 'error', message: error } : null
+}
+
+/**
+ * Redeems the token from an opened sign-in link for the extension's session.
+ * Throws with a message worth showing.
+ *
+ * This spends the link, so whoever gets here first wins: if someone taps
+ * "Continue" on the /auth/confirm page before the worker finishes, the
+ * *website* gets the session and this reports an expired link.
+ */
+export async function completeTokenSignIn(tokenHash: string, type: EmailOtpType): Promise<void> {
+  try {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+    if (error) throw new Error(authMessage(error))
+  } finally {
+    // A token is good once, whether or not it worked here.
+    await clearPendingSignIn()
+  }
 }
 
 /**

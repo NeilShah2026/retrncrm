@@ -51,14 +51,26 @@ link Retrn emails you, in the same browser (or use a password, if your account
 has one). This works however the account was created — Google, Apple, magic
 link or password.
 
-The link is requested with PKCE and redirects to `https://www.retrncrm.com/app`
-— the same place the website's own links go — with a one-time `?code=` on the
-end. The background worker notices that tab (only while the extension is
-waiting on a link), redeems the code with the verifier kept in the extension's
-storage, and swaps the tab for `signed-in.html`. The website has no verifier
-for that code, so it ignores it and the two sessions stay separate. The
-Supabase **Magic Link** email template needs `{{ .ConfirmationURL }}`, which is
-the default.
+Opening the link lands on the web app's `/auth/confirm`, carrying an unspent
+`token_hash`. That page spends nothing until someone taps its button (it exists
+so that email scanners can't burn a link), which leaves the background worker
+free to redeem the token for the extension first and swap the tab for
+`signed-in.html`.
+
+It only ever touches links that are its own. The extension is the one client on
+the project that asks with PKCE — the website and the iPhone app use the
+implicit flow — and Supabase prefixes a PKCE token hash with `pkce_`. A bare
+hash is a website or phone sign-in and is left alone. The worker also only acts
+while the extension is actually waiting on a link.
+
+The Supabase **Magic Link** template therefore has to link to
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`, which is
+what it does today. Supabase's own `{{ .ConfirmationURL }}` still works too:
+that sends the tab to `/app?code=…` instead, and the worker redeems the code
+with the verifier in its storage.
+
+Changing that template out from under the extension is what broke sign-in in
+0.3.0 — links arrived, but nothing in the extension recognised them.
 
 Versions before 0.3 copied the website's session instead. Supabase rotates
 refresh tokens and treats a reused one as stolen, so two apps sharing one token

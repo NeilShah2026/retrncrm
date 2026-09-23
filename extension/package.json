@@ -1,6 +1,6 @@
 {
   "name": "retrn-extension",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Retrn browser extension — log Gmail and Outlook emails and LinkedIn contacts to your Retrn network.",
   "type": "module",

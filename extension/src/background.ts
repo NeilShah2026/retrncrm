@@ -1,4 +1,12 @@
-import { authMessage, clearPendingSignIn, completeMagicLink, getPendingSignIn, readMagicLinkRedirect } from './auth'
+import {
+  authMessage,
+  clearPendingSignIn,
+  completeMagicLink,
+  completeTokenSignIn,
+  getPendingSignIn,
+  readMagicLinkRedirect,
+  type MagicLinkRedirect,
+} from './auth'
 import { findContactsByEmails, loggedEntry } from './db'
 import { SESSION_KEY, supabase } from './supabase'
 import type { RuntimeMessage, ThreadStatus } from './types'
@@ -39,9 +47,15 @@ async function threadStatus(emails: string[], threadKey: string): Promise<Thread
   }
 }
 
-// A magic link opens a Retrn tab with a one-time code on the end. The popup is
+// A sign-in link opens a Retrn tab carrying a one-time token. The popup is
 // long closed by then, so the worker redeems it — but only while the extension
-// is waiting on a link, so the website's own sign-ins are left alone.
+// is waiting on a link, and only for the PKCE-marked tokens that are the
+// extension's own, so the website's sign-ins are left alone.
+//
+// The race worth knowing about: the tab is the web app's /auth/confirm, which
+// spends nothing until someone taps its button. Reading the URL here happens
+// as the navigation commits, well before that page has even rendered, so the
+// worker is first in practice.
 const redeeming = new Set<string>()
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -53,20 +67,24 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   void finishSignIn(tabId, redirect)
 })
 
-async function finishSignIn(tabId: number, redirect: { code: string } | { error: string }) {
+async function finishSignIn(tabId: number, redirect: MagicLinkRedirect) {
   if (!(await getPendingSignIn())) return
   let error: string | null = null
-  if ('code' in redirect) {
-    if (redeeming.has(redirect.code)) return
-    redeeming.add(redirect.code)
+  if (redirect.kind === 'error') {
+    await clearPendingSignIn()
+    error = authMessage(redirect.message)
+  } else {
+    // Navigating the tab below can report the same URL twice; a token or code
+    // is only good once, so the second report has to be ignored.
+    const once = redirect.kind === 'token' ? redirect.tokenHash : redirect.code
+    if (redeeming.has(once)) return
+    redeeming.add(once)
     try {
-      await completeMagicLink(redirect.code)
+      if (redirect.kind === 'token') await completeTokenSignIn(redirect.tokenHash, redirect.type)
+      else await completeMagicLink(redirect.code)
     } catch (err) {
       error = err instanceof Error ? err.message : String(err)
     }
-  } else {
-    await clearPendingSignIn()
-    error = authMessage(redirect.error)
   }
   const page = new URL(chrome.runtime.getURL('signed-in.html'))
   if (error) page.searchParams.set('error', error)

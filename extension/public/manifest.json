@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Retrn — Log emails & contacts to your network",
   "short_name": "Retrn",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Log Gmail and Outlook emails to the people in your Retrn network, and save contacts from LinkedIn.",
   "minimum_chrome_version": "116",
   "action": {
