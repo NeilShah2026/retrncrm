@@ -247,13 +247,12 @@ Two bits of project setup this needs:
 1. `SUPABASE_SERVICE_ROLE_KEY` set in the deployment environment (the iCal
    feed already needs it). Without it the endpoint returns 503 and the card
    says verification isn't configured.
-2. The **Magic Link** email template in the Supabase dashboard must include
-   the code, since the Settings flow asks for one rather than a link — add
-   `{{ .Token }}` alongside the existing link:
-
-   ```html
-   <p>Your Retrn verification code is <strong>{{ .Token }}</strong>.</p>
-   ```
+2. The **Magic Link** email template must include the code, since the Settings
+   flow asks for one rather than a link. `supabase/email-templates/` holds the
+   templates Supabase should be serving — including `{{ .Token }}` — and the
+   README there documents the parts of the link other code depends on. The
+   dashboard is only a copy of those files; changing it there and not here is
+   how the browser extension's sign-in got broken once already.
 
 Run `supabase/migrations/0003_edu_verification.sql` before either path works.
 
