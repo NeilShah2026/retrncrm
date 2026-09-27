@@ -16,9 +16,11 @@ import {
   rowToEvent,
   rowToFollowUp,
   rowToKeyDate,
+  rowToColdTarget,
 } from '@/services/supabaseMappers'
 import type {
   CalendarEvent,
+  ColdTarget,
   Contact,
   FollowUp,
   KeyDate,
@@ -195,6 +197,19 @@ export function useFollowUps(): FollowUp[] | undefined {
 
 export function useKeyDates(): KeyDate[] | undefined {
   return useRealtimeTable('key_dates', rowToKeyDate as (row: never) => KeyDate, MISSING_OK)
+}
+
+/** Newest first — the order the Cold email page lists them in. */
+export function useColdTargets(): ColdTarget[] | undefined {
+  const items = useRealtimeTable(
+    'cold_targets',
+    rowToColdTarget as (row: never) => ColdTarget,
+    MISSING_OK,
+  )
+  return React.useMemo(
+    () => (items ? [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : items),
+    [items],
+  )
 }
 
 /** Stable across renders, so the realtime effect doesn't resubscribe. */

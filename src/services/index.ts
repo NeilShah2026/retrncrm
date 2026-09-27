@@ -3,11 +3,13 @@ import { SupabaseTagRepository } from './supabaseTagRepository'
 import { SupabaseOpportunityRepository } from './supabaseOpportunityRepository'
 import { SupabaseTemplateRepository } from './supabaseTemplateRepository'
 import { SupabaseEventRepository } from './supabaseEventRepository'
+import { SupabaseColdTargetRepository } from './supabaseColdTargetRepository'
 import {
   SupabaseFollowUpRepository,
   SupabaseKeyDateRepository,
 } from './supabaseReminderRepositories'
 import type {
+  ColdTargetRepository,
   ContactRepository,
   EventRepository,
   FollowUpRepository,
@@ -32,5 +34,6 @@ export const templateRepo: TemplateRepository = new SupabaseTemplateRepository()
 export const eventRepo: EventRepository = new SupabaseEventRepository()
 export const followUpRepo: FollowUpRepository = new SupabaseFollowUpRepository()
 export const keyDateRepo: KeyDateRepository = new SupabaseKeyDateRepository()
+export const coldTargetRepo: ColdTargetRepository = new SupabaseColdTargetRepository()
 
 export * from './types'

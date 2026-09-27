@@ -217,6 +217,14 @@ export type AnalyticsEvent =
   | 'card_info_sent_back'
   | 'card_published'
   | 'card_handoff_accepted'
+  /** Cold email: a target added, a send logged, how it ended. */
+  | 'cold_target_created'
+  | 'cold_target_limit_reached'
+  | 'cold_email_send_logged'
+  | 'cold_target_replied'
+  | 'cold_target_converted'
+  | 'cold_email_drafted'
+  | 'cold_email_reviewed'
   /** Sent by hand from Settings, to prove the pipe works end to end. */
   | 'test_event'
 

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
+import { toast } from 'sonner'
 import {
   AlarmClock,
   CalendarClock,
@@ -9,6 +10,7 @@ import {
   Inbox as InboxIcon,
   KanbanSquare,
   NotebookPen,
+  Send,
   type LucideIcon,
 } from 'lucide-react'
 import { PageShell } from '@/components/layout/PageShell'
@@ -20,13 +22,15 @@ import { Panel, PanelHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { completeFollowUp } from '@/components/reminders/followUpActions'
+import { logSend } from '@/components/cold-email/actions'
+import { describeFollowUp, followUpOrdinal, targetName, todayIso } from '@/lib/coldEmail'
 import { markCaughtUp } from '@/lib/caughtUp'
 import { describeDue } from '@/lib/followUps'
 import { fullName } from '@/lib/format'
 import { skipMeetingNotes, useInbox } from '@/lib/inbox'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { ROUTES } from '@/lib/routes'
-import type { CalendarEvent, Contact } from '@/types'
+import type { CalendarEvent, ColdTarget, Contact } from '@/types'
 
 /**
  * Everything waiting on you, in one place: follow-ups that are due, meetings
@@ -79,6 +83,48 @@ export function InboxPage() {
                     >
                       <Check />
                       <span className="hidden sm:inline">Done</span>
+                    </Button>
+                  }
+                />
+              ))}
+            </Section>
+          )}
+
+          {inbox.coldFollowUps.length > 0 && (
+            <Section
+              icon={Send}
+              title="Cold emails to follow up"
+              count={inbox.coldFollowUps.length}
+              more={
+                <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.coldEmail)}>
+                  Open cold email
+                </Button>
+              }
+            >
+              {inbox.coldFollowUps.map((target) => (
+                <Row
+                  key={target.id}
+                  icon={Send}
+                  title={`Follow up with ${targetName(target)}`}
+                  subtitle={[
+                    target.company,
+                    followUpOrdinal(target),
+                    target.nextFollowUp && describeFollowUp(target.nextFollowUp),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  urgent={Boolean(target.nextFollowUp && target.nextFollowUp < todayIso())}
+                  onOpen={() => navigate(ROUTES.coldEmailTarget(target.id))}
+                  action={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="I sent the follow-up"
+                      title="Log the follow-up as sent today"
+                      onClick={() => void quickLog(target)}
+                    >
+                      <Check />
+                      <span className="hidden sm:inline">Sent</span>
                     </Button>
                   }
                 />
@@ -212,6 +258,24 @@ export function InboxPage() {
       />
     </PageShell>
   )
+}
+
+/**
+ * "Sent it" from the Inbox: logged as going out today, on the original
+ * thread's subject — or what they'd drafted on the page, if anything.
+ */
+async function quickLog(target: ColdTarget) {
+  const first = target.sends[0]?.subject?.replace(/^re:\s*/i, '')
+  try {
+    await logSend(target, {
+      date: todayIso(),
+      subject: target.draftSubject || (first ? `Re: ${first}` : undefined),
+      body: target.draftBody,
+    })
+  } catch (err) {
+    console.error(err)
+    toast.error('Couldn’t log that follow-up.')
+  }
 }
 
 function deadlinePhrase(days: number, deadline: string): string {

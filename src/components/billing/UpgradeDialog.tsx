@@ -22,6 +22,7 @@ const PERKS = [
   'Unlimited contacts',
   'Voice and photo capture',
   'Recruiting pipeline and reminders',
+  'Cold email drafts and reviews',
   'Reconnect suggestions',
 ]
 

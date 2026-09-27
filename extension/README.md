@@ -44,6 +44,20 @@ and appends interactions exactly the way the web app does.
 Page reading lives in `src/extract.ts` — one self-contained function, because
 the popup also hands it to `chrome.scripting.executeScript` as source text.
 
+### Cold emails
+
+An email thread can also be logged as a **cold email**: the recipient goes
+into the `cold_targets` table — the web app's Cold email page — rather than
+into contacts, and follow-ups are scheduled 5 days after the send, then a week
+after the first follow-up. A thread with someone already on that list opens
+straight into this view, since logging it is a follow-up; either screen can
+switch to the other.
+
+`src/cold.ts` keeps its own copy of the follow-up schedule, because the
+extension can't import the web app's (`src/lib/coldEmail.ts`). Change them
+together. Before `supabase/migrations/0010_cold_emails.sql` has run, the
+lookup returns nothing and threads open to contacts as they always did.
+
 ### Signing in
 
 The extension has **its own session**: enter your email and open the sign-in

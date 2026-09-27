@@ -270,3 +270,59 @@ export interface KeyDate {
   createdAt: string
   updatedAt: string
 }
+
+// ---------------------------------------------------------------------------
+// Cold emails
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a cold email stands, as stored. "Follow-up due" and "No reply" are
+ * not stored — they're read off the dates by `coldStage` in lib/coldEmail.
+ */
+export type ColdTargetStatus = 'drafting' | 'sent' | 'replied' | 'converted' | 'closed'
+
+/** One email sent to a target — the first one, or a follow-up. */
+export interface ColdSend {
+  id: string
+  /** ISO date (yyyy-mm-dd) it went out. */
+  date: string
+  subject?: string
+  /**
+   * What was sent, when it was written here. Kept so a follow-up can be
+   * drafted from what the first email actually asked.
+   */
+  body?: string
+  /** The sent thread in Gmail or Outlook, when logged from the extension. */
+  link?: string
+  createdAt: string
+}
+
+/**
+ * Someone you're emailing but haven't met. Not a contact: they become one
+ * when they write back and you choose to keep them.
+ */
+export interface ColdTarget {
+  id: string
+  firstName: string
+  lastName: string
+  email?: string
+  company?: string
+  role?: string
+  linkedinUrl?: string
+  /** Why this person — the specific reason, in the sender's words. */
+  hook?: string
+  notes?: string
+  draftSubject?: string
+  draftBody?: string
+  status: ColdTargetStatus
+  /** Oldest first. The first is the cold email; the rest are follow-ups. */
+  sends: ColdSend[]
+  /** ISO date (yyyy-mm-dd) to follow up. Absent once the schedule is done. */
+  nextFollowUp?: string
+  /** ISO datetime they were marked as having replied. */
+  repliedAt?: string
+  /** The contact they became, once converted. */
+  contactId?: string
+  createdAt: string
+  updatedAt: string
+}

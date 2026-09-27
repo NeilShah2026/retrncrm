@@ -55,6 +55,8 @@ type Props = {
   host: Host
   account: string
   context: EmailContext | LinkedInMessageContext
+  /** Log this thread as a cold email instead. Email threads only. */
+  onColdEmail?: () => void
 }
 
 /**
@@ -63,7 +65,7 @@ type Props = {
  * when you were last in touch, and whether this thread is already logged; new
  * people are added as contacts in the same step.
  */
-export function LogScreen({ host, account, context }: Props) {
+export function LogScreen({ host, account, context, onColdEmail }: Props) {
   const isEmail = context.kind === 'email'
   const threadKey = isEmail ? context.threadKey : context.link
 
@@ -266,6 +268,15 @@ export function LogScreen({ host, account, context }: Props) {
           </div>
         </div>
       </div>
+
+      {onColdEmail && (
+        <p class="small muted mt-8">
+          Emailing someone you haven’t met?{' '}
+          <button class="link" onClick={onColdEmail}>
+            Log it as a cold email
+          </button>
+        </p>
+      )}
 
       <p class="section-label">{people.length === 1 ? 'Log to' : `People on this ${isEmail ? 'email' : 'thread'}`}</p>
 

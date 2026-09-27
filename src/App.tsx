@@ -17,6 +17,7 @@ import { ContactDetailPage } from '@/pages/ContactDetailPage'
 import { TagsPage } from '@/pages/TagsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { PipelinePage } from '@/pages/PipelinePage'
+import { ColdEmailPage } from '@/pages/ColdEmailPage'
 import { CollegePage } from '@/pages/CollegePage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MorePage } from '@/pages/MorePage'
@@ -84,6 +85,7 @@ function AppEntry() {
               <Route path="college" element={<CollegePage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="pipeline" element={<PipelinePage />} />
+              <Route path="cold-email" element={<ColdEmailPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="qr" element={<QrPage />} />

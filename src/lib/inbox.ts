@@ -1,16 +1,18 @@
 import * as React from 'react'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import {
+  useColdTargets,
   useContacts,
   useEvents,
   useFollowUps,
   useKeyDates,
   useOpportunities,
 } from '@/hooks/useData'
+import { dueTargets, useColdEmailAvailable } from '@/lib/coldEmail'
 import { isDue } from '@/lib/followUps'
 import { upcomingKeyDates } from '@/lib/keyDates'
 import { getReconnectStatus } from '@/lib/reconnect'
-import type { CalendarEvent, Contact, FollowUp, KeyDate, Opportunity } from '@/types'
+import type { CalendarEvent, ColdTarget, Contact, FollowUp, KeyDate, Opportunity } from '@/types'
 
 /**
  * The Inbox: everything that is waiting on you, in one list. Nothing here is
@@ -37,6 +39,8 @@ export interface Inbox {
   reconnect: Contact[]
   /** Everyone overdue, not just the few listed. */
   reconnectTotal: number
+  /** Cold emails whose follow-up is due. Laptop only, like the page. */
+  coldFollowUps: ColdTarget[]
   /** Items shown, for the nav badge. */
   count: number
   ready: boolean
@@ -100,6 +104,8 @@ export function buildInbox(
     events: CalendarEvent[]
     opportunities: Opportunity[]
     keyDates: KeyDate[]
+    /** Left out where the Cold email page isn't available. */
+    coldTargets?: ColdTarget[]
   },
   skipped: Set<string> = new Set(),
   now: Date = new Date(),
@@ -147,6 +153,8 @@ export function buildInbox(
     .sort((a, b) => (b.status.overdueBy ?? 0) - (a.status.overdueBy ?? 0))
   const reconnect = overdue.slice(0, MAX_RECONNECT).map(({ contact }) => contact)
 
+  const coldFollowUps = dueTargets(data.coldTargets ?? [], now)
+
   return {
     followUps,
     meetings,
@@ -154,8 +162,14 @@ export function buildInbox(
     keyDates,
     reconnect,
     reconnectTotal: overdue.length,
+    coldFollowUps,
     count:
-      followUps.length + meetings.length + deadlines.length + keyDates.length + reconnect.length,
+      followUps.length +
+      meetings.length +
+      deadlines.length +
+      keyDates.length +
+      reconnect.length +
+      coldFollowUps.length,
   }
 }
 
@@ -167,6 +181,10 @@ export function useInbox(): Inbox {
   const opportunities = useOpportunities()
   const keyDates = useKeyDates()
   const skipped = useSkipped()
+  // On a phone the page is hidden, so its follow-ups would be a dead end —
+  // and would inflate the tab bar's badge with things that can't be opened.
+  const coldAvailable = useColdEmailAvailable()
+  const coldTargets = useColdTargets()
 
   // Meetings move into "write it up" as they end, not only when data changes.
   const [minute, setMinute] = React.useState(0)
@@ -183,10 +201,16 @@ export function useInbox(): Inbox {
         events: events ?? [],
         opportunities: opportunities ?? [],
         keyDates: keyDates ?? [],
+        coldTargets: coldAvailable ? (coldTargets ?? []) : [],
       },
       skipped,
     )
-    return { ...inbox, ready: Boolean(contacts && followUps && events && opportunities && keyDates) }
+    return {
+      ...inbox,
+      ready: Boolean(
+        contacts && followUps && events && opportunities && keyDates && (!coldAvailable || coldTargets),
+      ),
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `minute` is the clock
-  }, [contacts, followUps, events, opportunities, keyDates, skipped, minute])
+  }, [contacts, followUps, events, opportunities, keyDates, coldTargets, coldAvailable, skipped, minute])
 }

@@ -1,5 +1,6 @@
 import type {
   CalendarEvent,
+  ColdTarget,
   Contact,
   FollowUp,
   KeyDate,
@@ -132,4 +133,15 @@ export interface KeyDateRepository {
   remove(id: string): Promise<void>
   /** Bulk insert with ids kept — address-book import and backup restore. */
   insertAll(items: KeyDate[]): Promise<void>
+}
+
+export type ColdTargetDraft = Omit<ColdTarget, 'id' | 'createdAt' | 'updatedAt'>
+export type ColdTargetPatch = Partial<Omit<ColdTarget, 'id' | 'createdAt'>>
+
+export interface ColdTargetRepository {
+  getAll(): Promise<ColdTarget[]>
+  /** Throws `ColdTargetLimitError` when a free account is at its limit. */
+  create(draft: ColdTargetDraft): Promise<ColdTarget>
+  update(id: string, patch: ColdTargetPatch): Promise<ColdTarget>
+  remove(id: string): Promise<void>
 }

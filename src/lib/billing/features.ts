@@ -20,6 +20,10 @@ export type Feature =
   | 'export'
   /** Subscribing an outside calendar to Retrn's feed. */
   | 'calendarSync'
+  /** Past FREE_COLD_TARGET_LIMIT open cold email targets. */
+  | 'coldEmailUnlimited'
+  /** The model writing a cold email draft, or reviewing one. */
+  | 'coldEmailAI'
 
 /** The cheapest plan that includes each feature. */
 const REQUIRES: Record<Feature, 'paid' | 'standard'> = {
@@ -28,6 +32,8 @@ const REQUIRES: Record<Feature, 'paid' | 'standard'> = {
   reminders: 'paid',
   export: 'paid',
   calendarSync: 'standard',
+  coldEmailUnlimited: 'paid',
+  coldEmailAI: 'paid',
 }
 
 /** What to say when someone runs into the gate. */
@@ -51,6 +57,16 @@ export const FEATURE_COPY: Record<Feature, { title: string; description: string 
     title: 'Export is a paid feature',
     description:
       'Take everything with you: a JSON backup you can re-import, or a CSV that opens in any spreadsheet.',
+  },
+  coldEmailUnlimited: {
+    title: 'The free plan tracks 10 cold emails at a time',
+    description:
+      'Make a contact of anyone who wrote back, or close the ones you’re done with, to free a slot — or upgrade to track everyone you’re writing to.',
+  },
+  coldEmailAI: {
+    title: 'Drafts and reviews are a paid feature',
+    description:
+      'Get a first draft built from who they are and why you’re writing, or have yours read back for what will get it ignored: too long, no clear ask, a subject line nobody opens.',
   },
   calendarSync: {
     title: 'Calendar sync is on Standard',

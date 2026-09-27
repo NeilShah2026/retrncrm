@@ -18,6 +18,7 @@ export type TableName =
   | 'events'
   | 'follow_ups'
   | 'key_dates'
+  | 'cold_targets'
 
 interface TableStatus {
   /** The last failure message, or null once a load succeeds. */

@@ -16,6 +16,7 @@ import {
   Tag as TagIcon,
   UserPlus,
   Users,
+  Send,
 } from 'lucide-react'
 import {
   CommandDialog,
@@ -36,6 +37,7 @@ import { FREQUENCY_KEYS, FREQUENCY_OPTIONS, TEMPLATE_CATEGORIES } from '@/lib/co
 import { distinctValues } from '@/lib/filters'
 import { fullName, formatRelativeShort } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
+import { useColdEmailAvailable } from '@/lib/coldEmail'
 import type { Contact, ContactFrequency } from '@/types'
 
 interface Props {
@@ -78,6 +80,7 @@ export function CommandPalette({
   onAssistant,
 }: Props) {
   const navigate = useNavigate()
+  const coldEmail = useColdEmailAvailable()
   const isMobile = useIsMobile()
   const contacts = useContacts()
   const tags = useTags() ?? []
@@ -351,6 +354,11 @@ export function CommandPalette({
                 <CommandItem value="go-pipeline" onSelect={() => run(() => navigate(ROUTES.pipeline))}>
                   <KanbanSquare /> Pipeline
                 </CommandItem>
+                {coldEmail && (
+                  <CommandItem value="go-cold-email" onSelect={() => run(() => navigate(ROUTES.coldEmail))}>
+                    <Send /> Cold email
+                  </CommandItem>
+                )}
                 <CommandItem value="go-assistant" onSelect={() => run(() => onAssistant(''))}>
                   <MessageSquare /> Assistant
                 </CommandItem>

@@ -22,3 +22,6 @@ export const APP_ORIGIN = 'https://www.retrncrm.com'
 export const RETRN_APP_URLS = ['https://www.retrncrm.com', 'https://retrncrm.com', 'http://localhost:5173']
 
 export const contactUrl = (id: string) => `${APP_ORIGIN}/app/contacts/${id}`
+
+/** A cold email target, opened on the web app's Cold email page. */
+export const coldEmailUrl = (id: string) => `${APP_ORIGIN}/app/cold-email?target=${encodeURIComponent(id)}`

@@ -6,6 +6,9 @@ import { HomeScreen } from './HomeScreen'
 import type { ContextSnapshot, Host } from './host'
 import { LinkedInScreen } from './LinkedInScreen'
 import { LogScreen } from './LogScreen'
+import { ColdEmailScreen } from './ColdEmailScreen'
+import { findColdTargetsByEmails } from '../cold'
+import type { EmailContext } from '../types'
 import { SignIn } from './SignIn'
 
 type Auth =
@@ -97,7 +100,7 @@ export function App({ host }: { host: Host }) {
   const { context } = snapshot
   if (context?.kind === 'email') {
     // Keyed by thread, so opening another email starts a fresh form.
-    return <LogScreen key={context.threadKey} host={host} account={auth.email} context={context} />
+    return <EmailThread key={context.threadKey} host={host} account={auth.email} context={context} />
   }
   if (context?.kind === 'linkedin-message') {
     return <LogScreen key={context.link} host={host} account={auth.email} context={context} />
@@ -106,4 +109,49 @@ export function App({ host }: { host: Host }) {
     return <LinkedInScreen key={context.link} host={host} account={auth.email} context={context} />
   }
   return <HomeScreen host={host} account={auth.email} pageHost={snapshot.pageHost} />
+}
+
+/**
+ * An email thread is logged one of two ways: to contacts, or as a cold email.
+ * It opens as a cold email when someone on it is already on the cold email
+ * list — that's a follow-up — and to contacts otherwise. Either screen can
+ * switch to the other.
+ */
+function EmailThread({ host, account, context }: { host: Host; account: string; context: EmailContext }) {
+  const [mode, setMode] = useState<'checking' | 'contact' | 'cold'>('checking')
+
+  // The page re-reads the thread as Gmail redraws it; key on who's on it, not
+  // on the snapshot object, so a redraw doesn't look up the list again.
+  const mine = [account, ...context.me].map((e) => e.toLowerCase())
+  const emails = context.participants
+    .map((p) => p.email?.toLowerCase() ?? '')
+    .filter((e) => e && !mine.includes(e))
+  const who = emails.join(',')
+
+  useEffect(() => {
+    let cancelled = false
+    // Only ever the first choice: a switch made by hand is never undone.
+    const decide = (next: 'contact' | 'cold') => !cancelled && setMode((m) => (m === 'checking' ? next : m))
+    findColdTargetsByEmails(who ? who.split(',') : [])
+      .then((targets) => {
+        // Someone converted is a contact now; log to them there.
+        decide(targets.some((t) => t.status !== 'converted') ? 'cold' : 'contact')
+      })
+      .catch(() => decide('contact'))
+    return () => {
+      cancelled = true
+    }
+  }, [who])
+
+  if (mode === 'checking') {
+    return (
+      <Frame host={host} account={account}>
+        <SkeletonRows count={3} />
+      </Frame>
+    )
+  }
+  if (mode === 'cold') {
+    return <ColdEmailScreen host={host} account={account} context={context} onSwitch={() => setMode('contact')} />
+  }
+  return <LogScreen host={host} account={account} context={context} onColdEmail={() => setMode('cold')} />
 }

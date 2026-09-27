@@ -1,6 +1,9 @@
 import type { Database } from '@/lib/database.types'
 import type {
   CalendarEvent,
+  ColdSend,
+  ColdTarget,
+  ColdTargetStatus,
   Contact,
   FollowUp,
   KeyDate,
@@ -300,5 +303,62 @@ export function keyDateToRow(
     year: k.year ?? null,
     created_at: k.createdAt,
     updated_at: k.updatedAt,
+  }
+}
+
+type ColdTargetRow = Database['public']['Tables']['cold_targets']['Row']
+
+const COLD_STATUSES: ColdTargetStatus[] = ['drafting', 'sent', 'replied', 'converted', 'closed']
+
+export function rowToColdTarget(row: ColdTargetRow): ColdTarget {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email ?? undefined,
+    company: row.company ?? undefined,
+    role: row.role ?? undefined,
+    linkedinUrl: row.linkedin_url ?? undefined,
+    hook: row.hook ?? undefined,
+    notes: row.notes ?? undefined,
+    draftSubject: row.draft_subject ?? undefined,
+    draftBody: row.draft_body ?? undefined,
+    // The column is checked in SQL; this only guards a hand-edited row.
+    status: COLD_STATUSES.includes(row.status as ColdTargetStatus)
+      ? (row.status as ColdTargetStatus)
+      : 'drafting',
+    sends: (row.sends as ColdSend[] | null) ?? [],
+    nextFollowUp: row.next_follow_up ?? undefined,
+    repliedAt: row.replied_at ?? undefined,
+    contactId: row.contact_id ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function coldTargetToRow(
+  userId: string,
+  t: ColdTarget,
+): Database['public']['Tables']['cold_targets']['Insert'] {
+  return {
+    id: t.id,
+    user_id: userId,
+    first_name: t.firstName,
+    last_name: t.lastName,
+    email: t.email ?? null,
+    company: t.company ?? null,
+    role: t.role ?? null,
+    linkedin_url: t.linkedinUrl ?? null,
+    hook: t.hook ?? null,
+    notes: t.notes ?? null,
+    draft_subject: t.draftSubject ?? null,
+    draft_body: t.draftBody ?? null,
+    status: t.status,
+    sends: t.sends as unknown as ColdTargetRow['sends'],
+    next_follow_up: t.nextFollowUp ?? null,
+    replied_at: t.repliedAt ?? null,
+    contact_id: t.contactId ?? null,
+    created_at: t.createdAt,
+    updated_at: t.updatedAt,
   }
 }

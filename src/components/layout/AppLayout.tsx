@@ -18,6 +18,7 @@ import {
   MessageSquare,
   LogOut,
   ChevronsUpDown,
+  Send,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +43,7 @@ import { useAnalyticsIdentity } from '@/hooks/useAnalyticsIdentity'
 import { selectionFeedback } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
+import { useColdEmailAvailable } from '@/lib/coldEmail'
 import { displayName, initialFor } from '@/lib/displayName'
 
 export { Logo }
@@ -52,6 +54,8 @@ const PRIMARY_NAV = [
   { to: ROUTES.contacts, label: 'Contacts', icon: Users, end: false },
   { to: ROUTES.college, label: 'College', icon: GraduationCap, end: false },
   { to: ROUTES.pipeline, label: 'Pipeline', icon: KanbanSquare, end: false },
+  // Laptop only: see useColdEmailAvailable. Filtered out where it isn't.
+  { to: ROUTES.coldEmail, label: 'Cold email', icon: Send, end: false, laptopOnly: true },
   { to: ROUTES.assistant, label: 'Assistant', icon: MessageSquare, end: false },
 ]
 
@@ -226,6 +230,7 @@ export function AppLayout() {
   const { openNewContact, openVoiceCapture, openSearch } = useUI()
   const { count: inboxCount } = useInbox()
   const [shareOpen, setShareOpen] = React.useState(false)
+  const coldEmail = useColdEmailAvailable()
 
   useAutoLogMeetings()
   useReminderSync()
@@ -268,7 +273,7 @@ export function AppLayout() {
         </div>
 
         <nav className="mt-4 flex-1 space-y-px px-3">
-          {PRIMARY_NAV.map((item) => (
+          {PRIMARY_NAV.filter((item) => !('laptopOnly' in item) || coldEmail).map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               <item.icon className="h-4 w-4 text-muted-foreground" />
               <span className="flex-1">{item.label}</span>

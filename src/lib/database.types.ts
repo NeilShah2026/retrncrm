@@ -187,6 +187,34 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['key_dates']['Row']>
         Relationships: []
       }
+      cold_targets: {
+        Row: {
+          id: string
+          user_id: string
+          first_name: string
+          last_name: string
+          email: string | null
+          company: string | null
+          role: string | null
+          linkedin_url: string | null
+          hook: string | null
+          notes: string | null
+          draft_subject: string | null
+          draft_body: string | null
+          status: string
+          sends: Json
+          next_follow_up: string | null
+          replied_at: string | null
+          contact_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['cold_targets']['Row']> & {
+          user_id: string
+        }
+        Update: Partial<Database['public']['Tables']['cold_targets']['Row']>
+        Relationships: []
+      }
       calendar_tokens: {
         Row: {
           token: string

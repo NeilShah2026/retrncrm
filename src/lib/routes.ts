@@ -36,6 +36,10 @@ export const ROUTES = {
   /** Opens the calendar with the new-meeting form already up. */
   calendarNew: '/app/calendar?new=1',
   pipeline: '/app/pipeline',
+  /** Cold emails: people you're writing to but haven't met. Laptop only. */
+  coldEmail: '/app/cold-email',
+  coldEmailTarget: (id: string) => `/app/cold-email?target=${encodeURIComponent(id)}`,
+  coldEmailPlaybook: '/app/cold-email?tab=playbook',
   /** Opens the board with the new-opportunity form already up. */
   pipelineNew: '/app/pipeline?new=1',
   templates: '/app/templates',

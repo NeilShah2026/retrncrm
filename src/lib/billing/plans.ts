@@ -70,6 +70,7 @@ export const PLANS: Plan[] = [
       'Up to 30 contacts',
       'Tags, filters and last-contact tracking',
       'Reconnect suggestions on the dashboard',
+      'Cold email tracking for 10 people at a time',
       '25 AI requests a day',
       'Private and synced to your account',
     ],
@@ -99,6 +100,7 @@ export const PLANS: Plan[] = [
       'Voice, photo and one-line capture',
       'Recruiting pipeline',
       'Follow-ups and key-date reminders',
+      'Unlimited cold emails, with drafts and reviews',
       'CSV and JSON export',
       '250 AI requests a day',
     ],
@@ -178,6 +180,14 @@ export function yearlySavingPercent(plan: Plan): number | null {
  * number (`enforce_free_contact_limit` in 0007_billing.sql) — keep them equal.
  */
 export const FREE_CONTACT_LIMIT = 30
+
+/**
+ * How many cold email targets a free account can have open at once —
+ * drafting, sent or replied. Converting one to a contact or closing it frees
+ * the slot. The database enforces the same number
+ * (`enforce_free_cold_target_limit` in 0010_cold_emails.sql) — keep them equal.
+ */
+export const FREE_COLD_TARGET_LIMIT = 10
 
 /**
  * The upgrade offer: Student at $3/month for the first six months, then the
