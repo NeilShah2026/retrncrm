@@ -8,6 +8,7 @@ import { DashboardMockup } from '@/components/marketing/mockups/DashboardMockup'
 import { ContactsMockup } from '@/components/marketing/mockups/ContactsMockup'
 import { PipelineMockup } from '@/components/marketing/mockups/PipelineMockup'
 import { ComposeMockup } from '@/components/marketing/mockups/ComposeMockup'
+import { ColdEmailMockup } from '@/components/marketing/mockups/ColdEmailMockup'
 import { Button } from '@/components/ui/button'
 import { ROUTES } from '@/lib/routes'
 import { CHROME_STORE_URL } from '@/lib/constants'
@@ -124,6 +125,16 @@ export function LandingPage() {
             visual={<ComposeMockup />}
           />
         </div>
+        <div className="mt-16 lg:mt-20">
+          <FeatureSection
+            index={4}
+            lead
+            eyebrow="Cold email"
+            title="Write to people you haven’t met"
+            description="Keep everyone you’re emailing cold on one list. Retrn drafts from your reason for writing, reviews yours for what gets ignored, and tells you when to follow up — five days out, then a week later, then it stops. When they write back, they become a contact with the whole thread."
+            visual={<ColdEmailMockup />}
+          />
+        </div>
       </section>
 
       {/* ---- Extension: a quiet row, not a glowing card ---- */}
@@ -136,8 +147,8 @@ export function LandingPage() {
             <div>
               <h2 className="text-lg font-semibold tracking-[-0.01em]">A browser extension for your inbox</h2>
               <p className="mt-1 max-w-lg text-sm leading-relaxed text-text-secondary">
-                Log emails from Gmail and Outlook, and add people from LinkedIn, to the right
-                Retrn contact without leaving the tab.
+                Log emails from Gmail and Outlook to the right Retrn contact or cold email, and
+                add people from LinkedIn, without leaving the tab.
               </p>
             </div>
           </div>
