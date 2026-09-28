@@ -1,55 +1,29 @@
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft } from 'lucide-react'
 import { AppMark, CapsuleButton } from '@/components/ui/capsule'
 import { SubscriptionLegal } from '@/components/billing/SubscriptionLegal'
-import { SetupLine, Stage } from '@/components/onboarding/panes'
 import {
-  FEATURES,
   PANES,
-  QUESTION_PANES,
+  TOUR,
+  firstName,
   useOfferActions,
-  useTailoringRun,
+  useOnboardingFlow,
 } from '@/components/onboarding/shared'
 import { OnboardingDesktop } from '@/components/onboarding/OnboardingDesktop'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { useAuth } from '@/auth/AuthProvider'
-import { useTags } from '@/hooks/useData'
-import {
-  cadenceLabel,
-  readOnboardingAnswers,
-  type OnboardingAnswers,
-  type OnboardingQuestion,
-} from '@/lib/onboarding'
-import type { Tag } from '@/types'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { selectionFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
-import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 import { isWebBilling } from '@/lib/billing/web'
 
 /**
- * Onboarding: what Retrn is, four questions, and the offer.
+ * Onboarding: your name, what Retrn does, and the offer.
  *
- * The shape is deliberate. Three things have to happen in the ninety seconds
- * a new account will give you, in this order, and none of them works out of
- * order:
- *
- *  1. **Show the product before asking for anything.** Three panes, one idea
- *     each, each illustrated with a true picture of the screen it describes.
- *     Nobody answers questions for software they have not seen.
- *  2. **Ask only questions that change something.** Four, all single-tap,
- *     each wired to a tag that gets created or a default that gets set — see
- *     the contract at the top of src/lib/onboarding.ts.
- *  3. **Then make the offer**, against the thing it is actually competing
- *     with. Not "unlimited contacts" — a coffee chat, which the person
- *     reading this has already decided is worth six dollars and an afternoon.
- *
- * The tailoring step in between is the hinge: it is where the four answers
- * become real objects in the account, and it reports only work that actually
- * finished. A progress screen that ticks boxes against nothing is the single
- * fastest way to teach someone that the rest of the app is also theatre.
+ * Three panes, kept short on purpose. The name is the only thing asked, and
+ * it is asked first because it is the one thing the app can't work out on its
+ * own. What Retrn does is shown in three lines rather than explained — the
+ * app itself is the better tour.
  */
 
 export function OnboardingFlow() {
@@ -61,105 +35,40 @@ export function OnboardingFlow() {
 }
 
 function PhoneOnboarding() {
-  const navigate = useNavigate()
-  const { user, saveOnboarding } = useAuth()
-  const tags = useTags()
-
-  const [index, setIndex] = React.useState(0)
-  const [back, setBack] = React.useState(false)
-  const [answers, setAnswers] = React.useState<OnboardingAnswers>(() =>
-    readOnboardingAnswers(user),
-  )
-
-  const pane = PANES[index]
-  // Read inside `finish`, which must not be re-created as panes change.
-  const paneRef = React.useRef(pane)
-  paneRef.current = pane
-
-  const go = React.useCallback((delta: number) => {
-    setBack(delta < 0)
-    setIndex((i) => Math.min(PANES.length - 1, Math.max(0, i + delta)))
-  }, [])
-
-  /**
-   * Leaving early still counts as onboarded. The alternative — reopening this
-   * flow at every launch until it is completed — punishes the person who
-   * already knows what the app is, and they are exactly the person who
-   * skipped.
-   */
-  const finish = React.useCallback(
-    (prefs: OnboardingAnswers = {}, to: string = ROUTES.dashboard) => {
-      // "Completed" means they reached the end; leaving early is a skip, and
-      // both still count as onboarded.
-      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
-        pane: paneRef.current,
-      })
-      void saveOnboarding({ ...prefs, onboarded: true, onboardedAt: new Date().toISOString() })
-      // `replace`, so the phone's back gesture from the app doesn't land
-      // someone back at the welcome screen they just finished.
-      navigate(to, { replace: true })
-    },
-    [navigate, saveOnboarding],
-  )
-
-  function answer(key: keyof OnboardingAnswers, value: string) {
-    selectionFeedback()
-    setAnswers((a) => ({ ...a, [key]: value }))
-    // A beat, so the selection is visibly registered before the pane moves.
-    // Without it the tap reads as "the screen jumped", not "that was taken".
-    window.setTimeout(() => go(1), 260)
-  }
-
-  const question = QUESTION_PANES[pane]
+  const { pane, index, back, go, finish, name, setName, nameReady, savingName, submitName } =
+    useOnboardingFlow()
 
   return (
     // `h-[100dvh]`, not `min-h`: the pinned action at the foot of every pane
     // has to stay on screen, so the pane's own body is the only thing that
-    // may scroll. With a minimum height the document grows instead and the
-    // button on a long pane (the offer) ends up below the fold.
+    // may scroll.
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
       <Chrome
         step={index}
         total={PANES.length}
-        onBack={index > 0 && pane !== 'tailoring' ? () => go(-1) : undefined}
-        onSkip={pane === 'tailoring' || pane === 'offer' ? undefined : () => finish(answers)}
+        onBack={pane === 'tour' ? () => go(-1) : undefined}
+        // No skip on the name pane: the name is the one thing we ask for.
+        onSkip={pane === 'tour' ? () => finish() : undefined}
       />
 
       <div
         key={pane}
-        className={cn(
-          'flex min-h-0 flex-1 flex-col',
-          back ? 'pane-in-back' : 'pane-in',
-        )}
+        className={cn('flex min-h-0 flex-1 flex-col', back ? 'pane-in-back' : 'pane-in')}
       >
-        {pane === 'welcome' && <Welcome onStart={() => go(1)} />}
-
-        {(pane === 'capture' || pane === 'reconnect' || pane === 'pipeline') && (
-          <Feature {...FEATURES[pane]} onNext={() => go(1)} />
-        )}
-
-        {question && (
-          <Question
-            question={question}
-            selected={answers[question.key]}
-            onSelect={(value) => answer(question.key, value)}
+        {pane === 'name' && (
+          <NamePane
+            name={name}
+            onChange={setName}
+            ready={nameReady}
+            saving={savingName}
+            onSubmit={() => void submitName()}
           />
         )}
 
-        {pane === 'tailoring' && (
-          <Tailoring
-            answers={answers}
-            existingTags={tags}
-            onSave={saveOnboarding}
-            onDone={() => go(1)}
-          />
-        )}
+        {pane === 'tour' && <Tour name={name} onNext={() => go(1)} />}
 
         {pane === 'offer' && (
-          <Offer
-            onDone={() => finish(answers)}
-            onSeeAllPlans={() => finish(answers, ROUTES.subscription)}
-          />
+          <Offer onDone={() => finish()} onSeeAllPlans={() => finish(ROUTES.subscription)} />
         )}
       </div>
     </div>
@@ -295,185 +204,91 @@ function Pane({
   )
 }
 
-function Welcome({ onStart }: { onStart: () => void }) {
+function NamePane({
+  name,
+  onChange,
+  ready,
+  saving,
+  onSubmit,
+}: {
+  name: string
+  onChange: (name: string) => void
+  ready: boolean
+  saving: boolean
+  onSubmit: () => void
+}) {
   return (
-    <Pane
-      center
-      footer={<CapsuleButton variant="dark" onClick={onStart}>Get started</CapsuleButton>}
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (ready) onSubmit()
+      }}
     >
-      <AppMark />
-      <h1 className="text-ios-large-title mt-8 text-center leading-[1.05] tracking-[-0.03em]">
-        You met them.
-        <br />
-        Now what?
-      </h1>
-      <p className="text-ios-body mx-auto mt-4 max-w-[19rem] text-center leading-relaxed text-text-secondary">
-        Retrn keeps the people you meet, and tells you when to reach back out — so the
-        conversation you had in September still counts in March.
-      </p>
-
-      {/* What the next three screens cover, so the flow announces its own
-          length instead of asking for open-ended patience. */}
-      <div className="mt-9 flex items-center justify-center gap-2.5">
-        {['Capture', 'Follow up', 'Follow through'].map((label, i) => (
-          <React.Fragment key={label}>
-            {i > 0 && <span className="h-1 w-1 rounded-full bg-border" aria-hidden />}
-            <span className="text-ios-caption text-muted-foreground">{label}</span>
-          </React.Fragment>
-        ))}
-      </div>
-      <p className="text-ios-caption mt-3 text-center text-muted-foreground">
-        About a minute.
-      </p>
-    </Pane>
+      <Pane
+        center
+        footer={
+          <CapsuleButton type="submit" variant="dark" disabled={!ready} loading={saving}>
+            Continue
+          </CapsuleButton>
+        }
+      >
+        <AppMark />
+        <h1 className="text-ios-large-title mt-8 text-center leading-[1.05] tracking-[-0.03em]">
+          Welcome to Retrn.
+        </h1>
+        <p className="text-ios-body mt-3 text-center text-text-secondary">
+          What should we call you?
+        </p>
+        <input
+          // Focusing it straight away is the point of the pane — the keyboard
+          // coming up says "type here" without a word of copy.
+          autoFocus
+          value={name}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Your name"
+          aria-label="Your name"
+          autoComplete="name"
+          autoCapitalize="words"
+          enterKeyHint="next"
+          maxLength={80}
+          className={cn(
+            'text-ios-body mt-8 h-[52px] w-full rounded-[14px] bg-bg-elevated px-4 text-center',
+            'ring-1 ring-inset ring-border/70 placeholder:text-muted-foreground',
+            'focus:outline-none focus:ring-[1.5px] focus:ring-brand',
+          )}
+        />
+      </Pane>
+    </form>
   )
 }
 
-function Feature({
-  eyebrow,
-  title,
-  body,
-  visual,
-  onNext,
-}: {
-  eyebrow: string
-  title: string
-  body: string
-  visual: React.ReactNode
-  onNext: () => void
-}) {
+function Tour({ name, onNext }: { name: string; onNext: () => void }) {
+  const first = firstName(name)
   return (
     <Pane center footer={<CapsuleButton variant="dark" onClick={onNext}>Continue</CapsuleButton>}>
-      <p className="text-label text-muted-foreground">{eyebrow}</p>
-      <h2 className="text-ios-title mt-2 leading-[1.12]">{title}</h2>
-      <p className="text-ios-subhead mt-3 text-text-secondary">{body}</p>
-      <div className="mt-7">
-        <Stage>{visual}</Stage>
-      </div>
-    </Pane>
-  )
-}
-
-function Question({
-  question,
-  selected,
-  onSelect,
-}: {
-  question: OnboardingQuestion<never>
-  selected?: string
-  onSelect: (value: string) => void
-}) {
-  return (
-    <Pane center footer={null}>
-      <p className="text-label text-muted-foreground">{question.eyebrow}</p>
-      <h2 className="text-ios-title mt-2 leading-[1.15]">{question.prompt}</h2>
-      <p className="text-ios-footnote mt-2 text-muted-foreground">{question.caption}</p>
-
-      <div role="radiogroup" aria-label={question.prompt} className="mt-6 space-y-2.5">
-        {question.options.map((option, i) => {
-          const active = selected === option.value
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => onSelect(option.value)}
-              // `turn-in` is the house entrance (index.css); the small
-              // per-row delay makes the list arrive as a list rather than as
-              // one block, which is what an iOS table view does on push.
-              style={{ animationDelay: `${i * 45}ms` }}
-              className={cn(
-                'turn-in press-scale flex w-full items-center gap-3 rounded-[14px] px-4 py-3.5 text-left',
-                'ring-inset transition-[background-color,box-shadow] duration-fast',
-                active
-                  ? 'bg-brand/[0.07] ring-[1.5px] ring-brand'
-                  : 'bg-bg-elevated ring-1 ring-border/70',
-              )}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="text-ios-body block font-medium">{option.label}</span>
-                <span className="text-ios-footnote mt-0.5 block text-muted-foreground">
-                  {option.detail}
-                </span>
-              </span>
-              {/* The same trailing checkmark a chosen row gets everywhere
-                  else on the phone (ui/inset-list.tsx's InsetCheckRow). */}
-              <Check
-                aria-hidden
-                strokeWidth={2.8}
-                className={cn(
-                  'h-[19px] w-[19px] shrink-0 text-brand transition-[opacity,transform] duration-base ease-[var(--ease-spring)]',
-                  active ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
-                )}
-              />
-            </button>
-          )
-        })}
-      </div>
-    </Pane>
-  )
-}
-
-/** The phone's setup screen. The work it reports on lives in `shared.tsx`. */
-function Tailoring({
-  answers,
-  existingTags,
-  onSave,
-  onDone,
-}: {
-  answers: OnboardingAnswers
-  existingTags: Tag[] | undefined
-  onSave: (prefs: OnboardingAnswers & { onboarded: boolean }) => Promise<{ error: string | null }>
-  onDone: () => void
-}) {
-  const { saveState, tagState, finished, failed, tagLabel } = useTailoringRun({
-    answers,
-    existingTags,
-    onSave,
-  })
-
-  return (
-    <Pane
-      center
-      footer={
-        <CapsuleButton variant="dark" disabled={!finished} onClick={onDone}>
-          {finished ? 'Continue' : 'Setting up…'}
-        </CapsuleButton>
-      }
-    >
       <h2 className="text-ios-title leading-[1.15]">
-        {!finished ? 'Setting up Retrn.' : failed ? 'That didn’t save.' : 'Retrn is set up.'}
+        {first ? `Nice to meet you, ${first}.` : 'Nice to meet you.'}
       </h2>
-      <p className="text-ios-subhead mt-3 text-text-secondary">
-        {!finished
-          ? 'One moment — this is writing to your account, not pretending to.'
-          : failed
-            ? 'Nothing was written. Carry on — you can set all of this from Settings, and running onboarding again will retry it.'
-            : 'Everything below is already in your account. All of it is editable later.'}
-      </p>
+      <p className="text-ios-subhead mt-2 text-text-secondary">Here’s what Retrn does.</p>
 
-      <div className="mt-6 divide-y divide-border/50 rounded-[14px] bg-bg-sunken px-4 py-1">
-        <SetupLine
-          state={saveState}
-          label={saveState === 'failed' ? 'Couldn’t save your answers' : 'Saved what you’re working toward'}
-        />
-        <SetupLine
-          state={tagState}
-          label={tagState === 'failed' ? 'Couldn’t add your tags' : tagLabel}
-        />
-      </div>
-
-      {finished && !failed && (
-        <div className="turn-in mt-3 rounded-[14px] bg-bg-sunken p-4">
-          <p className="text-ios-footnote text-muted-foreground">From here on</p>
-          <p className="text-ios-subhead mt-1 leading-snug text-foreground">
-            Everyone you add starts with a reconnect goal of{' '}
-            <span className="font-semibold">{cadenceLabel(answers.cadence)}</span>
-            {answers.cadence === 'none' ? '' : ', so nobody goes quiet without Retrn saying so'}.
-          </p>
-        </div>
-      )}
+      <ul className="mt-7 space-y-3">
+        {TOUR.map(({ icon: Icon, title, detail }, i) => (
+          <li
+            key={title}
+            style={{ animationDelay: `${i * 60}ms` }}
+            className="turn-in flex items-center gap-3.5 rounded-[14px] bg-bg-elevated px-4 py-3.5 ring-1 ring-inset ring-border/70"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-brand/[0.09] text-brand">
+              <Icon className="h-[20px] w-[20px]" strokeWidth={2.2} aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="text-ios-body block font-medium">{title}</span>
+              <span className="text-ios-footnote block text-muted-foreground">{detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </Pane>
   )
 }
@@ -583,10 +398,6 @@ function Offer({
       <h2 className="text-ios-title mt-2 leading-[1.15]">
         Cheaper than the coffee.
       </h2>
-      <p className="text-ios-subhead mt-3 text-text-secondary">
-        A coffee chat costs you about six dollars and most of an afternoon. Retrn costs less
-        than that per month — and it is the part that makes sure the afternoon was worth it.
-      </p>
 
       {/* The comparison, made literally: side by side, so the two numbers are
           read against each other rather than one after the other. The

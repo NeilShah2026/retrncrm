@@ -1,243 +1,109 @@
 import * as React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import {
-  CaptureVignette,
-  PipelineVignette,
-  ReconnectVignette,
-} from '@/components/onboarding/panes'
+import { BellRing, SquareKanban, UserPlus, type LucideIcon } from 'lucide-react'
+import { useAuth } from '@/auth/AuthProvider'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { useSubscription } from '@/hooks/useSubscription'
-import { tagRepo } from '@/services'
-import {
-  CADENCE_QUESTION,
-  FOCUS_QUESTION,
-  PLACE_QUESTION,
-  STAGE_QUESTION,
-  tagsToCreate,
-  type OnboardingAnswers,
-  type OnboardingQuestion,
-} from '@/lib/onboarding'
+import { initialName } from '@/lib/onboarding'
 import { planById, monthlyEquivalent } from '@/lib/billing/plans'
 import { BillingUnavailableError, purchase, restorePurchases } from '@/lib/billing/store'
 import { isWebBilling, startCheckout } from '@/lib/billing/web'
 import { errorFeedback, successFeedback } from '@/lib/haptics'
-import type { Tag } from '@/types'
-import type { TagDraft } from '@/services/types'
+import { ROUTES } from '@/lib/routes'
+import { track } from '@/lib/analytics'
 
 /**
  * What the two onboarding flows — the phone's and the laptop's — have in
- * common: the order of the panes, the words on them, and the two pieces of
- * real work they do (writing the answers, and buying).
+ * common: the order of the panes, the words on them, and the real work they
+ * do (saving the name, finishing, and buying).
  *
- * The layouts themselves stay apart on purpose. A first-run flow is the one
- * screen where the shape of the device matters most: a phone wants one idea
- * per full-height pane with a thumb-reachable action, and a laptop wants a
- * held card with the illustration beside the text, keyboard support and no
- * pretend safe areas. Sharing the markup would mean one of them always
- * looking like a translation of the other — which is the thing being fixed.
+ * The layouts themselves stay apart on purpose. A phone wants one idea per
+ * full-height pane with a thumb-reachable action; a laptop wants a held card
+ * with keyboard support. Sharing the markup would make one of them look like
+ * a translation of the other.
  */
 
-export type PaneId =
-  | 'welcome'
-  | 'capture'
-  | 'reconnect'
-  | 'pipeline'
-  | 'focus'
-  | 'stage'
-  | 'place'
-  | 'cadence'
-  | 'tailoring'
-  | 'offer'
+export type PaneId = 'name' | 'tour' | 'offer'
 
-export const PANES: PaneId[] = [
-  'welcome',
-  'capture',
-  'reconnect',
-  'pipeline',
-  'focus',
-  'stage',
-  'place',
-  'cadence',
-  'tailoring',
-  'offer',
+export const PANES: PaneId[] = ['name', 'tour', 'offer']
+
+export const TOUR: { icon: LucideIcon; title: string; detail: string }[] = [
+  { icon: UserPlus, title: 'Add anyone in one line', detail: 'Type or say who you met.' },
+  { icon: BellRing, title: 'Know when to reach out', detail: 'Get nudged before they go cold.' },
+  { icon: SquareKanban, title: 'Track the search', detail: 'Applications, next to the people.' },
 ]
 
-export const QUESTION_PANES: Partial<Record<PaneId, OnboardingQuestion<never>>> = {
-  focus: FOCUS_QUESTION as OnboardingQuestion<never>,
-  stage: STAGE_QUESTION as OnboardingQuestion<never>,
-  place: PLACE_QUESTION as OnboardingQuestion<never>,
-  cadence: CADENCE_QUESTION as OnboardingQuestion<never>,
-}
-
-export const FEATURES: Record<
-  'capture' | 'reconnect' | 'pipeline',
-  { eyebrow: string; title: string; body: string; visual: React.ReactNode }
-> = {
-  capture: {
-    eyebrow: 'Capture',
-    title: 'One line is the whole ask.',
-    body: 'Type or say who you met. Retrn turns it into a real record — name, company, where you met, and what to do next.',
-    visual: <CaptureVignette />,
-  },
-  reconnect: {
-    eyebrow: 'Follow up',
-    title: 'The follow-up is the whole game.',
-    body: 'Put a reconnect goal on anyone. Retrn tells you who is slipping, and reminds you what you last talked about before you reach out.',
-    visual: <ReconnectVignette />,
-  },
-  pipeline: {
-    eyebrow: 'Follow through',
-    title: 'From coffee chat to offer.',
-    body: 'Track every application on a board, and link the people who can move it forward. The network and the search stop being two separate things.',
-    visual: <PipelineVignette />,
-  },
-}
-
-// ---------------------------------------------------------------------------
-// The tailoring step
-// ---------------------------------------------------------------------------
-
-export type StepState = 'pending' | 'running' | 'done' | 'failed'
-
-export interface TailoringRun {
-  saveState: StepState
-  tagState: StepState
-  /** Names of the tags this run actually created. */
-  created: string[]
-  /** Both writes have settled, one way or the other. */
-  finished: boolean
-  /** Neither write landed — the screen must not claim to be set up. */
-  failed: boolean
-  /** What the tag line should say right now. */
-  tagLabel: string
+/** The first word of the name, for addressing someone on the next pane. */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? ''
 }
 
 /**
- * Where the four answers stop being a survey.
+ * The flow's state and its writes, shared by both layouts.
  *
- * Both steps are real writes, awaited in order, and each state only advances
- * when its own write has returned. If one fails it says so and the flow
- * continues — a tag that didn't get created is not a reason to trap someone
- * on a setup screen, and silently showing a checkmark over a failure would be
- * worse than either.
+ * The name is saved the moment it is submitted, and again when the flow
+ * finishes (or is skipped) — so a save that fails on a bad connection gets a
+ * second chance instead of leaving the account nameless.
  */
-export function useTailoringRun({
-  answers,
-  existingTags,
-  onSave,
-}: {
-  answers: OnboardingAnswers
-  /** `undefined` until the account's tags have loaded — see the guard below. */
-  existingTags: Tag[] | undefined
-  onSave: (prefs: OnboardingAnswers & { onboarded: boolean }) => Promise<{ error: string | null }>
-}): TailoringRun {
-  const [saveState, setSaveState] = React.useState<StepState>('pending')
-  const [tagState, setTagState] = React.useState<StepState>('pending')
-  const [created, setCreated] = React.useState<string[]>([])
-  const finished =
-    saveState !== 'pending' &&
-    saveState !== 'running' &&
-    tagState !== 'pending' &&
-    tagState !== 'running'
+export function useOnboardingFlow() {
+  const navigate = useNavigate()
+  const { user, updateName, saveOnboarding } = useAuth()
 
-  const draftsRef = React.useRef<TagDraft[] | null>(null)
-  const ranRef = React.useRef(false)
+  const [index, setIndex] = React.useState(0)
+  const [back, setBack] = React.useState(false)
+  const [name, setName] = React.useState(() => initialName(user))
+  const [savingName, setSavingName] = React.useState(false)
 
-  /**
-   * Whether this is still on screen — as opposed to whether *an effect run*
-   * is still current.
-   *
-   * These are not the same thing, and conflating them is what used to wedge
-   * this screen. The work below must start exactly once (it writes rows), so
-   * it is latched behind `ranRef`. But a plain `let alive` in the same effect
-   * is cancelled by any *re-run* of that effect — StrictMode's remount in
-   * development, or simply a parent re-render in production — and the latch
-   * then stops the re-run from starting replacement work. The result was an
-   * account that saved correctly behind a screen that said "Setting up…"
-   * forever, with its Continue button disabled.
-   */
-  const mountedRef = React.useRef(true)
-  React.useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
+  const pane = PANES[index]
+  // Read inside `finish`, which must not be re-created as panes change.
+  const paneRef = React.useRef(pane)
+  paneRef.current = pane
+  const nameRef = React.useRef(name)
+  nameRef.current = name
+
+  const go = React.useCallback((delta: number) => {
+    setBack(delta < 0)
+    setIndex((i) => Math.min(PANES.length - 1, Math.max(0, i + delta)))
   }, [])
 
-  // Props are read through refs so that neither a new `onSave` identity nor a
-  // new `answers` object can re-trigger (or cancel) work that runs once.
-  const answersRef = React.useRef(answers)
-  answersRef.current = answers
-  const onSaveRef = React.useRef(onSave)
-  onSaveRef.current = onSave
-  const tagsRef = React.useRef(existingTags)
-  tagsRef.current = existingTags
-
   /**
-   * Knowing the existing tags is worth a short wait — it is what stops a
-   * second run through onboarding re-creating the first run's tags — but it
-   * is not worth blocking on. A tag load that fails stays `undefined` for
-   * good (see useData), so waiting for it unconditionally is another way to
-   * hang this screen. After a moment, go ahead without it: the worst case is
-   * a duplicate tag, which is a great deal better than a dead screen.
+   * Leaving early still counts as onboarded. The alternative — reopening this
+   * flow at every launch until it is completed — punishes the person who
+   * already knows what the app is.
    */
-  const [waitedForTags, setWaitedForTags] = React.useState(false)
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setWaitedForTags(true), 2500)
-    return () => window.clearTimeout(timer)
-  }, [])
-  const ready = existingTags !== undefined || waitedForTags
+  const finish = React.useCallback(
+    (to: string = ROUTES.dashboard) => {
+      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
+        pane: paneRef.current,
+      })
+      const fullName = nameRef.current.trim()
+      void saveOnboarding({
+        ...(fullName && { full_name: fullName }),
+        onboarded: true,
+        onboardedAt: new Date().toISOString(),
+      })
+      // `replace`, so the back gesture from the app doesn't land someone on
+      // the welcome screen they just finished.
+      navigate(to, { replace: true })
+    },
+    [navigate, saveOnboarding],
+  )
 
-  React.useEffect(() => {
-    if (!ready || ranRef.current) return
-    // Creating a person's tags twice is duplicate rows in their account, so
-    // the run-once latch is real code, not a development workaround.
-    ranRef.current = true
+  const nameReady = name.trim().length > 0 && !savingName
 
-    const answersNow = answersRef.current
-    draftsRef.current = tagsToCreate(answersNow, tagsRef.current ?? [])
+  const submitName = React.useCallback(async () => {
+    const trimmed = nameRef.current.trim()
+    if (!trimmed) return
+    setSavingName(true)
+    const { error } = await updateName(trimmed)
+    setSavingName(false)
+    // Not a reason to hold someone on this pane: `finish` writes it again.
+    if (error) console.warn('[onboarding] name save failed; retrying at finish', error)
+    go(1)
+  }, [go, updateName])
 
-    void (async () => {
-      setSaveState('running')
-      const { error } = await onSaveRef.current({ ...answersNow, onboarded: true })
-      if (!mountedRef.current) return
-      setSaveState(error ? 'failed' : 'done')
-
-      setTagState('running')
-      const made: string[] = []
-      let failed = false
-      for (const draft of draftsRef.current ?? []) {
-        try {
-          await tagRepo.create(draft)
-          made.push(draft.name)
-        } catch {
-          failed = true
-        }
-      }
-      if (!mountedRef.current) return
-      setCreated(made)
-      setTagState(failed && made.length === 0 ? 'failed' : 'done')
-    })()
-  }, [ready])
-
-  const drafts = draftsRef.current ?? []
-  const tagLabel =
-    tagState === 'done' && created.length === 0
-      ? 'Your tags were already set up'
-      : created.length > 0
-        ? `Added ${created.length} ${created.length === 1 ? 'tag' : 'tags'}: ${created.join(', ')}`
-        : drafts.length > 0
-          ? `Adding ${drafts.length} tags`
-          : 'Checking your tags'
-
-  return {
-    saveState,
-    tagState,
-    created,
-    finished,
-    failed: saveState === 'failed' && tagState === 'failed',
-    tagLabel,
-  }
+  return { pane, index, back, go, finish, name, setName, nameReady, savingName, submitName }
 }
 
 // ---------------------------------------------------------------------------

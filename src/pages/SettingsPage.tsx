@@ -379,7 +379,7 @@ export function SettingsPage() {
           <InsetRow
             leading={<InsetRowIcon icon={CircleHelp} />}
             title="Run Through Onboarding"
-            subtitle="The welcome flow, and re-answer the setup questions"
+            subtitle="See the welcome flow again"
             onClick={openOnboarding}
           />
           <InsetRow
@@ -629,8 +629,7 @@ export function SettingsPage() {
               <div className="text-sm">
                 <p className="font-medium">Run through onboarding</p>
                 <p className="text-muted-foreground">
-                  The welcome flow again — including the setup questions, so you can change what
-                  Retrn tailored to you.
+                  See the welcome flow again.
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={openOnboarding} className="shrink-0">

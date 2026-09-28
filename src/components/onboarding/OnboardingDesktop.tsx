@@ -1,132 +1,49 @@
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/button'
-import { SetupLine, Stage } from '@/components/onboarding/panes'
+import { Input } from '@/components/ui/input'
 import { SubscriptionLegal } from '@/components/billing/SubscriptionLegal'
 import {
-  FEATURES,
   PANES,
-  QUESTION_PANES,
+  TOUR,
+  firstName,
   useOfferActions,
-  useTailoringRun,
+  useOnboardingFlow,
 } from '@/components/onboarding/shared'
-import { useAuth } from '@/auth/AuthProvider'
-import { useTags } from '@/hooks/useData'
-import {
-  cadenceLabel,
-  readOnboardingAnswers,
-  type OnboardingAnswers,
-  type OnboardingQuestion,
-} from '@/lib/onboarding'
 import { isWebBilling } from '@/lib/billing/web'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { ROUTES } from '@/lib/routes'
-import { track } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
-import type { Tag } from '@/types'
 
 /**
  * Onboarding on a laptop.
  *
- * Same ten panes and the same writes as the phone's flow (both live in
- * `shared.tsx`) — but built for the machine it's on rather than scaled up
- * from one that isn't. Three things make it a desktop screen instead of a
- * tall phone pane:
- *
- *  1. **A held card, not a full-bleed column.** A 100dvh flow with a pinned
- *     footer is a phone idea; on a monitor it leaves a metre of empty page
- *     around a 26rem strip of text. Here the pane is a card on a recessed
- *     ground, sized to the content.
- *  2. **The illustration sits beside the words**, because there is room for
- *     it to. On the phone it has to go underneath.
- *  3. **The keyboard works.** Enter or → continues, ← goes back, Esc skips,
- *     and 1–9 pick an answer — with the number shown on each option, so the
- *     shortcut is discoverable rather than folklore.
+ * Same three panes and the same writes as the phone's flow (both live in
+ * `shared.tsx`), laid out as a held card on a recessed ground rather than a
+ * phone pane stretched across a monitor. The keyboard works: Enter continues,
+ * ← goes back, Esc skips once the name is in.
  */
 export function OnboardingDesktop() {
-  const navigate = useNavigate()
-  const { user, saveOnboarding } = useAuth()
-  const tags = useTags()
+  const { pane, index, go, finish, name, setName, nameReady, savingName, submitName } =
+    useOnboardingFlow()
 
-  const [index, setIndex] = React.useState(0)
-  const [answers, setAnswers] = React.useState<OnboardingAnswers>(() =>
-    readOnboardingAnswers(user),
-  )
-  const pane = PANES[index]
-  // Read inside `finish`, which must not be re-created as panes change.
-  const paneRef = React.useRef(pane)
-  paneRef.current = pane
-
-  const go = React.useCallback((delta: number) => {
-    setIndex((i) => Math.min(PANES.length - 1, Math.max(0, i + delta)))
-  }, [])
-
-  /**
-   * Leaving early still counts as onboarded. The alternative — reopening
-   * this at every launch until it is completed — punishes the person who
-   * already knows what the app is, and they are exactly the person who
-   * skipped.
-   */
-  const finish = React.useCallback(
-    (prefs: OnboardingAnswers = {}, to: string = ROUTES.dashboard) => {
-      // "Completed" means they reached the end; leaving early is a skip, and
-      // both still count as onboarded.
-      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
-        pane: paneRef.current,
-      })
-      void saveOnboarding({ ...prefs, onboarded: true, onboardedAt: new Date().toISOString() })
-      navigate(to, { replace: true })
-    },
-    [navigate, saveOnboarding],
-  )
-
-  const question = QUESTION_PANES[pane]
-
-  const answer = React.useCallback(
-    (key: keyof OnboardingAnswers, value: string) => {
-      setAnswers((a) => ({ ...a, [key]: value }))
-      // A beat, so the choice is visibly taken before the pane moves on.
-      window.setTimeout(() => go(1), 220)
-    },
-    [go],
-  )
-
-  // The pane's own primary action, so Enter and the button agree on what
-  // "continue" means here.
-  const advance = React.useCallback(() => {
-    if (pane === 'offer' || question) return
-    go(1)
-  }, [go, pane, question])
-
-  const canGoBack = index > 0 && pane !== 'tailoring' && pane !== 'offer'
-  const canSkip = pane !== 'tailoring' && pane !== 'offer'
+  const canGoBack = pane === 'tour'
+  const canSkip = pane === 'tour'
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key === 'Enter' || e.key === 'ArrowRight') {
-        advance()
-        return
-      }
-      if (e.key === 'ArrowLeft' && canGoBack) {
-        go(-1)
-        return
-      }
-      if (e.key === 'Escape' && canSkip) {
-        finish(answers)
-        return
-      }
-      // 1–9 answer the question panes.
-      if (question && /^[1-9]$/.test(e.key)) {
-        const option = question.options[Number(e.key) - 1]
-        if (option) answer(question.key, option.value)
-      }
+      // The name pane is a form: Enter there is handled by its submit, and
+      // arrows belong to the text field.
+      if (pane !== 'tour') return
+      if (e.key === 'Enter' || e.key === 'ArrowRight') go(1)
+      else if (e.key === 'ArrowLeft' && canGoBack) go(-1)
+      else if (e.key === 'Escape' && canSkip) finish()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [advance, answer, answers, canGoBack, canSkip, finish, go, question])
+  }, [canGoBack, canSkip, finish, go, pane])
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-bg-sunken">
@@ -135,8 +52,8 @@ export function OnboardingDesktop() {
         <Progress step={index} total={PANES.length} />
         <div className="flex w-32 justify-end">
           {canSkip && (
-            <Button variant="ghost" size="sm" onClick={() => finish(answers)}>
-              Skip setup
+            <Button variant="ghost" size="sm" onClick={() => finish()}>
+              Skip
               <Kbd>Esc</Kbd>
             </Button>
           )}
@@ -146,37 +63,25 @@ export function OnboardingDesktop() {
       <main className="flex flex-1 items-center justify-center px-6 pb-10 pt-2">
         <div
           key={pane}
-          className="turn-in w-full max-w-3xl overflow-hidden rounded-xl border bg-card shadow-sm"
+          className={cn(
+            'turn-in w-full overflow-hidden rounded-xl border bg-card shadow-sm',
+            pane === 'offer' ? 'max-w-3xl' : 'max-w-lg',
+          )}
         >
-          {pane === 'welcome' && <Welcome onStart={() => go(1)} />}
-
-          {(pane === 'capture' || pane === 'reconnect' || pane === 'pipeline') && (
-            <Feature {...FEATURES[pane]} onNext={() => go(1)} onBack={() => go(-1)} />
-          )}
-
-          {question && (
-            <Question
-              question={question}
-              selected={answers[question.key]}
-              onSelect={(value) => answer(question.key, value)}
-              onBack={canGoBack ? () => go(-1) : undefined}
+          {pane === 'name' && (
+            <NamePane
+              name={name}
+              onChange={setName}
+              ready={nameReady}
+              saving={savingName}
+              onSubmit={() => void submitName()}
             />
           )}
 
-          {pane === 'tailoring' && (
-            <Tailoring
-              answers={answers}
-              existingTags={tags}
-              onSave={saveOnboarding}
-              onDone={() => go(1)}
-            />
-          )}
+          {pane === 'tour' && <Tour name={name} onNext={() => go(1)} onBack={() => go(-1)} />}
 
           {pane === 'offer' && (
-            <Offer
-              onDone={() => finish(answers)}
-              onSeeAllPlans={() => finish(answers, ROUTES.subscription)}
-            />
+            <Offer onDone={() => finish()} onSeeAllPlans={() => finish(ROUTES.subscription)} />
           )}
         </div>
       </main>
@@ -245,217 +150,97 @@ function Actions({
   )
 }
 
-function Welcome({ onStart }: { onStart: () => void }) {
+function NamePane({
+  name,
+  onChange,
+  ready,
+  saving,
+  onSubmit,
+}: {
+  name: string
+  onChange: (name: string) => void
+  ready: boolean
+  saving: boolean
+  onSubmit: () => void
+}) {
   return (
-    <>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (ready) onSubmit()
+      }}
+    >
       <div className="px-10 py-12 text-center">
-        <p className="text-label text-muted-foreground">Welcome to Retrn</p>
-        <h1 className="mx-auto mt-4 max-w-xl text-4xl font-semibold leading-[1.1] tracking-[-0.03em]">
-          You met them. Now what?
+        <h1 className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em]">
+          Welcome to Retrn.
         </h1>
-        <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary">
-          Retrn keeps the people you meet, and tells you when to reach back out — so the
-          conversation you had in September still counts in March.
-        </p>
-
-        {/* What the next three screens cover, so the flow announces its own
-            length instead of asking for open-ended patience. */}
-        <div className="mt-8 flex items-center justify-center gap-2.5">
-          {['Capture', 'Follow up', 'Follow through'].map((label, i) => (
-            <React.Fragment key={label}>
-              {i > 0 && <span className="h-1 w-1 rounded-full bg-border" aria-hidden />}
-              <span className="text-xs text-muted-foreground">{label}</span>
-            </React.Fragment>
-          ))}
-        </div>
+        <p className="mt-3 text-[15px] text-text-secondary">What should we call you?</p>
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Your name"
+          aria-label="Your name"
+          autoComplete="name"
+          maxLength={80}
+          className="mx-auto mt-7 h-11 max-w-xs text-center text-[15px]"
+        />
       </div>
-      <Actions hint="About a minute — four questions, then you’re in.">
-        <Button onClick={onStart}>
-          Get started
-          <Kbd>↵</Kbd>
+      <Actions>
+        <Button type="submit" disabled={!ready}>
+          {saving ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Saving…
+            </>
+          ) : (
+            <>
+              Continue
+              <Kbd>↵</Kbd>
+            </>
+          )}
         </Button>
       </Actions>
-    </>
+    </form>
   )
 }
 
-function Feature({
-  eyebrow,
-  title,
-  body,
-  visual,
+function Tour({
+  name,
   onNext,
   onBack,
 }: {
-  eyebrow: string
-  title: string
-  body: string
-  visual: React.ReactNode
+  name: string
   onNext: () => void
   onBack: () => void
 }) {
+  const first = firstName(name)
   return (
     <>
-      {/* Words and picture side by side — the one thing a phone pane can't do. */}
-      <div className="grid gap-8 px-10 py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:items-center">
-        <div>
-          <p className="text-label text-muted-foreground">{eyebrow}</p>
-          <h2 className="mt-2 text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">{title}</h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-text-secondary">{body}</p>
-        </div>
-        <Stage>{visual}</Stage>
+      <div className="px-10 py-10">
+        <h2 className="text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">
+          {first ? `Nice to meet you, ${first}.` : 'Nice to meet you.'}
+        </h2>
+        <p className="mt-2 text-[15px] text-text-secondary">Here’s what Retrn does.</p>
+
+        <ul className="mt-6 space-y-2.5">
+          {TOUR.map(({ icon: Icon, title, detail }) => (
+            <li key={title} className="flex items-center gap-3.5 rounded-lg border px-4 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand/[0.09] text-brand">
+                <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{title}</span>
+                <span className="block text-xs text-muted-foreground">{detail}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
       <Actions onBack={onBack}>
         <Button onClick={onNext}>
           Continue
           <Kbd>↵</Kbd>
-        </Button>
-      </Actions>
-    </>
-  )
-}
-
-function Question({
-  question,
-  selected,
-  onSelect,
-  onBack,
-}: {
-  question: OnboardingQuestion<never>
-  selected?: string
-  onSelect: (value: string) => void
-  onBack?: () => void
-}) {
-  return (
-    <>
-      <div className="px-10 py-10">
-        <p className="text-label text-muted-foreground">{question.eyebrow}</p>
-        <h2 className="mt-2 text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">
-          {question.prompt}
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">{question.caption}</p>
-
-        {/* Two columns: four options are one glance on a laptop, not a scroll. */}
-        <div
-          role="radiogroup"
-          aria-label={question.prompt}
-          className="mt-6 grid gap-2.5 sm:grid-cols-2"
-        >
-          {question.options.map((option, i) => {
-            const active = selected === option.value
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => onSelect(option.value)}
-                className={cn(
-                  'group flex items-start gap-3 rounded-lg border p-4 text-left',
-                  'transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-                  active
-                    ? 'border-brand bg-brand/[0.06]'
-                    : 'hover:border-border-strong hover:bg-accent/40',
-                )}
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    'mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border text-[11px] font-medium',
-                    active
-                      ? 'border-brand bg-brand text-brand-foreground'
-                      : 'text-muted-foreground group-hover:border-border-strong',
-                  )}
-                >
-                  {active ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{option.label}</span>
-                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                    {option.detail}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      {/* No button: picking an option is what moves the flow on. */}
-      <Actions onBack={onBack} hint="Pick one — or press its number." />
-    </>
-  )
-}
-
-function Tailoring({
-  answers,
-  existingTags,
-  onSave,
-  onDone,
-}: {
-  answers: OnboardingAnswers
-  existingTags: Tag[] | undefined
-  onSave: (prefs: OnboardingAnswers & { onboarded: boolean }) => Promise<{ error: string | null }>
-  onDone: () => void
-}) {
-  const { saveState, tagState, finished, failed, tagLabel } = useTailoringRun({
-    answers,
-    existingTags,
-    onSave,
-  })
-
-  return (
-    <>
-      <div className="px-10 py-10">
-        <h2 className="text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">
-          {!finished ? 'Setting up Retrn.' : failed ? 'That didn’t save.' : 'Retrn is set up.'}
-        </h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-text-secondary">
-          {!finished
-            ? 'One moment — this is writing to your account, not pretending to.'
-            : failed
-              ? 'Nothing was written. Carry on — you can set all of this from Settings, and running onboarding again will retry it.'
-              : 'Everything below is already in your account. All of it is editable later.'}
-        </p>
-
-        <div className="mt-6 divide-y divide-border/50 rounded-lg border px-4 py-1">
-          <SetupLine
-            state={saveState}
-            label={
-              saveState === 'failed'
-                ? 'Couldn’t save your answers'
-                : 'Saved what you’re working toward'
-            }
-          />
-          <SetupLine
-            state={tagState}
-            label={tagState === 'failed' ? 'Couldn’t add your tags' : tagLabel}
-          />
-        </div>
-
-        {finished && !failed && (
-          <div className="turn-in mt-3 rounded-lg bg-bg-sunken p-4">
-            <p className="text-xs text-muted-foreground">From here on</p>
-            <p className="mt-1 text-sm leading-snug">
-              Everyone you add starts with a reconnect goal of{' '}
-              <span className="font-semibold">{cadenceLabel(answers.cadence)}</span>
-              {answers.cadence === 'none' ? '' : ', so nobody goes quiet without Retrn saying so'}.
-            </p>
-          </div>
-        )}
-      </div>
-      <Actions>
-        <Button disabled={!finished} onClick={onDone}>
-          {finished ? (
-            <>
-              Continue
-              <Kbd>↵</Kbd>
-            </>
-          ) : (
-            <>
-              <Loader2 className="animate-spin" />
-              Setting up…
-            </>
-          )}
         </Button>
       </Actions>
     </>
@@ -507,10 +292,6 @@ function Offer({ onDone, onSeeAllPlans }: { onDone: () => void; onSeeAllPlans: (
           <h2 className="mt-2 text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">
             Cheaper than the coffee.
           </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-text-secondary">
-            A coffee chat costs you about six dollars and most of an afternoon. Retrn costs less
-            than that per month — and it is the part that makes sure the afternoon was worth it.
-          </p>
 
           {/* The comparison, made literally: side by side, so the two numbers
               are read against each other rather than one after the other. */}
