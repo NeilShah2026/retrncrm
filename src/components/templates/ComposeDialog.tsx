@@ -36,7 +36,7 @@ import { useMyName } from '@/hooks/useMyName'
 import { TEMPLATE_CATEGORIES } from '@/lib/constants'
 import { buildMailto, contactMergeSource, mergeTemplate } from '@/lib/templates'
 import { fullName } from '@/lib/format'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { draftOutreach } from '@/lib/ai/outreach'
 import type { Contact } from '@/types'
 
@@ -131,7 +131,9 @@ export function ComposeDialog({
       setEdited(true)
       toast.success('Draft written — read it before you send it.')
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         setAiOff(true)
         toast.info('AI isn’t set up here — the template is still ready to send.')
       } else {

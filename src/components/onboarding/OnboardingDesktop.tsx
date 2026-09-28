@@ -25,17 +25,22 @@ import { cn } from '@/lib/utils'
  * ← goes back, Esc skips once the name is in.
  */
 export function OnboardingDesktop() {
-  const { pane, index, go, finish, name, setName, nameReady, savingName, submitName } =
+  const { pane, index, go, finish, name, setName, mustName, nameReady, savingName, submitName } =
     useOnboardingFlow()
 
   const canGoBack = pane === 'tour'
-  const canSkip = pane === 'tour'
+  // Sign in with Apple accounts may skip the name (see nameRequired).
+  const canSkip = pane === 'tour' || (pane === 'name' && !mustName)
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       // The name pane is a form: Enter there is handled by its submit, and
       // arrows belong to the text field.
+      if (pane === 'name') {
+        if (e.key === 'Escape' && canSkip) finish()
+        return
+      }
       if (pane !== 'tour') return
       if (e.key === 'Enter' || e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft' && canGoBack) go(-1)
@@ -254,7 +259,7 @@ function Offer({ onDone, onSeeAllPlans }: { onDone: () => void; onSeeAllPlans: (
     edu,
     canPurchase,
     student,
-    yearly,
+    price,
     perMonth,
     busy,
     restoring,
@@ -293,28 +298,21 @@ function Offer({ onDone, onSeeAllPlans }: { onDone: () => void; onSeeAllPlans: (
             Cheaper than the coffee.
           </h2>
 
-          {/* The comparison, made literally: side by side, so the two numbers
-              are read against each other rather than one after the other. */}
-          <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-lg border">
-            <div className="px-4 py-4">
-              <p className="text-xs text-muted-foreground">One coffee chat</p>
-              <p className="tnum mt-1.5 text-2xl font-medium leading-none text-text-muted">~$6</p>
-              <p className="mt-2 text-xs leading-snug text-muted-foreground">
-                Gone by the end of the week
-              </p>
-            </div>
-            <div className="border-l px-4 py-4">
-              <p className="text-xs text-text-secondary">Retrn, a month</p>
-              <p className="tnum mt-1.5 text-[28px] font-semibold leading-none tracking-[-0.02em]">
-                $4.17
-              </p>
-              <p className="mt-2 text-xs leading-snug text-text-secondary">
-                Every chat you’ve ever had, kept
-              </p>
-            </div>
+          {/* The price as billed is the biggest number here — Guideline
+              3.1.2 — with the per-month figure beneath it, never above it. */}
+          <div className="mt-6 rounded-lg border px-4 py-4">
+            <p className="flex items-baseline gap-1.5">
+              <span className="tnum text-[28px] font-semibold leading-none tracking-[-0.02em]">
+                {price}
+              </span>
+              <span className="text-sm text-text-secondary">per year</span>
+            </p>
+            <p className="mt-2 text-xs leading-snug text-text-secondary">
+              {perMonth ? `${perMonth} — less than one coffee chat a month.` : '1 year, auto-renewing.'}
+            </p>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {yearly.display} per year — {perMonth}. Auto-renews until cancelled.
+            Renews every year at {price} until cancelled.
           </p>
         </div>
 
@@ -371,7 +369,7 @@ function Offer({ onDone, onSeeAllPlans }: { onDone: () => void; onSeeAllPlans: (
           {needsEdu
             ? 'See plans'
             : canPurchase
-              ? `Start Student — ${yearly.display}/year`
+              ? `Start Student — ${price}/year`
               : 'Available at launch'}
           {!busy && !needsEdu && canPurchase && <ArrowRight />}
         </Button>

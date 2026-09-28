@@ -27,7 +27,7 @@ import { contactRepo } from '@/services'
 import { CONNECTION_TYPES, INTERACTION_TYPES } from '@/lib/constants'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { fullName, formatDate, renderMarkdown } from '@/lib/format'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { generateTalkingPoints } from '@/lib/ai/prep'
 
 interface Props {
@@ -95,7 +95,9 @@ ${suggested}` : suggested))
       setDirty(true)
       toast.success('Suggestions added — edit them, then save.')
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         setAiOff(true)
       } else {
         console.error(err)

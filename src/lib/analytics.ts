@@ -209,6 +209,7 @@ export type AnalyticsEvent =
   | 'checkout_started'
   | 'subscription_active'
   | 'school_email_verified'
+  | 'ai_consent_changed'
   /** The QR card funnel, from a stranger's scan to an account. */
   | 'card_viewed'
   | 'card_contact_saved'

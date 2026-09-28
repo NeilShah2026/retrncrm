@@ -448,6 +448,10 @@ export async function generateBriefing(
     system: SYSTEM,
     maxTokens: 500,
     signal: options.signal,
+    // Built when the dashboard loads, so it never asks for AI permission —
+    // the rules-based list stands in until the account has given it. The
+    // refresh button (`force`) is a tap, so that one may ask.
+    background: !options.force,
     messages: [{ role: 'user', content: `It is now ${now}.\n\n${sections.join('\n\n')}` }],
   })
 

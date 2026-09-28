@@ -1,10 +1,12 @@
 import * as React from 'react'
+import { Link } from 'react-router-dom'
 import { Check, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { track } from '@/lib/analytics'
+import { ROUTES } from '@/lib/routes'
 import { sendHandoff } from '@/lib/sharedCard'
 import type { ShareProfile } from '@/lib/shareProfile'
 
@@ -151,6 +153,17 @@ export function SendBackForm({
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+
+      {/* Said where the details are typed, because the person typing them
+          has no account and has never seen our Privacy Policy. */}
+      <p className="text-xs text-muted-foreground">
+        What you send goes only to {firstName}’s Retrn account, and is kept until they delete
+        it. See the{' '}
+        <Link to={ROUTES.privacy} className="text-brand">
+          Privacy Policy
+        </Link>
+        .
+      </p>
 
       <div className="flex gap-2">
         <Button type="submit" loading={busy} disabled={!name.trim()} className="flex-1">

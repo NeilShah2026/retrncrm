@@ -22,7 +22,7 @@ import { useKeyboardOpen } from '@/hooks/useKeyboardOpen'
 import { contactRepo } from '@/services'
 import { captureFields, parseSpokenContact } from '@/lib/voiceParse'
 import type { ParsedCapture } from '@/lib/voiceParse'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { refineCapture } from '@/lib/ai/capture'
 import type { CaptureRefinement } from '@/lib/ai/capture'
 import { ensureTags } from '@/lib/tagging'
@@ -149,7 +149,9 @@ export function VoiceCaptureDialog({ open, onOpenChange, onSaved }: Props) {
       )
       setAi({ source: sentence, refinement: result })
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         setAiOff(true)
       } else {
         console.error(err)

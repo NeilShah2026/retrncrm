@@ -35,8 +35,19 @@ export function OnboardingFlow() {
 }
 
 function PhoneOnboarding() {
-  const { pane, index, back, go, finish, name, setName, nameReady, savingName, submitName } =
-    useOnboardingFlow()
+  const {
+    pane,
+    index,
+    back,
+    go,
+    finish,
+    name,
+    setName,
+    mustName,
+    nameReady,
+    savingName,
+    submitName,
+  } = useOnboardingFlow()
 
   return (
     // `h-[100dvh]`, not `min-h`: the pinned action at the foot of every pane
@@ -47,8 +58,9 @@ function PhoneOnboarding() {
         step={index}
         total={PANES.length}
         onBack={pane === 'tour' ? () => go(-1) : undefined}
-        // No skip on the name pane: the name is the one thing we ask for.
-        onSkip={pane === 'tour' ? () => finish() : undefined}
+        // No skip on the name pane when the name is required — the one thing
+        // we ask for. Sign in with Apple accounts may skip it (see nameRequired).
+        onSkip={pane === 'tour' || (pane === 'name' && !mustName) ? () => finish() : undefined}
       />
 
       <div
@@ -316,7 +328,7 @@ function Offer({
     edu,
     canPurchase,
     student,
-    yearly,
+    price,
     perMonth,
     busy,
     restoring,
@@ -355,7 +367,7 @@ function Offer({
             {needsEdu
               ? 'See plans'
               : canPurchase
-                ? `Start Student — ${yearly.display}/year`
+                ? `Start Student — ${price}/year`
                 : 'Available at launch'}
           </CapsuleButton>
           {needsEdu && (
@@ -399,34 +411,22 @@ function Offer({
         Cheaper than the coffee.
       </h2>
 
-      {/* The comparison, made literally: side by side, so the two numbers are
-          read against each other rather than one after the other. The
-          emphasis is type weight and size, not colour — the whole argument is
-          that one of these is visibly smaller than the other. */}
-      <div className="mt-7 grid grid-cols-2 overflow-hidden rounded-[18px] bg-bg-sunken ring-1 ring-inset ring-border/60">
-        {/* No strikethrough on the coffee: $4.17 is not a discount off $6,
-            it is a different thing that costs less. The emphasis is carried
-            by weight and size, which is the honest version of the claim. */}
-        <div className="px-4 py-4">
-          <p className="text-ios-caption text-muted-foreground">One coffee chat</p>
-          <p className="tnum mt-1.5 text-[25px] font-medium leading-none text-text-muted">~$6</p>
-          <p className="text-ios-caption mt-2 leading-snug text-muted-foreground">
-            Gone by the end of the week
-          </p>
-        </div>
-        <div className="border-l border-border/60 px-4 py-4">
-          <p className="text-ios-caption text-text-secondary">Retrn, a month</p>
-          <p className="tnum mt-1.5 text-[31px] font-semibold leading-none tracking-[-0.02em] text-foreground">
-            $4.17
-          </p>
-          <p className="text-ios-caption mt-2 leading-snug text-text-secondary">
-            Every chat you’ve ever had, kept
-          </p>
-        </div>
+      {/* The price as billed is the biggest number on the screen — Guideline
+          3.1.2 — with the per-month figure beneath it, never above it. */}
+      <div className="mt-7 rounded-[18px] bg-bg-sunken px-4 py-4 ring-1 ring-inset ring-border/60">
+        <p className="flex items-baseline gap-1.5">
+          <span className="tnum text-[31px] font-semibold leading-none tracking-[-0.02em] text-foreground">
+            {price}
+          </span>
+          <span className="text-ios-subhead text-text-secondary">per year</span>
+        </p>
+        <p className="text-ios-caption mt-2 leading-snug text-text-secondary">
+          {perMonth ? `${perMonth} — less than one coffee chat a month.` : '1 year, auto-renewing.'}
+        </p>
       </div>
 
       <p className="text-ios-caption mt-2.5 px-1 text-muted-foreground">
-        {yearly.display} per year — {perMonth}. Auto-renews until cancelled.
+        Renews every year at {price} until cancelled.
       </p>
 
       <ul className="mt-7 space-y-2.5">

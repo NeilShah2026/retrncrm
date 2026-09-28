@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SuggestedBadge } from '@/components/ui/badge'
 import { useFeatureGate } from '@/hooks/useFeatureGate'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import {
   draftColdEmail,
   reviewColdEmail,
@@ -98,7 +98,9 @@ export function ColdEmailEditor({ target, sender }: { target: ColdTarget; sender
       track('cold_email_drafted', { follow_up: isFollowUp, has_hook: Boolean(target.hook) })
       toast.success('Draft written — read it before you send it.')
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         setAiOff(true)
         toast.info('Drafting isn’t set up here. You can still write it yourself.')
       } else {
@@ -122,7 +124,9 @@ export function ColdEmailEditor({ target, sender }: { target: ColdTarget; sender
       setReview({ result, of: `${subject}\n${body}` })
       track('cold_email_reviewed', { verdict: result.verdict, issues: result.issues.length })
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         setAiOff(true)
         toast.info('Reviews aren’t set up here.')
       } else {

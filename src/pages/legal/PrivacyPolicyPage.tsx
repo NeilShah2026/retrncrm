@@ -57,9 +57,10 @@ export function PrivacyPolicyPage() {
         <UL
           items={[
             <>
-              <Strong>Account information.</Strong> Your email address and a
+              <Strong>Account information.</Strong> Your email address, a
               password (stored only as a salted hash by our authentication
-              provider). If you sign in with Google or Apple, we receive the name,
+              provider), and the name you give us when you set up your account.
+              If you sign in with Google or Apple, we receive the name,
               email address, and profile photo URL that provider shares with us;
               if you use Apple&rsquo;s &ldquo;Hide My Email,&rdquo; we receive only
               the relay address.
@@ -69,6 +70,8 @@ export function PrivacyPolicyPage() {
               your own shareable profile: name, headline, company, school,
               graduation year, major, LinkedIn URL, X/Twitter handle, website,
               email, and phone number, and the college you select in the app.
+              When you open your card in the app, these details are published
+              at a public link (see Section 7.2).
             </>,
             <>
               <Strong>Contacts and network data.</Strong> Information you enter
@@ -80,9 +83,12 @@ export function PrivacyPolicyPage() {
             </>,
             <>
               <Strong>Other content you create.</Strong> Calendar meetings
-              (title, description, location, time, attendees from your contacts),
-              recruiting-pipeline opportunities (company, role, stage, deadlines,
-              links, notes), outreach templates, and tags.
+              (title, description, location, time, attendees from your contacts,
+              and meeting notes), recruiting-pipeline opportunities (company,
+              role, stage, deadlines, links, notes), outreach templates, tags,
+              and cold-email outreach: the people you plan to write to (name,
+              email, company, role, LinkedIn URL, and your notes), your drafts,
+              and the dates you log as sent or replied to.
             </>,
             <>
               <Strong>Follow-ups and key dates.</Strong> Reminders you set to get
@@ -136,9 +142,11 @@ export function PrivacyPolicyPage() {
               session, theme preference, and a few interface preferences (like
               dismissed banners and cached results) in your browser&rsquo;s local
               storage or, in the iOS app, in the app&rsquo;s private on-device
-              storage. The website also uses a service worker to cache the app
-              shell so it loads quickly and works offline. None of this is used
-              for advertising or cross-site tracking.
+              storage. On the website, our analytics provider also sets a
+              first-party cookie to recognise your browser between visits. The
+              website uses a service worker to cache the app shell so it loads
+              quickly and works offline. None of this is used for advertising or
+              cross-site tracking.
             </>,
           ]}
         />
@@ -176,6 +184,14 @@ export function PrivacyPolicyPage() {
               <em>their</em> account, not yours. See Section 6.
             </>,
             <>
+              <Strong>People who scan your card.</Strong> Someone who opens your
+              card link can send you their own details without a Retrn account:
+              their name and, if they choose, email, phone, company, headline,
+              school, a note, and where and when you met. These go only to your
+              account, where you can add them as a contact or delete them. We
+              also count how many times your card is opened and saved.
+            </>,
+            <>
               <Strong>The browser extension</Strong>, when you use it on Gmail,
               Outlook, or LinkedIn (see Section 5).
             </>,
@@ -196,7 +212,8 @@ export function PrivacyPolicyPage() {
             <>
               <Strong>Power optional AI features</Strong> such as smart capture,
               the daily briefing, the assistant, outreach drafts, coffee-chat
-              prep, and tag suggestions (see Section 4).
+              prep, cold-email drafting and review, business card reading, and tag
+              suggestions (see Section 4).
             </>,
             <>
               <Strong>Verify eligibility</Strong> for student or school-based
@@ -242,11 +259,19 @@ export function PrivacyPolicyPage() {
         <H3>4.1 AI features</H3>
         <P>
           Retrn&rsquo;s AI features are designed to help you act on your own
-          network. When you use one, or when a screen that includes one loads
-          (for example, the daily briefing on your dashboard or smart capture
-          after you dictate a contact), Retrn sends the text needed for that task
-          through our server to a third-party large language model provider. That
-          text can include:
+          network. <Strong>They are off until you allow them.</Strong> The first
+          time you use one, Retrn asks for your permission and explains what is
+          sent and to whom; until you agree, nothing is sent to an AI provider and
+          the app uses its non-AI versions instead (for example, a rules-based
+          daily list). You can turn AI features off at any time in{' '}
+          <em>Settings → Privacy → AI features</em>.
+        </P>
+        <P>
+          Once you have allowed them, when you use an AI feature, or when a
+          screen that includes one loads (for example, the daily briefing on your
+          dashboard or smart capture after you dictate a contact), Retrn sends
+          the text needed for that task through our server to a third-party large
+          language model provider. That text can include:
         </P>
         <UL
           items={[
@@ -265,7 +290,9 @@ export function PrivacyPolicyPage() {
           results are returned to your device. Under the commercial terms that
           govern this access, the model provider does not use these inputs or
           outputs to train its models. We do not use your content to train AI
-          models either.
+          models either. We keep a daily count of how many AI requests your
+          account makes, to enforce plan limits; it does not include what was
+          sent.
         </P>
         <P>
           AI output can be wrong. Nothing an AI feature proposes is saved to your
@@ -478,9 +505,11 @@ export function PrivacyPolicyPage() {
           items={[
             <>
               <Strong>Your shareable profile / QR code.</Strong> The profile
-              details you choose to include are encoded into the link, so anyone
-              you share it with (or who scans your code) can see them and add you
-              to their own Retrn network.
+              details you choose to include are published at a public link on{' '}
+              {LEGAL.site} when you open your card in the app, so anyone with the
+              link or your QR code can see them and add you to their own
+              contacts. Remove a detail from your profile and it is removed from
+              the card; deleting your account deletes the card.
             </>,
             <>
               <Strong>Calendar subscription feed.</Strong> If you turn on the
@@ -563,8 +592,13 @@ export function PrivacyPolicyPage() {
               and everything in it, immediately and from inside the app — no
               request and no waiting period. When an account is deleted, all of
               its contacts, follow-ups, key dates, meetings, opportunities,
-              templates, tags, calendar feed links, and verification records are
-              deleted with it. If you
+              templates, tags, cold-email records, your published card and the
+              details people sent through it, calendar feed links, and
+              verification records are deleted with it. A subscription bought on
+              the website is cancelled at the same time. A subscription bought in
+              the iOS app is billed by Apple, and Apple does not let us cancel it:
+              cancel it in your Apple Account settings, or it will keep renewing.
+              If you
               would rather we did it for you, email{' '}
               <Mail to={LEGAL.emails.privacy} /> from the address on your account
               and we will delete it within 30 days.
@@ -605,7 +639,8 @@ export function PrivacyPolicyPage() {
             <>
               <Strong>Withdraw permissions</Strong> for the camera, photo library,
               contacts, microphone, speech recognition, and notifications in your
-              device settings. The rest of Retrn keeps working.
+              device settings, and for AI features in{' '}
+              <em>Settings → Privacy</em>. The rest of Retrn keeps working.
             </>,
             <>
               <Strong>Opt out</Strong> of marketing emails using the unsubscribe

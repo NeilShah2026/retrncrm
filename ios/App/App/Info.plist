@@ -65,15 +65,17 @@
 	     question on every upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- Taking or choosing a contact's photo (ContactFormDialog). -->
+	<!-- Scanning a business card or a Retrn QR code (ScanCardPage), and taking
+	     a contact's photo (ContactFormDialog). -->
 	<key>NSCameraUsageDescription</key>
-	<string>Retrn uses your camera to scan someone's Retrn QR code, and to take a photo for a contact.</string>
+	<string>Retrn uses your camera to scan business cards and Retrn QR codes, and to take a photo for a contact.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Retrn uses your photo library so you can choose a photo for someone in your contacts.</string>
-	<!-- Say-who-you-met voice capture and dictation in the assistant
-	     (src/components/contacts/VoiceCaptureDialog.tsx, src/hooks/useSpeechRecognition.ts). -->
+	<string>Retrn uses your photo library so you can choose a photo for someone in your contacts, or a business card to scan.</string>
+	<!-- Importing people from the address book (only the ones picked). -->
 	<key>NSContactsUsageDescription</key>
 	<string>Retrn reads your contacts so you can choose people to add to your network. Only the people you pick are saved.</string>
+	<!-- Say-who-you-met voice capture and dictation in the assistant
+	     (src/components/contacts/VoiceCaptureDialog.tsx, src/hooks/useSpeechRecognition.ts). -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Retrn uses your microphone so you can add a contact by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

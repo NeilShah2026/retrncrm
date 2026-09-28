@@ -122,6 +122,8 @@ export async function suggestTagsForSubject(
   tags: Tag[],
   exclude: string[] = [],
   signal?: AbortSignal,
+  /** Suggested on its own rather than tapped for — see `AskOptions.background`. */
+  background?: boolean,
 ): Promise<TagSuggestion[]> {
   const name =
     [subject.firstName, subject.lastName].filter(Boolean).join(' ').trim() ||
@@ -133,6 +135,7 @@ export async function suggestTagsForSubject(
 Reply with a single JSON object and nothing else: {"tags": ["…"]}`,
     maxTokens: 200,
     signal,
+    background,
     messages: [
       { role: 'user', content: [name, ...subjectLines(subject)].join('\n') },
     ],

@@ -15,7 +15,7 @@ import { defaultContactFrequency } from '@/lib/onboarding'
 import { parseSpokenContact } from '@/lib/voiceParse'
 import { saveCaptureReminders } from '@/components/reminders/followUpActions'
 import { CardScanError, scanBusinessCard } from '@/lib/ai/cardScan'
-import { AiUnavailableError } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError } from '@/lib/ai/client'
 import { describeDue, dueInSentence } from '@/lib/followUps'
 import { formatKeyDate } from '@/lib/keyDates'
 import { fullName, todayISO } from '@/lib/format'
@@ -67,7 +67,9 @@ export function QuickAddSheet({ open, onOpenChange, onSaved, onCardScanned }: Pr
       // Whatever was already typed about where you met comes along too.
       onCardScanned({ ...fields, whereWeMet: where.trim() || undefined, dateMet: todayISO() })
     } catch (err) {
-      if (err instanceof AiUnavailableError) toast.error('Card scanning isn’t available right now.')
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) toast.error('Card scanning isn’t available right now.')
       else if (err instanceof CardScanError) toast.error(err.message)
       else {
         console.error(err)

@@ -37,6 +37,19 @@ export function initialName(user: User | null | undefined): string {
 }
 
 /**
+ * Whether onboarding may insist on a name.
+ *
+ * Not for Sign in with Apple: Apple offers to share the name as part of its
+ * own sheet, and App Review rejects apps that then require it again. Those
+ * accounts are asked, prefilled where Apple sent a name, but may skip.
+ */
+export function nameRequired(user: User | null | undefined): boolean {
+  const meta = user?.app_metadata ?? {}
+  const providers = (meta.providers as string[] | undefined) ?? [meta.provider as string]
+  return !providers.includes('apple')
+}
+
+/**
  * The reconnect goal a newly added contact starts with. Read by the contact
  * form and the quick capture sheet.
  */

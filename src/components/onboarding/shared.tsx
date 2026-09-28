@@ -5,9 +5,14 @@ import { BellRing, SquareKanban, UserPlus, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { useSubscription } from '@/hooks/useSubscription'
-import { initialName } from '@/lib/onboarding'
+import { initialName, nameRequired } from '@/lib/onboarding'
 import { planById, monthlyEquivalent } from '@/lib/billing/plans'
-import { BillingUnavailableError, purchase, restorePurchases } from '@/lib/billing/store'
+import {
+  BillingUnavailableError,
+  getProducts,
+  purchase,
+  restorePurchases,
+} from '@/lib/billing/store'
 import { isWebBilling, startCheckout } from '@/lib/billing/web'
 import { errorFeedback, successFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
@@ -90,11 +95,16 @@ export function useOnboardingFlow() {
     [navigate, saveOnboarding],
   )
 
-  const nameReady = name.trim().length > 0 && !savingName
+  const mustName = nameRequired(user)
+  const nameReady = (!mustName || name.trim().length > 0) && !savingName
 
   const submitName = React.useCallback(async () => {
     const trimmed = nameRef.current.trim()
-    if (!trimmed) return
+    if (!trimmed) {
+      // Only reachable when the name is optional (Sign in with Apple).
+      go(1)
+      return
+    }
     setSavingName(true)
     const { error } = await updateName(trimmed)
     setSavingName(false)
@@ -103,7 +113,19 @@ export function useOnboardingFlow() {
     go(1)
   }, [go, updateName])
 
-  return { pane, index, back, go, finish, name, setName, nameReady, savingName, submitName }
+  return {
+    pane,
+    index,
+    back,
+    go,
+    finish,
+    name,
+    setName,
+    mustName,
+    nameReady,
+    savingName,
+    submitName,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +145,22 @@ export function useOfferActions(onDone: () => void) {
 
   const student = planById('student')!
   const yearly = student.prices!.yearly
+
+  // What the App Store will actually charge in this storefront. Guideline
+  // 3.1.2 wants the billed amount, localized, as the most prominent price —
+  // not our USD fallback, and not a per-month breakdown of it.
+  const [storePrice, setStorePrice] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    if (isWebBilling || !yearly.appStoreProductId) return
+    let alive = true
+    void getProducts([yearly.appStoreProductId]).then((list) => {
+      if (alive) setStorePrice(list[0]?.price ?? null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [yearly.appStoreProductId])
+  const price = storePrice ?? yearly.display
 
   async function buy() {
     setBusy(true)
@@ -176,7 +214,13 @@ export function useOfferActions(onDone: () => void) {
     canPurchase,
     student,
     yearly,
-    perMonth: monthlyEquivalent(yearly) ?? '',
+    /** The yearly price as billed — localized by the store when there is one. */
+    price,
+    /**
+     * "$4.17/mo, billed yearly" — worked out in US dollars, so only offered
+     * when the price being charged is the US one it was worked out from.
+     */
+    perMonth: price === yearly.display ? (monthlyEquivalent(yearly) ?? '') : '',
     busy,
     restoring,
     buy,

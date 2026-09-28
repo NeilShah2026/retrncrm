@@ -71,15 +71,15 @@ export class StripeError extends Error {
   }
 }
 
-/** Call the Stripe API. GET sends params as a query string, POST as a form. */
+/** Call the Stripe API. GET and DELETE send params as a query string, POST as a form. */
 export async function stripe<T = Record<string, unknown>>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   params: Params = {},
 ): Promise<T> {
   const { secretKey } = stripeEnv()
   const body = encode(params).join('&')
-  const url = `https://api.stripe.com/v1${path}${method === 'GET' && body ? `?${body}` : ''}`
+  const url = `https://api.stripe.com/v1${path}${method !== 'POST' && body ? `?${body}` : ''}`
   const res = await fetch(url, {
     method,
     headers: {

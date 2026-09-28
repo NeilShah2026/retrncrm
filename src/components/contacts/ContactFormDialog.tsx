@@ -73,7 +73,7 @@ import { createId } from '@/lib/utils'
 import { fullName } from '@/lib/format'
 import { parseLinkedIn } from '@/lib/linkedin'
 import { CardScanError, scanBusinessCard } from '@/lib/ai/cardScan'
-import { AiUnavailableError } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError } from '@/lib/ai/client'
 import type {
   Contact,
   ConnectionType,
@@ -314,7 +314,9 @@ export function ContactFormDialog({
           : 'Read the card, but every field it found is already filled.',
       )
     } catch (err) {
-      if (err instanceof AiUnavailableError) {
+      if (err instanceof AiConsentError) {
+        // Declined the AI prompt: nothing to report, and the next tap asks again.
+      } else if (err instanceof AiUnavailableError) {
         toast.error('Card scanning needs the assistant, which isn’t available right now.')
       } else if (err instanceof CardScanError) {
         toast.error(err.message)

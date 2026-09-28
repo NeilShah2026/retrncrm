@@ -32,6 +32,7 @@ import {
 import { ThemeToggle } from './ThemeToggle'
 import { Logo } from './Logo'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
+import { AiConsentPrompt } from '@/components/ai/AiConsentPrompt'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { BillingNotice } from '@/components/billing/BillingNotice'
 import { useUI } from '@/context/ui-context'
@@ -326,6 +327,7 @@ export function AppLayout() {
       </div>
 
       <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
+      <AiConsentPrompt />
       <ExtensionBanner />
     </div>
   )

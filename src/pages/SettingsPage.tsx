@@ -48,6 +48,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { useFeatureGate } from '@/hooks/useFeatureGate'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { deleteAccount } from '@/lib/deleteAccount'
+import { hasAiConsent, setAiConsent } from '@/lib/ai/consent'
 import { isNative } from '@/lib/platform'
 import { ReminderSettingsRow } from '@/components/reminders/ReminderSettingsRow'
 import { LEGAL } from '@/pages/legal/legalInfo'
@@ -116,6 +117,22 @@ export function SettingsPage() {
     }
     track('test_event')
     toast.success('Sent. It shows in PostHog → Activity within a minute.')
+  }
+
+  // Guideline 5.1.2(i): the account's permission to send data to the AI
+  // provider, withdrawable from the same place it is described.
+  const aiOn = hasAiConsent(user)
+  const [aiSaving, setAiSaving] = React.useState(false)
+  async function toggleAi() {
+    setAiSaving(true)
+    const { error } = await setAiConsent(!aiOn)
+    setAiSaving(false)
+    if (error) {
+      toast.error('Couldn’t save that. Try again.')
+      return
+    }
+    track('ai_consent_changed', { granted: !aiOn, from: 'settings' })
+    toast.success(aiOn ? 'AI features turned off' : 'AI features turned on')
   }
 
   function toggleAnalytics() {
@@ -309,11 +326,24 @@ export function SettingsPage() {
           <InsetRow title="Templates" detail={templates.length} chevron={false} last />
         </InsetGroup>
 
-        {isAnalyticsEnabled() && (
-          <InsetGroup
-            title="Privacy"
-            footer="Anonymous counts of which features get used — never your contacts, notes or messages. Off applies to this device."
-          >
+        <InsetGroup
+          title="Privacy"
+          footer={
+            isAnalyticsEnabled()
+              ? 'AI features send the details a feature needs to Anthropic’s Claude. Usage analytics count which features get used, linked to your account — never your contacts, notes or messages, and off applies to this device.'
+              : 'AI features send the details a feature needs to Anthropic’s Claude. Never used to train AI models.'
+          }
+        >
+          <InsetRow
+            title="AI Features"
+            role="switch"
+            checked={aiOn}
+            chevron={false}
+            accessory={<Switch checked={aiOn} />}
+            last={!isAnalyticsEnabled()}
+            onClick={() => !aiSaving && void toggleAi()}
+          />
+          {isAnalyticsEnabled() && (
             <InsetRow
               title="Share Usage Analytics"
               role="switch"
@@ -323,8 +353,8 @@ export function SettingsPage() {
               last
               onClick={toggleAnalytics}
             />
-          </InsetGroup>
-        )}
+          )}
+        </InsetGroup>
 
         <InsetGroup
           title="Backup"
@@ -562,23 +592,41 @@ export function SettingsPage() {
             </PanelSection>
           </Panel>
 
-          {isAnalyticsEnabled() && (
-            <Panel>
-              <PanelHeader>Privacy</PanelHeader>
+          <Panel>
+            <PanelHeader>Privacy</PanelHeader>
+            <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <p className="font-medium">AI features</p>
+                <p className="text-muted-foreground">
+                  Drafting, chat prep, card scanning and the assistant send the details they need
+                  to Anthropic’s Claude. Never used to train AI models.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={aiSaving}
+                onClick={() => void toggleAi()}
+                className="shrink-0"
+              >
+                {aiOn ? 'Turn off' : 'Turn on'}
+              </Button>
+            </PanelSection>
+            {isAnalyticsEnabled() && (
               <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm">
                   <p className="font-medium">Share usage analytics</p>
                   <p className="text-muted-foreground">
-                    Anonymous counts of which features get used, so we know what to improve.
-                    Never your contacts, notes or messages. Applies to this device.
+                    Counts of which features get used, linked to your account, so we know what to
+                    improve. Never your contacts, notes or messages. Applies to this device.
                   </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={toggleAnalytics} className="shrink-0">
                   {analyticsOff ? 'Turn on' : 'Turn off'}
                 </Button>
               </PanelSection>
-            </Panel>
-          )}
+            )}
+          </Panel>
 
           <Panel>
             <PanelHeader>Backup</PanelHeader>
@@ -753,7 +801,18 @@ export function SettingsPage() {
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title="Delete your account?"
-        description="This permanently deletes your Retrn account and every contact, activity, tag, opportunity and template in it. It cannot be undone, and signing in again will not bring it back. Export a backup first if you want to keep any of it."
+        description={
+          <>
+            This permanently deletes your Retrn account and every contact, activity, tag,
+            opportunity and template in it. It cannot be undone, and signing in again will not
+            bring it back. Export a backup first if you want to keep any of it.
+            <span className="mt-2 block">
+              A subscription bought on the website is cancelled with it. One bought in the iPhone
+              app is billed by Apple and keeps renewing until you cancel it in Settings → your
+              name → Subscriptions.
+            </span>
+          </>
+        }
         confirmLabel="Delete my account"
         confirmWord="delete"
         destructive

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { withCors } from './cors.js'
+import { stripe, StripeError } from './stripe.js'
 
 /**
  * Permanent account deletion, as the App Store requires it.
@@ -69,6 +70,35 @@ async function handle(req: Request): Promise<Response> {
 
   // A hard delete, not `shouldSoftDelete` — Apple's requirement is that the
   // account and its data are actually gone, not flagged as inactive.
+  // A web subscription is billed by Stripe, not by the row we are about to
+  // cascade away — deleting the account without cancelling it would keep
+  // charging a card for an account that no longer exists. If Stripe can't be
+  // reached, stop: an account deleted with a live subscription can't be
+  // cancelled from inside the app ever again.
+  const { data: sub } = await admin
+    .from('subscriptions')
+    .select('stripe_subscription_id, status')
+    .eq('user_id', caller.user.id)
+    .maybeSingle()
+  if (
+    sub?.stripe_subscription_id &&
+    ['active', 'trialing', 'past_due', 'incomplete', 'unpaid'].includes(sub.status ?? '')
+  ) {
+    try {
+      await stripe('DELETE', `/subscriptions/${sub.stripe_subscription_id}`)
+    } catch (err) {
+      // Already cancelled on Stripe's side: nothing left to stop.
+      const gone = err instanceof StripeError && err.status === 404
+      if (!gone) {
+        console.error('[delete-account] could not cancel Stripe subscription', err)
+        return json(
+          { error: 'Could not cancel your subscription, so nothing was deleted. Please try again.' },
+          502,
+        )
+      }
+    }
+  }
+
   const { error } = await admin.auth.admin.deleteUser(caller.user.id)
   if (error) {
     console.error('[delete-account] failed', error)

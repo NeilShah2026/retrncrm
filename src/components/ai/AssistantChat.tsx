@@ -22,7 +22,7 @@ import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { askNetwork, startSession } from '@/lib/ai/network'
 import { applyActions } from '@/lib/ai/actions'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { fullName, renderMarkdown } from '@/lib/format'
 import { dismissKeyboard, dismissKeyboardOnDrag } from '@/lib/keyboard'
 import { tapFeedback } from '@/lib/haptics'
@@ -232,7 +232,9 @@ export function AssistantChat() {
         settle({ answer, fellBack: false, chosen: answer.actions.map(() => true) })
       } catch (err) {
         if (epoch.current !== startedAt) return
-        if (err instanceof AiUnavailableError) {
+        if (err instanceof AiConsentError) {
+          // Declined the AI prompt: nothing to report, and the next tap asks again.
+        } else if (err instanceof AiUnavailableError) {
           toast.info('AI isn’t set up here. Showing keyword matches.')
         } else {
           console.error(err)

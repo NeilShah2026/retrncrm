@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { postApi } from '@/lib/apiFetch'
+import { hasAiConsent, requestAiConsent } from './consent'
 
 /**
  * The single client-side door to the model.
@@ -36,6 +37,12 @@ export interface AskOptions {
   /** Server caps this; ask for what the feature actually needs. */
   maxTokens?: number
   signal?: AbortSignal
+  /**
+   * The call wasn't asked for by a tap — the dashboard briefing, tags
+   * suggested as a form fills in. Without AI consent these fail quietly into
+   * their non-AI path instead of putting a permission prompt over the screen.
+   */
+  background?: boolean
 }
 
 /** The deployment has no model configured (or no session) — hide AI affordances. */
@@ -51,6 +58,19 @@ export class AiRequestError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'AiRequestError'
+  }
+}
+
+/**
+ * The account hasn't allowed AI features. A subclass of `AiUnavailableError`
+ * so every caller's existing non-AI fallback applies; callers that switch AI
+ * off for the session on `AiUnavailableError` should not do so for this one,
+ * since the next tap can ask again.
+ */
+export class AiConsentError extends AiUnavailableError {
+  constructor() {
+    super('AI features are off. Turn them on in Settings → Privacy.')
+    this.name = 'AiConsentError'
   }
 }
 
@@ -73,12 +93,18 @@ export async function askClaude({
   messages,
   maxTokens,
   signal,
+  background,
 }: AskOptions): Promise<string> {
   if (unavailable) throw new AiUnavailableError('AI is not available here.')
 
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new AiUnavailableError('Sign in to use AI features.')
+
+  // Nothing leaves for the model provider without the account's permission.
+  if (!hasAiConsent(data.session?.user)) {
+    if (background || !(await requestAiConsent())) throw new AiConsentError()
+  }
 
   let response: Response
   try {

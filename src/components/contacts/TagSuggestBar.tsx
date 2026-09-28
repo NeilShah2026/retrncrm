@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Loader2, Plus, Tags } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTags } from '@/hooks/useData'
-import { AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
+import { AiConsentError, AiUnavailableError, isAiAvailable } from '@/lib/ai/client'
 import { hasTaggableDetail, suggestTagsForSubject } from '@/lib/ai/tagging'
 import {
   ensureTags,
@@ -61,16 +61,18 @@ export function TagSuggestBar({ subject, value, onChange, auto, className }: Pro
   const latest = React.useRef({ subject, tags, value })
   latest.current = { subject, tags, value }
 
-  const run = React.useCallback(async () => {
+  const run = React.useCallback(async (background = false) => {
     const { subject: s, tags: t, value: v } = latest.current
     setLoading(true)
     try {
       const next = aiOff
         ? suggestTagsLocally(s, t, v)
-        : await suggestTagsForSubject(s, t, v)
+        : await suggestTagsForSubject(s, t, v, undefined, background)
       setSuggestions(next)
     } catch (err) {
-      if (err instanceof AiUnavailableError) setAiOff(true)
+      // No AI consent yet isn't "AI is off here": the next tap can still ask.
+      if (err instanceof AiConsentError) void 0
+      else if (err instanceof AiUnavailableError) setAiOff(true)
       else console.error(err)
       // Whatever went wrong, the rules-based pass still has something to say.
       setSuggestions(suggestTagsLocally(s, t, v))
@@ -105,7 +107,7 @@ export function TagSuggestBar({ subject, value, onChange, auto, className }: Pro
     if (!hasTaggableDetail(latest.current.subject)) return
     const timer = setTimeout(() => {
       autoRan.current = true
-      void run()
+      void run(true)
     }, IDLE_BEFORE_SUGGEST_MS)
     return () => clearTimeout(timer)
   }, [auto, fingerprint, run])
