@@ -38,7 +38,7 @@ function buildExampleContact(exampleTagId: string): Contact {
     tagIds: [exampleTagId],
     relationshipStrength: 3,
     lastContactDate: today,
-    contactFrequencyGoal: 'quarterly',
+    contactFrequencyGoal: '90d',
     talkingPoints:
       'Talking points and prep notes show up here — try the "Prep" button above.',
     notes:

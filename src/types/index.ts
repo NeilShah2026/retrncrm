@@ -31,14 +31,11 @@ export interface OtherLink {
   url: string
 }
 
-/** Preset cadence goals. Mapped to concrete day counts in lib/reconnect.ts. */
-export type ContactFrequency =
-  | 'none'
-  | 'weekly'
-  | 'monthly'
-  | 'quarterly'
-  | 'biannually'
-  | 'annually'
+/**
+ * Reconnect cadence: "none", or a number of days between catch-ups ("45d").
+ * Helpers live in lib/constants.ts (frequencyDays, frequencyLabel…).
+ */
+export type ContactFrequency = 'none' | `${number}d`
 
 /** How a person relates to you — tuned for a student's network. */
 export type ConnectionType =

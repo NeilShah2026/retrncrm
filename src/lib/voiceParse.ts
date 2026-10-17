@@ -14,7 +14,7 @@
  */
 
 import { formatDate, todayISO } from './format'
-import { CONNECTION_TYPES, FREQUENCY_OPTIONS, MEET_SOURCES } from './constants'
+import { CONNECTION_TYPES, MEET_SOURCES, frequencyFromDays, frequencyShort } from './constants'
 import { extractFollowUp, type ExtractedFollowUp } from './followUps'
 import { formatKeyDate, parseBirthday } from './keyDates'
 import type { ConnectionType, ContactFrequency, KeyDate, MeetSource } from '@/types'
@@ -121,11 +121,15 @@ const SOURCE_PHRASES: [RegExp, MeetSource][] = [
  * "in a month" is a one-off follow-up (see `extractFollowUp`).
  */
 const CADENCE_PHRASES: [RegExp, ContactFrequency][] = [
-  [/\b(?:every|each) week\b|\bweekly\b/i, 'weekly'],
-  [/\b(?:every|each) month\b|\bmonthly\b/i, 'monthly'],
-  [/\b(?:every|each) (?:quarter|(?:three|3) months)\b|\bquarterly\b/i, 'quarterly'],
-  [/\b(?:every|each) (?:six|6) months\b|\btwice a year\b/i, 'biannually'],
-  [/\b(?:every|each) year\b|\byearly\b|\bannually\b/i, 'annually'],
+  [/\b(?:every|each) (\d+) days\b/i, 'none'], // the number comes from the match
+  [/\b(?:every|each) week\b|\bweekly\b/i, '7d'],
+  [/\b(?:every|each) (?:two|2) weeks\b|\bbiweekly\b/i, '14d'],
+  [/\b(?:every|each) month\b|\bmonthly\b/i, '30d'],
+  [/\b(?:every|each) (?:six|6) weeks\b/i, '45d'],
+  [/\b(?:every|each) (?:two|2) months\b/i, '60d'],
+  [/\b(?:every|each) (?:quarter|(?:three|3) months)\b|\bquarterly\b/i, '90d'],
+  [/\b(?:every|each) (?:six|6) months\b|\btwice a year\b/i, '182d'],
+  [/\b(?:every|each) year\b|\byearly\b|\bannually\b/i, '365d'],
 ]
 
 /** Capitalised words that still can't be part of a person's name. */
@@ -413,8 +417,10 @@ export function parseSpokenContact(input: string): ParsedCapture {
 
   // --- cadence & follow-up -------------------------------------------------
   for (const [re, freq] of CADENCE_PHRASES) {
-    if (re.test(text)) {
-      result.contactFrequencyGoal = freq
+    const match = re.exec(text)
+    if (match) {
+      // "every 45 days" carries its own number; the rest are fixed.
+      result.contactFrequencyGoal = match[1] ? frequencyFromDays(Number(match[1])) : freq
       break
     }
   }
@@ -473,7 +479,7 @@ export function captureFields(p: ParsedCapture): CaptureField[] {
     out.push({
       key: 'contactFrequencyGoal',
       label: 'Catch up',
-      value: FREQUENCY_OPTIONS[p.contactFrequencyGoal]?.short ?? p.contactFrequencyGoal,
+      value: frequencyShort(p.contactFrequencyGoal),
     })
   }
   if (p.followUp) {

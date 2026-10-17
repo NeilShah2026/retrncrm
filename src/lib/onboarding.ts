@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import type { ContactFrequency } from '@/types'
+import { normalizeFrequency } from '@/lib/constants'
 
 /**
  * What onboarding stores on the account.
@@ -10,8 +11,6 @@ import type { ContactFrequency } from '@/types'
  * it is whatever the person typed here.
  */
 
-/** A subset of ContactFrequency: the cadences an earlier onboarding let people pick. */
-type OnboardingCadence = Extract<ContactFrequency, 'monthly' | 'quarterly' | 'biannually' | 'none'>
 
 /** The onboarding keys as they are stored in `user_metadata`. */
 export interface OnboardingPrefs {
@@ -23,7 +22,7 @@ export interface OnboardingPrefs {
    * Written by the old onboarding quiz, which no longer exists. Still read, so
    * accounts that answered it keep the default they chose.
    */
-  cadence?: OnboardingCadence
+  cadence?: string
 }
 
 /**
@@ -54,8 +53,8 @@ export function nameRequired(user: User | null | undefined): boolean {
  * form and the quick capture sheet.
  */
 export function defaultContactFrequency(user: User | null | undefined): ContactFrequency {
-  const cadence = (user?.user_metadata as OnboardingPrefs | undefined)?.cadence
-  return cadence ?? 'none'
+  // Stored by name ("quarterly") by the old quiz.
+  return normalizeFrequency((user?.user_metadata as OnboardingPrefs | undefined)?.cadence)
 }
 
 export function hasOnboarded(user: User | null | undefined): boolean {

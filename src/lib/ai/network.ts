@@ -5,7 +5,6 @@ import { getReconnectStatus } from '@/lib/reconnect'
 import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
-  FREQUENCY_KEYS,
   MEET_SOURCES,
   MEET_SOURCE_KEYS,
   OPPORTUNITY_STAGE_KEYS,
@@ -130,7 +129,7 @@ doesn't give you — never invent a company, title, email, or time:
 {"type":"log_caught_up","person":"Full Name","date":"YYYY-MM-DD"}
 {"type":"add_note","person":"Full Name","text":"…"}
 {"type":"add_tags","person":"Full Name","tagNames":["…"]}
-{"type":"set_followup","person":"Full Name","frequency":"${FREQUENCY_KEYS.join('|')}"}
+{"type":"set_followup","person":"Full Name","frequency":"days between catch-ups, e.g. 30, 45, 60 or 90"}
 {"type":"add_followup","person":"Full Name","dueDate":"YYYY-MM-DD","note":"what to do, as a short to-do"}
 {"type":"add_key_date","person":"Full Name","label":"Birthday","month":3,"day":14,"year":1999}
 {"type":"add_opportunity","company":"…","role":"…","opportunityType":"${OPPORTUNITY_TYPE_KEYS.join('|')}","stage":"${OPPORTUNITY_STAGE_KEYS.join('|')}","deadline":"YYYY-MM-DD","people":["Full Name"]}

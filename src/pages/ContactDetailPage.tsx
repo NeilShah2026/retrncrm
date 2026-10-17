@@ -63,7 +63,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { contactRepo } from '@/services'
 import {
   CONNECTION_TYPES,
-  FREQUENCY_OPTIONS,
+  frequencyLabel,
   INTERACTION_TYPES,
   MEET_SOURCES,
   STRENGTH_LABELS,
@@ -344,7 +344,7 @@ function ContactDetail({ contact }: { contact: Contact }) {
           />
           <InsetRow
             title="Catch-up goal"
-            detail={FREQUENCY_OPTIONS[contact.contactFrequencyGoal].label}
+            detail={frequencyLabel(contact.contactFrequencyGoal)}
             chevron={false}
             onClick={() => edit()}
           />
@@ -757,7 +757,7 @@ function ContactDetail({ contact }: { contact: Contact }) {
                       : 'Never'
                   }
                 />
-                <InfoRow icon={Repeat} label="Cadence" value={FREQUENCY_OPTIONS[contact.contactFrequencyGoal].label} />
+                <InfoRow icon={Repeat} label="Cadence" value={frequencyLabel(contact.contactFrequencyGoal)} />
                 <InfoRow
                   icon={status.overdue ? Clock : CalendarDays}
                   label="Status"

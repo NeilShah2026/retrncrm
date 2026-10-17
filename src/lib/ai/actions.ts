@@ -3,8 +3,8 @@ import { contactRepo, eventRepo, followUpRepo, keyDateRepo, opportunityRepo } fr
 import { ensureTags } from '@/lib/tagging'
 import {
   CONNECTION_TYPE_KEYS,
-  FREQUENCY_KEYS,
-  FREQUENCY_OPTIONS,
+  frequencyLabel,
+  parseFrequency,
   MEET_SOURCE_KEYS,
   OPPORTUNITY_STAGES,
   OPPORTUNITY_STAGE_KEYS,
@@ -286,7 +286,7 @@ function parseAction(raw: Raw): AssistantAction | null {
     case 'set_followup':
     case 'set_follow_up': {
       const person = str(raw.person)
-      const frequency = enumOf(raw.frequency, FREQUENCY_KEYS)
+      const frequency = parseFrequency(raw.frequency)
       if (!person || !frequency) return null
       return { type: 'set_followup', person, frequency }
     }
@@ -414,7 +414,7 @@ export function describeAction(action: AssistantAction): ActionDescription {
     case 'set_followup':
       return {
         label: `Set a catch-up goal for ${action.person}`,
-        detail: FREQUENCY_OPTIONS[action.frequency].label,
+        detail: frequencyLabel(action.frequency),
       }
     case 'add_followup':
       return {
@@ -678,7 +678,7 @@ async function runOne(
       return {
         action,
         status: 'done',
-        message: `${contact.firstName}: ${FREQUENCY_OPTIONS[action.frequency].label.toLowerCase()}`,
+        message: `${contact.firstName}: ${frequencyLabel(action.frequency).toLowerCase()}`,
         route: ROUTES.contact(contact.id),
       }
     }

@@ -14,7 +14,8 @@ import { AssistantLauncher } from '@/components/ai/AssistantLauncher'
 import { NextUp } from '@/components/dashboard/BriefingCard'
 import { NeedsAttention } from '@/components/dashboard/NeedsAttention'
 import { UpcomingMeetings } from '@/components/dashboard/UpcomingMeetings'
-import { ComingUpPanel, FollowUpsPanel } from '@/components/dashboard/FollowUpsPanel'
+import { FollowUpsPanel } from '@/components/dashboard/FollowUpsPanel'
+import { RecentOutreach } from '@/components/dashboard/RecentOutreach'
 import {
   useContacts,
   useContactMap,
@@ -25,6 +26,10 @@ import {
   useTagMap,
 } from '@/hooks/useData'
 import { useUI } from '@/context/ui-context'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { useAuth } from '@/auth/AuthProvider'
+import { displayName } from '@/lib/displayName'
+import { format } from 'date-fns'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { isDue } from '@/lib/followUps'
 import { fullName, formatDateShort, daysSince } from '@/lib/format'
@@ -34,9 +39,14 @@ import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
 
 /**
- * The page people land on. It answers three questions in order: what should I
- * do now, who am I seeing next, and who have I let go quiet — then the slower
- * context underneath.
+ * The page people land on.
+ *
+ * On a laptop it is one screen, no scrolling: a line of numbers, then two
+ * columns — Next up, the one list of everything with a clock on it (meetings,
+ * follow-ups, people gone quiet, deadlines, birthdays) put in order by the AI,
+ * and Recent outreach, who you last talked to — then the pipeline in a line.
+ * Each list scrolls inside its own panel if it runs long, so the page never
+ * does. The phone keeps its stacked layout.
  */
 export function DashboardPage() {
   const contacts = useContacts()
@@ -48,9 +58,14 @@ export function DashboardPage() {
   const tagMap = useTagMap()
   const { openNewContact, openVoiceCapture, openSearch, openImportContacts } = useUI()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
+  const { user } = useAuth()
+  const first = displayName(user).split(/\s+/)[0]
 
   return (
     <PageShell
+      // The laptop layout fits the window and scrolls inside its panels.
+      scrollBody={isMobile}
       mobile={{
         // `pl-2` on top of the bar's own `px-2`: the mark then starts on the
         // same 16px margin as the page's content below it, rather than four
@@ -71,10 +86,7 @@ export function DashboardPage() {
         ),
       }}
       header={
-        <PageHeader
-          title="Dashboard"
-          description="What to do next, who you’re seeing, and who’s gone quiet."
-        >
+        <PageHeader title={`${greeting()}, ${first}`} description={format(new Date(), 'EEEE, MMMM d')}>
           {/* The sidebar already carries the primary "Say who you met";
               the page header offers the form path as the secondary. */}
           <Button variant="outline" onClick={openNewContact}>
@@ -112,17 +124,27 @@ export function DashboardPage() {
           />
         }
       >
-        {(list) => (
-          <DashboardBody
-            contacts={list}
-            opportunities={opportunities}
-            events={events}
-            followUps={followUps ?? []}
-            keyDates={keyDates ?? []}
-            contactMap={contactMap}
-            tagMap={tagMap}
-          />
-        )}
+        {(list) =>
+          isMobile ? (
+            <DashboardBody
+              contacts={list}
+              opportunities={opportunities}
+              events={events}
+              followUps={followUps ?? []}
+              contactMap={contactMap}
+              tagMap={tagMap}
+            />
+          ) : (
+            <DesktopDashboard
+              contacts={list}
+              opportunities={opportunities}
+              events={events}
+              followUps={followUps}
+              keyDates={keyDates}
+              tagMap={tagMap}
+            />
+          )
+        }
       </NetworkGate>
     </PageShell>
   )
@@ -133,7 +155,6 @@ function DashboardBody({
   opportunities,
   events,
   followUps,
-  keyDates,
   contactMap,
   tagMap,
 }: {
@@ -141,7 +162,6 @@ function DashboardBody({
   opportunities: Opportunity[] | undefined
   events: CalendarEvent[] | undefined
   followUps: FollowUp[]
-  keyDates: KeyDate[]
   contactMap: Map<string, Contact>
   tagMap: ReturnType<typeof useTagMap>
 }) {
@@ -170,8 +190,6 @@ function DashboardBody({
         <div className="lg:col-span-2">
           <FollowUpsPanel followUps={followUps} contactMap={contactMap} />
         </div>
-
-        <ComingUpPanel keyDates={keyDates} contactMap={contactMap} />
 
         <div className="lg:col-span-2">
           <NeedsAttention contacts={contacts} />
@@ -271,6 +289,101 @@ function DashboardBody({
   )
 }
 
+function greeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function DesktopDashboard({
+  contacts,
+  opportunities,
+  events,
+  followUps,
+  keyDates,
+  tagMap,
+}: {
+  contacts: Contact[]
+  opportunities: Opportunity[] | undefined
+  events: CalendarEvent[] | undefined
+  followUps: FollowUp[] | undefined
+  keyDates: KeyDate[] | undefined
+  tagMap: ReturnType<typeof useTagMap>
+}) {
+  const stats = computeStats(contacts, events, opportunities, followUps ?? [])
+  const pipeline = computePipelineStats(opportunities)
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 pb-5">
+      <MetricStrip stats={stats} />
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(0,2fr)] grid-rows-[minmax(0,1fr)] gap-4">
+        <NextUp
+          contacts={contacts}
+          opportunities={opportunities ?? []}
+          events={events ?? []}
+          followUps={followUps ?? []}
+          keyDates={keyDates ?? []}
+          tagMap={tagMap}
+          ready={
+            opportunities !== undefined &&
+            events !== undefined &&
+            followUps !== undefined &&
+            keyDates !== undefined
+          }
+          className="min-h-0"
+        />
+        <RecentOutreach contacts={contacts} className="min-h-0" />
+      </div>
+      <PipelineLine pipeline={pipeline} />
+    </div>
+  )
+}
+
+/** The pipeline in one line: counts by stage and the next deadline. */
+function PipelineLine({ pipeline }: { pipeline: PipelineStats }) {
+  const next = pipeline.upcomingDeadlines[0]
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border px-4 py-2.5 text-sm">
+      <span className="font-medium">Pipeline</span>
+      {pipeline.total === 0 ? (
+        <span className="text-muted-foreground">
+          No applications yet.{' '}
+          <Link to={ROUTES.pipelineNew} className="text-brand hover:underline">
+            Add one
+          </Link>
+        </span>
+      ) : (
+        OPPORTUNITY_STAGE_KEYS.filter((stage) => stage !== 'closed' && pipeline.byStage[stage] > 0).map(
+          (stage) => (
+            <Link
+              key={stage}
+              to={ROUTES.pipeline}
+              className="inline-flex items-center gap-1.5 text-text-secondary hover:text-foreground"
+            >
+              <span className={cn('h-1.5 w-1.5 rounded-full', OPPORTUNITY_STAGES[stage].dot)} />
+              {OPPORTUNITY_STAGES[stage].label}
+              <span className="tnum font-medium text-foreground">{pipeline.byStage[stage]}</span>
+            </Link>
+          ),
+        )
+      )}
+      <span className="ml-auto flex items-center gap-3">
+        {next && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Next deadline: <span className="text-foreground">{next.company}</span>{' '}
+            {formatDateShort(next.deadline)}
+          </span>
+        )}
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={ROUTES.pipeline}>Open board</Link>
+        </Button>
+      </span>
+    </div>
+  )
+}
+
 /**
  * The numbers, in one line. Unequal on purpose: contacts and overdue are the
  * two that change what you do today; the rest are context.
@@ -284,19 +397,16 @@ function MetricStrip({ stats }: { stats: Stats }) {
         label={stats.total === 1 ? 'contact' : 'contacts'}
         emphasis
       />
-      {stats.followUpsDue > 0 && (
-        <Metric
-          to={ROUTES.dashboard}
-          value={stats.followUpsDue}
-          label={stats.followUpsDue === 1 ? 'follow-up due' : 'follow-ups due'}
-          emphasis
-          tone="warning"
-        />
-      )}
+      <Metric
+        to={ROUTES.contacts}
+        value={stats.reachedLately}
+        label="reached in 30 days"
+        emphasis
+      />
       <Metric
         to={ROUTES.contactsOverdue}
         value={stats.overdueCount}
-        label="overdue"
+        label="due to reconnect"
         emphasis
         tone={stats.overdueCount > 0 ? 'warning' : undefined}
       />
@@ -350,6 +460,8 @@ interface Stats {
   total: number
   recent: Contact[]
   overdueCount: number
+  /** People last contacted in the past 30 days. */
+  reachedLately: number
   followUpsDue: number
   meetingsThisWeek: number
   openOpportunities: number
@@ -375,6 +487,10 @@ function computeStats(
     total: contacts?.length ?? 0,
     recent: recentSorted.slice(0, 5),
     overdueCount: (contacts ?? []).filter((c) => getReconnectStatus(c).overdue).length,
+    reachedLately: (contacts ?? []).filter((c) => {
+      const days = daysSince(c.lastContactDate)
+      return days !== null && days <= 30
+    }).length,
     followUpsDue: followUps.filter((f) => isDue(f)).length,
     meetingsThisWeek,
     openOpportunities: (opportunities ?? []).filter((o) => o.stage !== 'closed').length,

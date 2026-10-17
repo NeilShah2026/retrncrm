@@ -1,4 +1,5 @@
 import type { Database } from '@/lib/database.types'
+import { normalizeFrequency } from '@/lib/constants'
 import type {
   CalendarEvent,
   ColdSend,
@@ -8,7 +9,6 @@ import type {
   FollowUp,
   KeyDate,
   ConnectionType,
-  ContactFrequency,
   Interaction,
   MeetSource,
   Opportunity,
@@ -53,7 +53,8 @@ export function rowToContact(row: ContactRow): Contact {
     tagIds: row.tag_ids ?? [],
     relationshipStrength: row.relationship_strength,
     lastContactDate: row.last_contact_date ?? undefined,
-    contactFrequencyGoal: row.contact_frequency_goal as ContactFrequency,
+    // Rows written before day-count cadences hold names ("monthly").
+    contactFrequencyGoal: normalizeFrequency(row.contact_frequency_goal),
     notes: row.notes ?? undefined,
     interactions: (row.interactions as Interaction[] | null) ?? [],
     createdAt: row.created_at,

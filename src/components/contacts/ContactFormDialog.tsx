@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { CadenceSelect } from '@/components/contacts/CadenceSelect'
 import { toast } from 'sonner'
 import {
   AlertTriangle,
@@ -62,7 +63,8 @@ import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
   FREQUENCY_KEYS,
-  FREQUENCY_OPTIONS,
+  frequencyLabel,
+  isPresetFrequency,
   MEET_SOURCES,
   MEET_SOURCE_KEYS,
   STRENGTH_LABELS,
@@ -901,7 +903,11 @@ export function ContactFormDialog({
                   allowNone={false}
                   value={form.contactFrequencyGoal}
                   onChange={(v) => set('contactFrequencyGoal', (v || 'none') as ContactFrequency)}
-                  options={FREQUENCY_KEYS.map((k) => ({ value: k, label: FREQUENCY_OPTIONS[k].label }))}
+                  options={[
+                    ...FREQUENCY_KEYS,
+                    // A custom interval set on the laptop stays selectable here.
+                    ...(isPresetFrequency(form.contactFrequencyGoal) ? [] : [form.contactFrequencyGoal]),
+                  ].map((k) => ({ value: k, label: frequencyLabel(k) }))}
                   last
                 />
               </InsetGroup>
@@ -1464,24 +1470,12 @@ export function ContactFormDialog({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Contact goal</Label>
-                    <Select
+                    <Label htmlFor="cadence">Reconnect every</Label>
+                    <CadenceSelect
+                      id="cadence"
                       value={form.contactFrequencyGoal}
-                      onValueChange={(v) =>
-                        set('contactFrequencyGoal', v as ContactFrequency)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FREQUENCY_KEYS.map((k) => (
-                          <SelectItem key={k} value={k}>
-                            {FREQUENCY_OPTIONS[k].label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => set('contactFrequencyGoal', v)}
+                    />
                   </div>
                 </div>
 

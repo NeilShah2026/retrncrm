@@ -33,7 +33,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { contactRepo } from '@/services'
 import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { markCaughtUp } from '@/lib/caughtUp'
-import { FREQUENCY_KEYS, FREQUENCY_OPTIONS, TEMPLATE_CATEGORIES } from '@/lib/constants'
+import { FREQUENCY_KEYS, TEMPLATE_CATEGORIES, frequencyLabel } from '@/lib/constants'
 import { distinctValues } from '@/lib/filters'
 import { fullName, formatRelativeShort } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
@@ -145,7 +145,7 @@ export function CommandPalette({
 
   async function setCadence(contact: Contact, freq: ContactFrequency) {
     await contactRepo.update(contact.id, { contactFrequencyGoal: freq })
-    toast.success(`${contact.firstName}: ${FREQUENCY_OPTIONS[freq].label.toLowerCase()}`)
+    toast.success(`${contact.firstName}: ${frequencyLabel(freq).toLowerCase()}`)
   }
 
   const backItem = (
@@ -180,7 +180,7 @@ export function CommandPalette({
                 onSelect={() => run(() => void setCadence(mode.contact, k))}
               >
                 <Repeat />
-                {FREQUENCY_OPTIONS[k].label}
+                {frequencyLabel(k)}
                 {mode.contact.contactFrequencyGoal === k && (
                   <CommandShortcut>
                     <Check className="h-3.5 w-3.5" />

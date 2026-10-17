@@ -1,5 +1,5 @@
 import type { Contact } from '@/types'
-import { FREQUENCY_OPTIONS, STALE_CONTACT_DAYS } from './constants'
+import { STALE_CONTACT_DAYS, frequencyDays } from './constants'
 import { daysSince } from './format'
 
 export interface ReconnectStatus {
@@ -24,7 +24,7 @@ export interface ReconnectStatus {
 export function getReconnectStatus(contact: Contact): ReconnectStatus {
   const reference = contact.lastContactDate ?? contact.dateMet ?? null
   const daysSinceContact = daysSince(reference)
-  const goalDays = FREQUENCY_OPTIONS[contact.contactFrequencyGoal]?.days ?? null
+  const goalDays = frequencyDays(contact.contactFrequencyGoal)
 
   if (daysSinceContact === null) {
     return {

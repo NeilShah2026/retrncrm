@@ -2,8 +2,8 @@ import { askClaudeJson, truncate } from './client'
 import {
   CONNECTION_TYPES,
   CONNECTION_TYPE_KEYS,
-  FREQUENCY_KEYS,
-  FREQUENCY_OPTIONS,
+  frequencyShort,
+  parseFrequency,
   MEET_SOURCES,
   MEET_SOURCE_KEYS,
 } from '@/lib/constants'
@@ -100,7 +100,7 @@ Keys:
   email, phone, linkedinUrl
   connectionType: one of ${CONNECTION_TYPE_KEYS.join(', ')}
   source: one of ${MEET_SOURCE_KEYS.join(', ')}
-  contactFrequencyGoal: one of ${FREQUENCY_KEYS.join(', ')}
+  contactFrequencyGoal: days between catch-ups as a number ("every month" = 30, "every six weeks" = 45, "quarterly" = 90)
   followUpDate: YYYY-MM-DD, resolved from today's date (given below the sentence)
   followUpNote: what the speaker promised to do, as a short to-do ("Email her back about the internship")
   birthday: MM-DD, or YYYY-MM-DD when the year is said
@@ -171,7 +171,7 @@ function humanize(key: keyof ParsedCapture, value: unknown): string {
   }
   if (key === 'source') return MEET_SOURCES[value as MeetSource]?.label ?? String(value)
   if (key === 'contactFrequencyGoal') {
-    return FREQUENCY_OPTIONS[value as ContactFrequency]?.short ?? String(value)
+    return frequencyShort(value as ContactFrequency)
   }
   if (key === 'followUp') {
     const f = value as NonNullable<ParsedCapture['followUp']>
@@ -243,7 +243,7 @@ export async function refineCapture(
   for (const key of TEXT_KEYS) apply(key, cleanText(raw[key], key === 'linkedinUrl' ? 200 : 80))
   apply('connectionType', pickEnum(raw.connectionType, CONNECTION_TYPE_KEYS))
   apply('source', pickEnum(raw.source, MEET_SOURCE_KEYS))
-  apply('contactFrequencyGoal', pickEnum(raw.contactFrequencyGoal, FREQUENCY_KEYS))
+  apply('contactFrequencyGoal', parseFrequency(raw.contactFrequencyGoal))
   apply('followUp', pickFollowUp(raw.followUpDate, raw.followUpNote))
   apply('birthday', pickBirthday(raw.birthday))
 

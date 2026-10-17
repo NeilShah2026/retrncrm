@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ContactAvatar } from '@/components/common/ContactAvatar'
 import { TagBadge } from '@/components/common/TagBadge'
 import { ReconnectBadge } from '@/components/common/ReconnectBadge'
-import { FREQUENCY_OPTIONS } from '@/lib/constants'
+import { frequencyShort } from '@/lib/constants'
 import { fullName, formatDateShort, formatRelativeShort } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { ROUTES } from '@/lib/routes'
@@ -97,7 +97,6 @@ export function ContactsTable({
       <tbody>
         {contacts.map((c) => {
           const tags = c.tagIds.map((id) => tagMap.get(id)).filter(Boolean) as Tag[]
-          const cadence = FREQUENCY_OPTIONS[c.contactFrequencyGoal]
           return (
             <tr
               key={c.id}
@@ -138,7 +137,7 @@ export function ContactsTable({
                   <ReconnectBadge contact={c} />
                 </div>
               </td>
-              <td className="whitespace-nowrap px-3 py-0 text-text-secondary">{cadence.short}</td>
+              <td className="whitespace-nowrap px-3 py-0 text-text-secondary">{frequencyShort(c.contactFrequencyGoal)}</td>
               <td className="tnum whitespace-nowrap px-3 py-0 text-text-secondary">
                 {formatDateShort(c.dateMet)}
               </td>

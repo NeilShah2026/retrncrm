@@ -87,17 +87,24 @@ export function shortDate(iso: string): string {
   })
 }
 
-const CADENCE_DAYS: Record<string, number> = {
+/** Names the app stored before cadences became day counts ("45d"). */
+const LEGACY_CADENCE_DAYS: Record<string, number> = {
   weekly: 7,
   monthly: 30,
-  quarterly: 91,
+  quarterly: 90,
   biannually: 182,
   annually: 365,
 }
 
+function cadenceDays(goal: string | null): number | null {
+  if (!goal || goal === 'none') return null
+  const m = /^(\d+)d$/.exec(goal)
+  return m ? Number(m[1]) : (LEGACY_CADENCE_DAYS[goal] ?? null)
+}
+
 /** Days past their catch-up goal, if they have one and are past it. */
 export function overdueBy(contact: Contact): number | null {
-  const goal = CADENCE_DAYS[contact.contact_frequency_goal ?? '']
+  const goal = cadenceDays(contact.contact_frequency_goal)
   if (!goal || !contact.last_contact_date) return null
   const over = daysSince(contact.last_contact_date) - goal
   return over > 0 ? over : null

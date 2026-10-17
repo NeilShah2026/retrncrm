@@ -3,15 +3,16 @@ import { askClaudeJson, truncate } from './client'
 import { getReconnectStatus } from '@/lib/reconnect'
 import { CONNECTION_TYPES, OPPORTUNITY_STAGES } from '@/lib/constants'
 import { fullName, daysSince } from '@/lib/format'
-import type { CalendarEvent, Contact, Opportunity, Tag } from '@/types'
+import { daysUntilKeyDate } from '@/lib/keyDates'
+import type { CalendarEvent, Contact, FollowUp, KeyDate, Opportunity, Tag } from '@/types'
 
 /**
- * "What should I actually do today?"
+ * "What should I actually do today?" — the dashboard's one list.
  *
- * The dashboard already shows counts — overdue people, meetings, deadlines.
- * Counts are not a decision. This takes the same three lists, hands the model
- * a compact snapshot of them, and gets back a handful of specific, ordered
- * actions with the reason each one made the cut.
+ * Everything with a clock on it lives here, not in a panel of its own:
+ * meetings this week, follow-ups due, people gone quiet, deadlines and
+ * birthdays. The model gets a compact snapshot of all five and returns them
+ * as one ordered list, each with the reason it made the cut.
  *
  * Two rules hold it to the same bargain as the rest of the AI here: every
  * action must point at a real record (the model answers with a reference into
@@ -20,7 +21,7 @@ import type { CalendarEvent, Contact, Opportunity, Tag } from '@/types'
  * is useful with AI switched off, just less pointed.
  */
 
-export type BriefingKind = 'prep' | 'reconnect' | 'draft' | 'pipeline'
+export type BriefingKind = 'prep' | 'reconnect' | 'draft' | 'pipeline' | 'followup' | 'date'
 
 export interface BriefingAction {
   kind: BriefingKind
@@ -31,6 +32,8 @@ export interface BriefingAction {
   contact?: Contact
   opportunity?: Opportunity
   event?: CalendarEvent
+  followUp?: FollowUp
+  keyDate?: KeyDate
 }
 
 export interface Briefing {
@@ -40,24 +43,31 @@ export interface Briefing {
   fromModel: boolean
 }
 
-/** The three lists worth acting on, already trimmed to what fits a prompt. */
+/** The lists worth acting on, already trimmed to what fits a prompt. */
 export interface NetworkSnapshot {
   people: Contact[]
   meetings: { event: CalendarEvent; attendees: Contact[] }[]
   opportunities: { opp: Opportunity; helpers: Contact[] }[]
+  followUps: { followUp: FollowUp; contact: Contact }[]
+  dates: { keyDate: KeyDate; contact: Contact }[]
   /** Nothing to brief on at all — the caller shows an empty state instead. */
   empty: boolean
 }
 
 const MAX_PEOPLE = 12
-const MAX_MEETINGS = 6
+const MAX_MEETINGS = 8
 const MAX_OPPS = 5
-/** A short list is the point — three things you'll actually do. */
-const MAX_ACTIONS = 3
-/** However many applications are in flight, one of them is enough for today. */
-const MAX_PIPELINE_ACTIONS = 1
-/** Meetings this far out are "coming up"; past that they aren't today's problem. */
-const MEETING_HORIZON_DAYS = 14
+const MAX_FOLLOW_UPS = 8
+const MAX_DATES = 5
+/** The whole list fits the dashboard without scrolling. */
+const MAX_ACTIONS = 8
+/** Applications get a voice, but can't crowd out the people. */
+const MAX_PIPELINE_ACTIONS = 2
+/** "This week": meetings and birthdays further out aren't today's problem. */
+const MEETING_HORIZON_DAYS = 7
+const DATE_HORIZON_DAYS = 7
+/** Follow-ups due within this many days (and every overdue one). */
+const FOLLOW_UP_HORIZON_DAYS = 2
 const DEADLINE_HORIZON_DAYS = 30
 
 /**
@@ -107,8 +117,25 @@ export function buildSnapshot(
   contacts: Contact[],
   opportunities: Opportunity[],
   events: CalendarEvent[],
+  followUps: FollowUp[] = [],
+  keyDates: KeyDate[] = [],
 ): NetworkSnapshot {
   const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+  const dueFollowUps = followUps
+    .filter((f) => !f.completedAt && contactMap.has(f.contactId))
+    .filter((f) => (daysUntil(f.dueDate) ?? 999) <= FOLLOW_UP_HORIZON_DAYS)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, MAX_FOLLOW_UPS)
+    .map((followUp) => ({ followUp, contact: contactMap.get(followUp.contactId)! }))
+
+  const dates = keyDates
+    .filter((k) => contactMap.has(k.contactId))
+    .map((keyDate) => ({ keyDate, days: daysUntilKeyDate(keyDate) }))
+    .filter(({ days }) => days <= DATE_HORIZON_DAYS)
+    .sort((a, b) => a.days - b.days)
+    .slice(0, MAX_DATES)
+    .map(({ keyDate }) => ({ keyDate, contact: contactMap.get(keyDate.contactId)! }))
 
   const now = Date.now()
   const meetings = events
@@ -124,9 +151,12 @@ export function buildSnapshot(
         .filter((c): c is Contact => Boolean(c)),
     }))
 
-  // Someone you're about to sit down with doesn't also belong on the
-  // "you've gone quiet on them" list — the meeting is the action.
-  const scheduled = new Set(meetings.flatMap((m) => m.event.contactIds))
+  // Someone you're about to sit down with — or already owe a follow-up —
+  // doesn't also belong on the "gone quiet" list: that is the action.
+  const scheduled = new Set([
+    ...meetings.flatMap((m) => m.event.contactIds),
+    ...dueFollowUps.map((f) => f.contact.id),
+  ])
 
   const people = contacts
     .filter((c) => !scheduled.has(c.id))
@@ -164,7 +194,14 @@ export function buildSnapshot(
     people,
     meetings,
     opportunities: opps,
-    empty: people.length === 0 && meetings.length === 0 && opps.length === 0,
+    followUps: dueFollowUps,
+    dates,
+    empty:
+      people.length === 0 &&
+      meetings.length === 0 &&
+      opps.length === 0 &&
+      dueFollowUps.length === 0 &&
+      dates.length === 0,
   }
 }
 
@@ -245,11 +282,24 @@ function opportunityLine(
   return parts.join(' | ')
 }
 
+function followUpLine({ followUp, contact }: NetworkSnapshot['followUps'][number], index: number): string {
+  const days = daysUntil(followUp.dueDate) ?? 0
+  const due = days < 0 ? `overdue by ${-days} days` : `due ${whenPhrase(days)}`
+  const what = truncate(followUp.note, 100) || 'follow up'
+  return `F${index}. ${fullName(contact)} | ${what} | ${due}`
+}
+
+function dateLine({ keyDate, contact }: NetworkSnapshot['dates'][number], index: number): string {
+  const days = daysUntilKeyDate(keyDate)
+  return `B${index}. ${fullName(contact)}'s ${keyDate.label.toLowerCase()} | ${whenPhrase(days)}`
+}
+
 const SYSTEM = `You are the morning briefing for someone's personal CRM. They \
 are a student or early-career professional keeping track of people they've met.
 
-You are given three lists from their own records: meetings coming up (M), \
-people they have gone quiet on (P), and job applications in flight (O).
+You are given lists from their own records: meetings this week (M), \
+follow-ups they promised (F), people they have gone quiet on (P), job \
+applications in flight (O), and birthdays or other yearly dates this week (B).
 
 Reply with a single JSON object and nothing else:
 {"headline": "one short sentence", "actions": [{"ref": "P3", "kind": "reconnect", "do": "…", "why": "…"}]}
@@ -257,18 +307,19 @@ Reply with a single JSON object and nothing else:
 Rules:
 - "ref" must be an id that appears in the lists above. Never invent a person, \
 a meeting, or a company, and never reference the same one twice.
-- "kind" is one of: "prep" (get ready for a meeting), "reconnect" (reach out \
-to someone who has gone quiet), "draft" (write a specific message), \
-"pipeline" (act on an application).
-- At most ${MAX_ACTIONS} actions, most urgent first, and at most \
-${MAX_PIPELINE_ACTIONS} "pipeline" action. Fewer is better than padding — one \
-or two is a fine answer. Only include what is genuinely worth doing today or \
-tomorrow.
+- "kind" is one of: "prep" (get ready for a meeting), "followup" (do the \
+thing they promised), "reconnect" (reach out to someone who has gone quiet), \
+"draft" (write a specific message), "pipeline" (act on an application), \
+"date" (a birthday or yearly date to acknowledge).
+- This is their whole to-do list for the next few days, so include every \
+meeting, every follow-up and every date given, plus the people and \
+applications most worth acting on. At most ${MAX_ACTIONS} actions and at most \
+${MAX_PIPELINE_ACTIONS} "pipeline" actions, most urgent first. Overdue \
+follow-ups and meetings today come first.
 - "do" is an imperative under 8 words: "Prep for coffee with Dana Cruz".
 - "why" is under 12 words citing the one fact that made it urgent. Never \
 restate "do". For a meeting, use the day exactly as given in the list \
 ("today", "tomorrow", "Tue Sep 22") — never work out a day yourself.
-- A meeting today or tomorrow outranks anything else.
 - "headline" is under 12 words and states the shape of the day. No \
 greeting, no pep talk, no exclamation marks.
 - These records are all you know. Do not use outside knowledge about any \
@@ -286,7 +337,7 @@ interface RawBriefing {
   actions?: unknown
 }
 
-const KINDS: BriefingKind[] = ['prep', 'reconnect', 'draft', 'pipeline']
+const KINDS: BriefingKind[] = ['prep', 'reconnect', 'draft', 'pipeline', 'followup', 'date']
 
 // ---------------------------------------------------------------------------
 // Cache
@@ -308,6 +359,8 @@ export function snapshotFingerprint(snapshot: NetworkSnapshot): string {
     ...snapshot.opportunities.map(
       ({ opp }) => `o${opp.id}:${opp.stage}:${opp.deadline ?? ''}`,
     ),
+    ...snapshot.followUps.map(({ followUp }) => `f${followUp.id}:${followUp.dueDate}`),
+    ...snapshot.dates.map(({ keyDate }) => `b${keyDate.id}`),
   ]
   const joined = parts.join('|')
   let hash = 0
@@ -360,7 +413,7 @@ function resolve(raw: RawBriefing, snapshot: NetworkSnapshot): Briefing {
     const { ref, kind, do: title, why } = entry as RawAction
     if (typeof ref !== 'string' || typeof title !== 'string' || !title.trim()) continue
 
-    const match = /^([PMO])(\d+)$/i.exec(ref.trim())
+    const match = /^([PMOFB])(\d+)$/i.exec(ref.trim())
     if (!match) continue
     const list = match[1].toUpperCase()
     const index = Number(match[2]) - 1
@@ -382,6 +435,18 @@ function resolve(raw: RawBriefing, snapshot: NetworkSnapshot): Briefing {
       action.event = meeting.event
       action.contact = meeting.attendees[0]
       if (action.kind === 'reconnect') action.kind = 'prep'
+    } else if (list === 'F') {
+      const entry = snapshot.followUps[index]
+      if (!entry) continue
+      action.followUp = entry.followUp
+      action.contact = entry.contact
+      action.kind = 'followup'
+    } else if (list === 'B') {
+      const entry = snapshot.dates[index]
+      if (!entry) continue
+      action.keyDate = entry.keyDate
+      action.contact = entry.contact
+      action.kind = 'date'
     } else {
       const entry = snapshot.opportunities[index]
       if (!entry || pipeline >= MAX_PIPELINE_ACTIONS) continue
@@ -442,11 +507,21 @@ export async function generateBriefing(
         .join('\n')}`,
     )
   }
+  if (snapshot.followUps.length) {
+    sections.push(
+      `Follow-ups they promised:\n${snapshot.followUps.map((f, i) => followUpLine(f, i + 1)).join('\n')}`,
+    )
+  }
+  if (snapshot.dates.length) {
+    sections.push(
+      `Dates this week:\n${snapshot.dates.map((d, i) => dateLine(d, i + 1)).join('\n')}`,
+    )
+  }
 
   const now = format(new Date(), "EEEE, MMM d, h:mm a")
   const raw = await askClaudeJson<RawBriefing>({
     system: SYSTEM,
-    maxTokens: 500,
+    maxTokens: 900,
     signal: options.signal,
     // Built when the dashboard loads, so it never asks for AI permission —
     // the rules-based list stands in until the account has given it. The
@@ -475,8 +550,18 @@ export function pruneBriefing(briefing: Briefing, snapshot: NetworkSnapshot): Br
   )
   const meetings = new Map(snapshot.meetings.map((m) => [m.event.id, m.event] as const))
   const opps = new Map(snapshot.opportunities.map(({ opp }) => [opp.id, opp] as const))
+  const followUps = new Map(snapshot.followUps.map((f) => [f.followUp.id, f] as const))
+  const dates = new Map(snapshot.dates.map((d) => [d.keyDate.id, d] as const))
 
   const actions = briefing.actions.flatMap((action): BriefingAction[] => {
+    if (action.followUp) {
+      const entry = followUps.get(action.followUp.id)
+      return entry ? [{ ...action, followUp: entry.followUp, contact: entry.contact }] : []
+    }
+    if (action.keyDate) {
+      const entry = dates.get(action.keyDate.id)
+      return entry ? [{ ...action, keyDate: entry.keyDate, contact: entry.contact }] : []
+    }
     if (action.event) {
       const event = meetings.get(action.event.id)
       if (!event || isOver(event)) return []
@@ -504,70 +589,108 @@ export function pruneBriefing(briefing: Briefing, snapshot: NetworkSnapshot): Br
 // ---------------------------------------------------------------------------
 
 /**
- * The same briefing, written by rules. Meetings first (they have a clock),
- * then imminent deadlines, then the people who have waited longest — which is
- * roughly the order the model lands on anyway, minus the judgment about who is
- * actually worth the outreach.
+ * The same list, written by rules: everything scored by how soon it needs
+ * you, then the people who have waited longest. Roughly the order the model
+ * lands on, minus its judgment about who is actually worth the outreach.
  */
 export function localBriefing(snapshot: NetworkSnapshot): Briefing {
-  const actions: BriefingAction[] = []
+  const scored: { score: number; action: BriefingAction }[] = []
+
+  for (const { followUp, contact } of snapshot.followUps) {
+    const days = daysUntil(followUp.dueDate) ?? 0
+    scored.push({
+      // Overdue first, then due today — ahead of a meeting later today.
+      score: Math.min(days, 0) - 0.5,
+      action: {
+        kind: 'followup',
+        title: followUp.note?.trim() || `Follow up with ${fullName(contact)}`,
+        why: days < 0 ? `Overdue by ${-days} ${-days === 1 ? 'day' : 'days'}` : `Due ${whenPhrase(days)}`,
+        contact,
+        followUp,
+      },
+    })
+  }
 
   for (const { event, attendees } of snapshot.meetings) {
-    if (actions.length >= MAX_ACTIONS) break
     const days = daysUntil(event.startsAt) ?? 0
-    if (days > 1) break
     const who = attendees.length ? fullName(attendees[0]) : null
     const unprepared = attendees.length && !attendees.some((c) => c.talkingPoints?.trim())
-    actions.push({
-      kind: 'prep',
-      title: who ? `Prep for ${event.title} with ${who}` : `Prep for ${event.title}`,
-      why: `${whenPhrase(days)}${unprepared ? ' · no talking points saved yet' : ''}`,
-      event,
-      contact: attendees[0],
+    const start = new Date(event.startsAt)
+    scored.push({
+      score: days,
+      action: {
+        kind: 'prep',
+        title: who ? `${event.title} with ${who}` : event.title,
+        why: `${event.allDay ? whenPhrase(days) : `${whenPhrase(days)}, ${format(start, 'h:mm a')}`}${unprepared ? ' · no talking points yet' : ''}`,
+        event,
+        contact: attendees[0],
+      },
     })
   }
 
+  let pipeline = 0
   for (const { opp } of snapshot.opportunities) {
-    if (actions.length >= MAX_ACTIONS) break
-    if (actions.some((a) => a.kind === 'pipeline')) break
     const days = daysUntil(opp.deadline)
-    if (days === null || days > 7) continue
-    actions.push({
-      kind: 'pipeline',
-      title: `Finish the ${opp.company} application`,
-      why: `${opp.role} · deadline ${whenPhrase(days)}`,
-      opportunity: opp,
+    if (days === null || days > 14 || pipeline >= MAX_PIPELINE_ACTIONS) continue
+    pipeline++
+    scored.push({
+      score: days + 0.25,
+      action: {
+        kind: 'pipeline',
+        title: `${opp.company} application`,
+        why: `${opp.role} · deadline ${whenPhrase(days)}`,
+        opportunity: opp,
+      },
     })
   }
 
-  for (const contact of snapshot.people) {
-    if (actions.length >= MAX_ACTIONS) break
-    actions.push({
-      kind: 'reconnect',
-      title: `Reach out to ${fullName(contact)}`,
-      why: getReconnectStatus(contact).reason,
-      contact,
+  for (const { keyDate, contact } of snapshot.dates) {
+    const days = daysUntilKeyDate(keyDate)
+    scored.push({
+      score: days + 0.5,
+      action: {
+        kind: 'date',
+        title: `${fullName(contact)}’s ${keyDate.label.toLowerCase()}`,
+        why: whenPhrase(days).replace(/^./, (c) => c.toUpperCase()),
+        contact,
+        keyDate,
+      },
     })
   }
 
+  // People who've gone quiet have no clock of their own: after anything due
+  // in the next couple of days, most overdue first (the snapshot's order).
+  snapshot.people.forEach((contact, i) => {
+    scored.push({
+      score: 2.5 + i * 0.01,
+      action: {
+        kind: 'reconnect',
+        title: `Reach out to ${fullName(contact)}`,
+        why: getReconnectStatus(contact).reason,
+        contact,
+      },
+    })
+  })
+
+  const actions = scored
+    .sort((a, b) => a.score - b.score)
+    .slice(0, MAX_ACTIONS)
+    .map((x) => x.action)
   return { headline: localHeadline(snapshot), actions, fromModel: false }
 }
 
 function localHeadline(snapshot: NetworkSnapshot): string {
   if (snapshot.empty) return 'Nothing needs you right now.'
   const bits: string[] = []
-  if (snapshot.meetings.length) {
-    bits.push(
-      `${snapshot.meetings.length} meeting${snapshot.meetings.length === 1 ? '' : 's'} coming up`,
-    )
-  }
-  if (snapshot.people.length) {
-    bits.push(`${snapshot.people.length} to reconnect with`)
-  }
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  if (snapshot.followUps.length) bits.push(plural(snapshot.followUps.length, 'follow-up', 'follow-ups'))
+  if (snapshot.meetings.length) bits.push(plural(snapshot.meetings.length, 'meeting', 'meetings'))
+  if (snapshot.people.length) bits.push(`${snapshot.people.length} to reconnect with`)
   const soon = snapshot.opportunities.filter(({ opp }) => {
     const days = daysUntil(opp.deadline)
     return days !== null && days <= 7
   }).length
-  if (soon) bits.push(`${soon} deadline${soon === 1 ? '' : 's'} inside a week`)
+  if (soon) bits.push(plural(soon, 'deadline', 'deadlines'))
+  if (snapshot.dates.length) bits.push(plural(snapshot.dates.length, 'birthday', 'birthdays'))
   return `${bits.join(', ')}.`.replace(/^./, (c) => c.toUpperCase())
 }

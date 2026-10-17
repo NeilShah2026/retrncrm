@@ -2,6 +2,8 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlarmClock,
+  BellRing,
+  Cake,
   Check,
   Coffee,
   KanbanSquare,
@@ -26,25 +28,32 @@ import {
 import type { Briefing, BriefingAction, BriefingKind } from '@/lib/ai/briefing'
 import { AiUnavailableError } from '@/lib/ai/client'
 import { markCaughtUp } from '@/lib/caughtUp'
+import { completeFollowUp } from '@/components/reminders/followUpActions'
 import { fullName } from '@/lib/format'
 import { ROUTES } from '@/lib/routes'
 import { cn } from '@/lib/utils'
-import type { CalendarEvent, Contact, Opportunity, Tag } from '@/types'
+import type { CalendarEvent, Contact, FollowUp, KeyDate, Opportunity, Tag } from '@/types'
 
 interface Props {
   contacts: Contact[]
   opportunities: Opportunity[]
   events: CalendarEvent[]
   tagMap: Map<string, Tag>
-  /** False while any of the three lists is still loading. */
+  /** Folded into the same list when given (the laptop dashboard). */
+  followUps?: FollowUp[]
+  keyDates?: KeyDate[]
+  /** False while any of the lists is still loading. */
   ready: boolean
+  className?: string
 }
 
 const KIND: Record<BriefingKind, { icon: typeof Coffee; label: string }> = {
   prep: { icon: Coffee, label: 'Prep' },
   reconnect: { icon: AlarmClock, label: 'Reconnect' },
   draft: { icon: PenLine, label: 'Write' },
-  pipeline: { icon: KanbanSquare, label: 'Pipeline' },
+  pipeline: { icon: KanbanSquare, label: 'Deadline' },
+  followup: { icon: BellRing, label: 'Follow-up' },
+  date: { icon: Cake, label: 'Birthday' },
 }
 
 const ASK_SUGGESTIONS = [
@@ -59,7 +68,16 @@ const ASK_SUGGESTIONS = [
  * is an order and a reason. When the model wrote the order, the panel says
  * so with a text badge; when the rules did, it says nothing.
  */
-export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props) {
+export function NextUp({
+  contacts,
+  opportunities,
+  events,
+  tagMap,
+  followUps,
+  keyDates,
+  ready,
+  className,
+}: Props) {
   const navigate = useNavigate()
   const { openAssistant } = useUI()
 
@@ -72,9 +90,9 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
   }, [])
 
   const snapshot = React.useMemo(
-    () => buildSnapshot(contacts, opportunities, events),
+    () => buildSnapshot(contacts, opportunities, events, followUps, keyDates),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `minute` is the clock
-    [contacts, opportunities, events, minute],
+    [contacts, opportunities, events, followUps, keyDates, minute],
   )
   const fingerprint = React.useMemo(() => snapshotFingerprint(snapshot), [snapshot])
 
@@ -127,6 +145,10 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
   }, [fingerprint, ready, run])
 
   function openAction(action: BriefingAction) {
+    if (action.followUp || action.keyDate) {
+      if (action.contact) navigate(ROUTES.contact(action.contact.id))
+      return
+    }
     if (action.opportunity) navigate(ROUTES.pipeline)
     else if (action.contact) navigate(ROUTES.contact(action.contact.id))
     else if (action.event) navigate(ROUTES.calendar)
@@ -136,7 +158,7 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
   const pending = (!ready || loading) && !briefing
 
   return (
-    <Panel>
+    <Panel className={cn('flex flex-col', className)}>
       <PanelHeader
         action={
           <Button
@@ -159,7 +181,7 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
       </PanelHeader>
 
       {pending ? (
-        <ul aria-busy="true">
+        <ul aria-busy="true" className="min-h-0 flex-1">
           {Array.from({ length: 3 }).map((_, i) => (
             <li key={i} className="flex h-11 items-center gap-3 border-b px-4 last:border-b-0">
               <Skeleton className="h-6 w-6 rounded-full" />
@@ -168,7 +190,7 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
           ))}
         </ul>
       ) : empty ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">
+        <p className="flex-1 px-4 py-6 text-sm text-muted-foreground">
           Nothing overdue and nothing scheduled. Add people as you meet them
           and this list fills in on its own.
         </p>
@@ -179,10 +201,10 @@ export function NextUp({ contacts, opportunities, events, tagMap, ready }: Props
               {briefing.headline}
             </p>
           )}
-          <ul>
+          <ul className="scroll-native min-h-0 flex-1 overflow-y-auto scrollbar-thin">
             {briefing?.actions.map((action, i) => (
               <ActionRow
-                key={`${action.kind}-${action.contact?.id ?? action.opportunity?.id ?? i}`}
+                key={`${action.kind}-${action.followUp?.id ?? action.keyDate?.id ?? action.event?.id ?? action.contact?.id ?? action.opportunity?.id ?? i}`}
                 action={action}
                 onOpen={() => openAction(action)}
                 onPrep={action.contact ? () => setPrepContactId(action.contact?.id) : undefined}
@@ -265,7 +287,10 @@ function ActionRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm">{action.title}</span>
           <span className="block truncate text-xs text-muted-foreground">
-            <span className="text-text-secondary">{kind.label}</span> · {action.why}
+            <span className="text-text-secondary">
+              {action.kind === 'date' ? (action.keyDate?.label ?? kind.label) : kind.label}
+            </span>{' '}
+            · {action.why}
           </span>
         </span>
       </button>
@@ -274,6 +299,17 @@ function ActionRow({
         {onPrep && (action.kind === 'prep' || action.kind === 'draft') && (
           <Button variant="ghost" size="sm" onClick={onPrep}>
             Prep
+          </Button>
+        )}
+        {action.followUp && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Done"
+            aria-label={`Mark done: ${action.title}`}
+            onClick={() => void completeFollowUp(action.followUp!, contact)}
+          >
+            <Check />
           </Button>
         )}
         {contact && action.kind === 'reconnect' && (

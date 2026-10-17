@@ -1,5 +1,5 @@
 import type { Contact, FollowUp, KeyDate, Opportunity, OutreachTemplate, Tag } from '@/types'
-import { FREQUENCY_OPTIONS } from './constants'
+import { frequencyLabel, normalizeFrequency } from './constants'
 
 export const EXPORT_VERSION = 3
 
@@ -120,7 +120,7 @@ export function exportCsv(contacts: Contact[], tags: Tag[]): void {
     c.tagIds.map((id) => tagMap.get(id) ?? '').filter(Boolean).join('; '),
     String(c.relationshipStrength),
     c.lastContactDate ?? '',
-    FREQUENCY_OPTIONS[c.contactFrequencyGoal]?.label ?? '',
+    frequencyLabel(c.contactFrequencyGoal),
     String(c.interactions.length),
     c.notes ?? '',
   ])
@@ -246,11 +246,8 @@ function normalizeContact(c: unknown): Contact | null {
     relationshipStrength:
       strengthRaw >= 1 && strengthRaw <= 5 ? strengthRaw : 3,
     lastContactDate: str(o.lastContactDate),
-    contactFrequencyGoal:
-      typeof o.contactFrequencyGoal === 'string' &&
-      o.contactFrequencyGoal in FREQUENCY_OPTIONS
-        ? (o.contactFrequencyGoal as Contact['contactFrequencyGoal'])
-        : 'none',
+    // Backups from before day-count cadences carry names ("monthly").
+    contactFrequencyGoal: normalizeFrequency(o.contactFrequencyGoal),
     notes: str(o.notes),
     interactions: Array.isArray(o.interactions)
       ? (o.interactions as Contact['interactions'])

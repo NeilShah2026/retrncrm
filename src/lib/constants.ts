@@ -79,20 +79,86 @@ export function tagColor(color: string) {
   return TAG_COLORS[color] ?? TAG_COLORS.slate
 }
 
-/** Contact frequency presets → human labels + concrete day intervals. */
-export const FREQUENCY_OPTIONS: Record<
-  ContactFrequency,
-  { label: string; short: string; days: number | null }
-> = {
-  none: { label: 'No goal', short: '—', days: null },
-  weekly: { label: 'Every week', short: 'Weekly', days: 7 },
-  monthly: { label: 'Every month', short: 'Monthly', days: 30 },
-  quarterly: { label: 'Every 3 months', short: 'Quarterly', days: 91 },
-  biannually: { label: 'Every 6 months', short: '6 months', days: 182 },
-  annually: { label: 'Every year', short: 'Yearly', days: 365 },
+/**
+ * Reconnect cadence: a number of days between catch-ups, stored as "45d", or
+ * "none". The dropdown offers the presets; "Custom…" takes any number.
+ */
+export const FREQUENCY_PRESET_DAYS = [30, 45, 60, 90] as const
+export const FREQUENCY_KEYS: ContactFrequency[] = [
+  'none',
+  ...FREQUENCY_PRESET_DAYS.map((d) => `${d}d` as ContactFrequency),
+]
+/** The longest cadence "Custom…" accepts. */
+export const MAX_FREQUENCY_DAYS = 730
+
+/**
+ * The cadences older versions stored by name. Each keeps its own interval
+ * (quarterly was 91 days, now the 90-day preset), so nobody's reconnect
+ * schedule moves when they upgrade.
+ */
+const LEGACY_FREQUENCY_DAYS: Record<string, number> = {
+  weekly: 7,
+  monthly: 30,
+  quarterly: 90,
+  biannually: 182,
+  annually: 365,
 }
 
-export const FREQUENCY_KEYS = Object.keys(FREQUENCY_OPTIONS) as ContactFrequency[]
+export function frequencyFromDays(days: number): ContactFrequency {
+  const n = Math.round(days)
+  if (!Number.isFinite(n) || n < 1) return 'none'
+  return `${Math.min(n, MAX_FREQUENCY_DAYS)}d` as ContactFrequency
+}
+
+/** Days between catch-ups, or null for no goal. */
+export function frequencyDays(f: ContactFrequency | string | null | undefined): number | null {
+  if (!f || f === 'none') return null
+  const m = /^(\d+)d$/.exec(f)
+  if (m) return Number(m[1]) || null
+  return LEGACY_FREQUENCY_DAYS[f] ?? null
+}
+
+/**
+ * Anything that might describe a cadence — "45d", 45, "45", "monthly",
+ * "every 45 days", "every 2 weeks" — as a stored value, or undefined when it
+ * doesn't describe one. Used for stored rows, imports, AI replies and speech.
+ */
+export function parseFrequency(raw: unknown): ContactFrequency | undefined {
+  if (typeof raw === 'number') return frequencyFromDays(raw)
+  if (typeof raw !== 'string') return undefined
+  const s = raw.trim().toLowerCase()
+  if (!s) return undefined
+  if (s === 'none' || s === 'no goal') return 'none'
+  if (/^\d+d?$/.test(s)) return frequencyFromDays(parseInt(s, 10))
+  if (s in LEGACY_FREQUENCY_DAYS) return frequencyFromDays(LEGACY_FREQUENCY_DAYS[s])
+  const m = /(\d+)\s*(day|week|month)/.exec(s)
+  if (m) {
+    const unit = m[2] === 'week' ? 7 : m[2] === 'month' ? 30 : 1
+    return frequencyFromDays(Number(m[1]) * unit)
+  }
+  return undefined
+}
+
+/** A stored value, normalised — legacy names become day counts. */
+export function normalizeFrequency(raw: unknown): ContactFrequency {
+  return parseFrequency(raw) ?? 'none'
+}
+
+/** "Every 45 days", or "No goal". */
+export function frequencyLabel(f: ContactFrequency | string | null | undefined): string {
+  const days = frequencyDays(f)
+  return days === null ? 'No goal' : `Every ${days} ${days === 1 ? 'day' : 'days'}`
+}
+
+/** "45 days", or "—" — for tables. */
+export function frequencyShort(f: ContactFrequency | string | null | undefined): string {
+  const days = frequencyDays(f)
+  return days === null ? '—' : `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
+export function isPresetFrequency(f: ContactFrequency): boolean {
+  return FREQUENCY_KEYS.includes(f)
+}
 
 /** Interaction types → label + emoji for the timeline. */
 export const INTERACTION_TYPES: Record<

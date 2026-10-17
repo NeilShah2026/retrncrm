@@ -241,12 +241,15 @@ export function AppLayout() {
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r bg-bg-sunken/50 md:flex">
-        <div className="flex h-12 items-center px-4">
+        {/* One left edge for everything readable: the logo, nav icons, the
+            section label and the footer rows all sit 20px in (a 12px gutter
+            plus each row's 8px padding). Full-width controls use the gutter. */}
+        <div className="flex h-14 shrink-0 items-center px-5">
           <Logo />
         </div>
 
-        <div className="space-y-1.5 px-3 pt-1">
-          <div className="flex gap-1.5">
+        <div className="space-y-2 px-3">
+          <div className="flex gap-2">
             <Button className="flex-1 justify-start" onClick={openVoiceCapture}>
               <PenLine />
               Say who you met
@@ -273,7 +276,7 @@ export function AppLayout() {
           </button>
         </div>
 
-        <nav className="mt-4 flex-1 space-y-px px-3">
+        <nav className="scroll-native mt-5 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
           {PRIMARY_NAV.filter((item) => !('laptopOnly' in item) || coldEmail).map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               <item.icon className="h-4 w-4 text-muted-foreground" />
@@ -285,7 +288,7 @@ export function AppLayout() {
               )}
             </NavLink>
           ))}
-          <div className="text-label px-2 pb-1 pt-4 text-muted-foreground">Toolkit</div>
+          <div className="text-label px-2 pb-1.5 pt-5 text-muted-foreground">Toolkit</div>
           {SECONDARY_NAV.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               <item.icon className="h-4 w-4 text-muted-foreground" />
@@ -294,7 +297,7 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="space-y-1 border-t px-3 py-2">
+        <div className="space-y-0.5 border-t px-3 pb-3 pt-2">
           <button
             onClick={() => setShareOpen(true)}
             className="flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-sm text-text-secondary transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
@@ -303,7 +306,7 @@ export function AppLayout() {
             Share profile
           </button>
           <AccountMenu />
-          <div className="flex items-center justify-between px-2 pt-0.5">
+          <div className="flex h-8 items-center justify-between pl-2">
             <span className="text-xs text-muted-foreground">Synced</span>
             <ThemeToggle />
           </div>
