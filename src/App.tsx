@@ -22,6 +22,7 @@ import { CollegePage } from '@/pages/CollegePage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { MorePage } from '@/pages/MorePage'
 import { OnboardingPage } from '@/pages/OnboardingPage'
+import { ImportSpreadsheetPage } from '@/pages/ImportSpreadsheetPage'
 import { SubscriptionPage } from '@/pages/SubscriptionPage'
 import { QrPage } from '@/pages/QrPage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
@@ -81,6 +82,7 @@ function AppEntry() {
               <Route path="inbox" element={<InboxPage />} />
               <Route path="assistant" element={<AssistantPage />} />
               <Route path="contacts" element={<ContactsPage />} />
+              <Route path="contacts/import" element={<ImportSpreadsheetPage />} />
               <Route path="contacts/:id" element={<ContactDetailPage />} />
               <Route path="college" element={<CollegePage />} />
               <Route path="calendar" element={<CalendarPage />} />

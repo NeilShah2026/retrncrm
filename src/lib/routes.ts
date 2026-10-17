@@ -30,6 +30,8 @@ export const ROUTES = {
   contact: (id: string) => `/app/contacts/${id}`,
   contactsSearch: (q: string) => `/app/contacts?q=${encodeURIComponent(q)}`,
   contactsOverdue: '/app/contacts?overdue=1',
+  /** Import contacts from an Excel or CSV file, with a review step before saving. */
+  importSheet: '/app/contacts/import',
   assistant: '/app/assistant',
   college: '/app/college',
   calendar: '/app/calendar',

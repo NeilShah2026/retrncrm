@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Download, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import {
 import { isWebBilling } from '@/lib/billing/web'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { ROUTES } from '@/lib/routes'
+import { downloadTemplate } from '@/lib/sheetImport/template'
 import { cn } from '@/lib/utils'
 
 /**
@@ -28,9 +29,9 @@ export function OnboardingDesktop() {
   const { pane, index, go, finish, name, setName, mustName, nameReady, savingName, submitName } =
     useOnboardingFlow()
 
-  const canGoBack = pane === 'tour'
+  const canGoBack = pane === 'tour' || pane === 'import'
   // Sign in with Apple accounts may skip the name (see nameRequired).
-  const canSkip = pane === 'tour' || (pane === 'name' && !mustName)
+  const canSkip = pane === 'tour' || pane === 'import' || (pane === 'name' && !mustName)
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -41,7 +42,7 @@ export function OnboardingDesktop() {
         if (e.key === 'Escape' && canSkip) finish()
         return
       }
-      if (pane !== 'tour') return
+      if (pane !== 'tour' && pane !== 'import') return
       if (e.key === 'Enter' || e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft' && canGoBack) go(-1)
       else if (e.key === 'Escape' && canSkip) finish()
@@ -84,6 +85,14 @@ export function OnboardingDesktop() {
           )}
 
           {pane === 'tour' && <Tour name={name} onNext={() => go(1)} onBack={() => go(-1)} />}
+
+          {pane === 'import' && (
+            <ImportPane
+              onImport={() => finish(ROUTES.importSheet)}
+              onNext={() => go(1)}
+              onBack={() => go(-1)}
+            />
+          )}
 
           {pane === 'offer' && (
             <Offer onDone={() => finish()} onSeeAllPlans={() => finish(ROUTES.subscription)} />
@@ -207,6 +216,49 @@ function NamePane({
         </Button>
       </Actions>
     </form>
+  )
+}
+
+/** The optional "bring your people" step — see the phone's ImportPane. */
+function ImportPane({
+  onImport,
+  onNext,
+  onBack,
+}: {
+  onImport: () => void
+  onNext: () => void
+  onBack: () => void
+}) {
+  return (
+    <>
+      <div className="px-10 py-10">
+        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-success/10 text-success">
+          <FileSpreadsheet className="h-5 w-5" aria-hidden />
+        </span>
+        <h2 className="mt-5 text-2xl font-semibold leading-[1.15] tracking-[-0.02em]">
+          Bring your people.
+        </h2>
+        <p className="mt-2 text-[15px] text-text-secondary">
+          Keep contacts in a spreadsheet? Import it in any layout — you’ll check every row first.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button onClick={onImport}>
+            <FileSpreadsheet />
+            Import from Excel
+          </Button>
+          <Button variant="outline" onClick={() => void downloadTemplate('onboarding')}>
+            <Download />
+            Download template
+          </Button>
+        </div>
+      </div>
+      <Actions onBack={onBack}>
+        <Button variant="ghost" onClick={onNext}>
+          I’ll add people as I go
+          <Kbd>↵</Kbd>
+        </Button>
+      </Actions>
+    </>
   )
 }
 

@@ -105,9 +105,8 @@ export function PrivacyPolicyPage() {
             </>,
             <>
               <Strong>Contacts you import.</Strong> If you import from your
-              iPhone&rsquo;s Contacts or a contacts file, the people you choose and
-              their name, company, job title, email, phone, links, and birthday
-              (Section 4.3).
+              iPhone&rsquo;s Contacts, a contacts file, or a spreadsheet, the people
+              you choose and the details you import for them (Section 4.3).
             </>,
             <>
               <Strong>Voice and typed input.</Strong> Sentences you speak or type
@@ -279,6 +278,7 @@ export function PrivacyPolicyPage() {
             'Relevant details from your contacts (for example names, companies, roles, tags, notes, how you met, and last-contact dates)',
             'Relevant upcoming meetings, pipeline opportunities, templates, open follow-ups, and birthdays',
             'A photo of a business card, when you choose to scan one',
+            'The column headers and first few rows of a spreadsheet you import, so its columns can be matched to Retrn’s fields',
             "Today's date, so relative dates like \"next Tuesday\" can be resolved",
           ]}
         />
@@ -351,6 +351,16 @@ export function PrivacyPolicyPage() {
           else from your address book leaves your device, and Retrn does not
           re-read your contacts in the background. You can revoke Contacts access
           at any time in iOS Settings.
+        </P>
+        <P>
+          You can also import people from a spreadsheet (.xlsx or .csv). The file
+          is opened on your device and shown to you row by row before anything is
+          saved; <Strong>only the rows you choose to import are uploaded</Strong>{' '}
+          to your Retrn account. If you have allowed AI features, the
+          spreadsheet&rsquo;s column headers and its first few rows (each cell
+          shortened) are sent to our AI provider so it can work out which column
+          is which, as described in Section 4.1; the rest of the file is not.
+          Without AI features, columns are matched by their names on your device.
         </P>
 
         <H3>4.4 Reminders and notifications</H3>

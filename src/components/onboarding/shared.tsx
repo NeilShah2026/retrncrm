@@ -29,9 +29,9 @@ import { track } from '@/lib/analytics'
  * a translation of the other.
  */
 
-export type PaneId = 'name' | 'tour' | 'offer'
+export type PaneId = 'name' | 'tour' | 'import' | 'offer'
 
-export const PANES: PaneId[] = ['name', 'tour', 'offer']
+export const PANES: PaneId[] = ['name', 'tour', 'import', 'offer']
 
 export const TOUR: { icon: LucideIcon; title: string; detail: string }[] = [
   { icon: UserPlus, title: 'Add anyone in one line', detail: 'Type or say who you met.' },
@@ -79,7 +79,9 @@ export function useOnboardingFlow() {
    */
   const finish = React.useCallback(
     (to: string = ROUTES.dashboard) => {
-      track(paneRef.current === 'offer' ? 'onboarding_completed' : 'onboarding_skipped', {
+      // Heading off to import a spreadsheet is finishing, not skipping.
+      const completed = paneRef.current === 'offer' || to === ROUTES.importSheet
+      track(completed ? 'onboarding_completed' : 'onboarding_skipped', {
         pane: paneRef.current,
       })
       const fullName = nameRef.current.trim()

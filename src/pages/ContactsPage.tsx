@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CircleX,
   ClipboardPaste,
@@ -13,6 +13,8 @@ import {
   Users,
   X,
   BookUser,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PageShell } from '@/components/layout/PageShell'
@@ -53,6 +55,8 @@ import { buildSearchIndex, searchContacts } from '@/lib/search'
 import { fullName } from '@/lib/format'
 import { dismissKeyboard, dismissKeyboardOnDrag } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
+import { ROUTES } from '@/lib/routes'
+import { downloadTemplate } from '@/lib/sheetImport/template'
 import type { Contact } from '@/types'
 import { toast } from 'sonner'
 
@@ -73,6 +77,7 @@ export function ContactsPage() {
   const tagMap = useTagMap()
   const { openNewContact, openVoiceCapture, openImportContacts } = useUI()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const [query, setQuery] = React.useState(searchParams.get('q') ?? '')
   const [filters, setFilters] = React.useState<ContactFilters>(() => ({
@@ -265,6 +270,9 @@ export function ContactsPage() {
                 <Tags />
               </BarButton>
             )}
+            <BarButton onClick={() => navigate(ROUTES.importSheet)} aria-label="Import from Excel">
+              <FileSpreadsheet />
+            </BarButton>
             <BarButton onClick={openNewContact} aria-label="New contact">
               <Plus strokeWidth={2.4} />
             </BarButton>
@@ -291,6 +299,10 @@ export function ContactsPage() {
                 Suggest tags
               </Button>
             )}
+            <Button variant="outline" onClick={() => navigate(ROUTES.importSheet)}>
+              <FileSpreadsheet />
+              Import from Excel
+            </Button>
             <Button onClick={openNewContact}>
               <UserPlus />
               New contact
@@ -325,9 +337,17 @@ export function ContactsPage() {
                   <ClipboardPaste />
                   Paste from LinkedIn
                 </Button>
+                <Button variant="outline" onClick={() => navigate(ROUTES.importSheet)}>
+                  <FileSpreadsheet />
+                  Import from Excel
+                </Button>
                 <Button variant="outline" onClick={openImportContacts}>
                   <BookUser />
                   Import contacts
+                </Button>
+                <Button variant="ghost" onClick={() => void downloadTemplate('contacts_empty')}>
+                  <Download />
+                  Download template
                 </Button>
               </>
             }

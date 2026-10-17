@@ -210,6 +210,10 @@ export type AnalyticsEvent =
   | 'subscription_active'
   | 'school_email_verified'
   | 'ai_consent_changed'
+  /** Importing contacts from a spreadsheet. */
+  | 'import_template_downloaded'
+  | 'sheet_import_started'
+  | 'sheet_import_completed'
   /** The QR card funnel, from a stranger's scan to an account. */
   | 'card_viewed'
   | 'card_contact_saved'

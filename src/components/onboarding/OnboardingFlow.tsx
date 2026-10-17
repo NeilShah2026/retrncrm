@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check, ChevronLeft } from 'lucide-react'
+import { Check, ChevronLeft, Download, FileSpreadsheet } from 'lucide-react'
 import { AppMark, CapsuleButton } from '@/components/ui/capsule'
 import { SubscriptionLegal } from '@/components/billing/SubscriptionLegal'
 import {
@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { isPurchaseSurface } from '@/lib/billing/store'
 import { selectionFeedback } from '@/lib/haptics'
 import { ROUTES } from '@/lib/routes'
+import { downloadTemplate } from '@/lib/sheetImport/template'
 import { cn } from '@/lib/utils'
 import { isWebBilling } from '@/lib/billing/web'
 
@@ -57,10 +58,14 @@ function PhoneOnboarding() {
       <Chrome
         step={index}
         total={PANES.length}
-        onBack={pane === 'tour' ? () => go(-1) : undefined}
+        onBack={pane === 'tour' || pane === 'import' ? () => go(-1) : undefined}
         // No skip on the name pane when the name is required — the one thing
         // we ask for. Sign in with Apple accounts may skip it (see nameRequired).
-        onSkip={pane === 'tour' || (pane === 'name' && !mustName) ? () => finish() : undefined}
+        onSkip={
+          pane === 'tour' || pane === 'import' || (pane === 'name' && !mustName)
+            ? () => finish()
+            : undefined
+        }
       />
 
       <div
@@ -78,6 +83,10 @@ function PhoneOnboarding() {
         )}
 
         {pane === 'tour' && <Tour name={name} onNext={() => go(1)} />}
+
+        {pane === 'import' && (
+          <ImportPane onImport={() => finish(ROUTES.importSheet)} onNext={() => go(1)} />
+        )}
 
         {pane === 'offer' && (
           <Offer onDone={() => finish()} onSeeAllPlans={() => finish(ROUTES.subscription)} />
@@ -272,6 +281,49 @@ function NamePane({
         />
       </Pane>
     </form>
+  )
+}
+
+/**
+ * The optional "bring your people" step. Anyone with a spreadsheet of
+ * contacts leaves onboarding straight for the import page; everyone else
+ * carries on, and can import any time from Contacts.
+ */
+function ImportPane({ onImport, onNext }: { onImport: () => void; onNext: () => void }) {
+  return (
+    <Pane
+      center
+      footer={
+        <>
+          <CapsuleButton variant="dark" onClick={onImport}>
+            Import from Excel
+          </CapsuleButton>
+          <button
+            type="button"
+            onClick={onNext}
+            className="press text-ios-subhead w-full py-2 text-center text-muted-foreground"
+          >
+            I’ll add people as I go
+          </button>
+        </>
+      }
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-success/10 text-success">
+        <FileSpreadsheet className="h-6 w-6" strokeWidth={2} aria-hidden />
+      </span>
+      <h2 className="text-ios-title mt-5 leading-[1.15]">Bring your people.</h2>
+      <p className="text-ios-subhead mt-2 text-text-secondary">
+        Keep contacts in a spreadsheet? Import it in any layout — you’ll check every row first.
+      </p>
+      <button
+        type="button"
+        onClick={() => void downloadTemplate('onboarding')}
+        className="press text-ios-subhead mt-6 flex items-center gap-2 text-brand"
+      >
+        <Download className="h-4 w-4" aria-hidden />
+        Or start from the Retrn template
+      </button>
+    </Pane>
   )
 }
 
