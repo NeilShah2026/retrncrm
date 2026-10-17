@@ -9,6 +9,7 @@ import { ContactsMockup } from '@/components/marketing/mockups/ContactsMockup'
 import { PipelineMockup } from '@/components/marketing/mockups/PipelineMockup'
 import { ComposeMockup } from '@/components/marketing/mockups/ComposeMockup'
 import { ColdEmailMockup } from '@/components/marketing/mockups/ColdEmailMockup'
+import { ImportMockup } from '@/components/marketing/mockups/ImportMockup'
 import { Button } from '@/components/ui/button'
 import { ROUTES } from '@/lib/routes'
 import { CHROME_STORE_URL } from '@/lib/constants'
@@ -133,6 +134,16 @@ export function LandingPage() {
             title="Write to people you haven’t met"
             description="Keep everyone you’re emailing cold on one list. Retrn drafts from your reason for writing, reviews yours for what gets ignored, and tells you when to follow up — five days out, then a week later, then it stops. When they write back, they become a contact with the whole thread."
             visual={<ColdEmailMockup />}
+          />
+        </div>
+        <div className="mt-16 lg:mt-20">
+          <FeatureSection
+            index={5}
+            lead
+            eyebrow="Import"
+            title="Bring the spreadsheet you already have"
+            description="Drop in an Excel or CSV file, however its columns are named, and Retrn matches them to the right fields. Every row is shown before anything is saved, and anyone already in Retrn is flagged so you don’t add them twice. Your phone’s address book comes in the same way."
+            visual={<ImportMockup />}
           />
         </div>
       </section>
