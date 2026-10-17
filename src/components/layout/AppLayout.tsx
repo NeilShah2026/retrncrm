@@ -33,6 +33,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { Logo } from './Logo'
 import { ShareProfileDialog } from '@/components/profile/ShareProfileDialog'
 import { AiConsentPrompt } from '@/components/ai/AiConsentPrompt'
+import { TourProvider } from '@/components/tour/TourProvider'
 import { ExtensionBanner } from '@/components/layout/ExtensionBanner'
 import { BillingNotice } from '@/components/billing/BillingNotice'
 import { useUI } from '@/context/ui-context'
@@ -215,7 +216,9 @@ function AccountMenu() {
 /** Sidebar row: 32px, selected = brand text on a sunken tint. */
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return cn(
-    'flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors duration-fast',
+    // 32px rows, 28px on a short window, so the whole sidebar fits without
+    // scrolling on any laptop screen.
+    'flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors duration-fast [@media(max-height:720px)]:h-7',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
     isActive
       ? 'bg-accent font-medium text-foreground [&_svg]:text-brand'
@@ -238,100 +241,118 @@ export function AppLayout() {
   useAnalyticsIdentity()
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r bg-bg-sunken/50 md:flex">
-        {/* One left edge for everything readable: the logo, nav icons, the
-            section label and the footer rows all sit 20px in (a 12px gutter
-            plus each row's 8px padding). Full-width controls use the gutter. */}
-        <div className="flex h-14 shrink-0 items-center px-5">
-          <Logo />
-        </div>
+    <TourProvider>
+      <div className="flex h-[100dvh] overflow-hidden bg-background">
+        {/* Desktop sidebar */}
+        <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r bg-bg-sunken/50 md:flex">
+          {/* One left edge for everything readable: the logo, nav icons, the
+              section label and the footer rows all sit 20px in (a 12px gutter
+              plus each row's 8px padding). Full-width controls use the gutter. */}
+          <div className="flex h-12 shrink-0 items-center px-5 [@media(max-height:720px)]:h-11">
+            <Logo />
+          </div>
 
-        <div className="space-y-2 px-3">
-          <div className="flex gap-2">
-            <Button className="flex-1 justify-start" onClick={openVoiceCapture}>
-              <PenLine />
-              Say who you met
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={openNewContact}
-              aria-label="New contact (form)"
-              title="New contact (N)"
+          <div className="space-y-2 px-3">
+            <div className="flex gap-2">
+              <Button className="flex-1 justify-start" onClick={openVoiceCapture} data-tour="capture">
+                <PenLine />
+                Say who you met
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openNewContact}
+                aria-label="New contact (form)"
+                title="New contact (N)"
+              >
+                <Plus />
+              </Button>
+            </div>
+            <button
+              onClick={openSearch}
+              data-tour="search"
+              className="flex h-8 w-full items-center gap-2 rounded-md border bg-background px-2 text-sm text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
-              <Plus />
-            </Button>
+              <Search className="h-4 w-4" />
+              <span className="flex-1 text-left">Search or run…</span>
+              <kbd className="pointer-events-none rounded-sm border bg-bg-sunken px-1 font-mono text-[10px] text-muted-foreground">
+                ⌘K
+              </kbd>
+            </button>
           </div>
-          <button
-            onClick={openSearch}
-            className="flex h-8 w-full items-center gap-2 rounded-md border bg-background px-2 text-sm text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            <Search className="h-4 w-4" />
-            <span className="flex-1 text-left">Search or run…</span>
-            <kbd className="pointer-events-none rounded-sm border bg-bg-sunken px-1 font-mono text-[10px] text-muted-foreground">
-              ⌘K
-            </kbd>
-          </button>
+
+          {/* Sized to fit; the scroll is only a fallback for a tiny window. */}
+          <nav className="scroll-native mt-4 min-h-0 flex-1 space-y-px overflow-y-auto px-3 pb-2 scrollbar-thin [@media(max-height:720px)]:mt-3">
+            {PRIMARY_NAV.filter((item) => !('laptopOnly' in item) || coldEmail).map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={navLinkClass}
+                data-tour={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">{item.label}</span>
+                {item.to === ROUTES.inbox && inboxCount > 0 && (
+                  <span className="tnum rounded-full bg-bg-sunken px-1.5 text-xs font-medium text-text-secondary">
+                    {inboxCount}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+            <div className="text-label px-2 pb-1 pt-4 text-muted-foreground [@media(max-height:720px)]:pt-3">
+              Toolkit
+            </div>
+            {SECONDARY_NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={navLinkClass}
+                data-tour={`nav-${item.label.toLowerCase()}`}
+              >
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Two rows: share + theme, then the account. */}
+          <div className="shrink-0 space-y-px border-t px-3 py-2">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShareOpen(true)}
+                className="flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 text-sm text-text-secondary transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <QrCode className="h-4 w-4 text-muted-foreground" />
+                Share profile
+              </button>
+              <ThemeToggle />
+            </div>
+            <AccountMenu />
+          </div>
+        </aside>
+
+        {/* Content column */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* A card that failed, or a subscription running out: above every
+              page, because it is about to change what the app can do. */}
+          <BillingNotice />
+          {/* Gives up its bottom edge to the keyboard as the keyboard rises,
+              so every page shrinks with it instead of being covered. */}
+          <main className="keyboard-inset flex min-h-0 flex-1 flex-col overflow-hidden">
+            <Outlet />
+          </main>
+
+          {/* Floats over the content it scrolls above rather than sitting in a
+              strip below it — pages leave room with `pb-tab-bar` (PageShell). */}
+          <PhoneTabBar />
         </div>
 
-        <nav className="scroll-native mt-5 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-          {PRIMARY_NAV.filter((item) => !('laptopOnly' in item) || coldEmail).map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              <item.icon className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1">{item.label}</span>
-              {item.to === ROUTES.inbox && inboxCount > 0 && (
-                <span className="tnum rounded-full bg-bg-sunken px-1.5 text-xs font-medium text-text-secondary">
-                  {inboxCount}
-                </span>
-              )}
-            </NavLink>
-          ))}
-          <div className="text-label px-2 pb-1.5 pt-5 text-muted-foreground">Toolkit</div>
-          {SECONDARY_NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              <item.icon className="h-4 w-4 text-muted-foreground" />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="space-y-0.5 border-t px-3 pb-3 pt-2">
-          <button
-            onClick={() => setShareOpen(true)}
-            className="flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-sm text-text-secondary transition-colors duration-fast hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            <QrCode className="h-4 w-4 text-muted-foreground" />
-            Share profile
-          </button>
-          <AccountMenu />
-          <div className="flex h-8 items-center justify-between pl-2">
-            <span className="text-xs text-muted-foreground">Synced</span>
-            <ThemeToggle />
-          </div>
-        </div>
-      </aside>
-
-      {/* Content column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* A card that failed, or a subscription running out: above every
-            page, because it is about to change what the app can do. */}
-        <BillingNotice />
-        {/* Gives up its bottom edge to the keyboard as the keyboard rises,
-            so every page shrinks with it instead of being covered. */}
-        <main className="keyboard-inset flex min-h-0 flex-1 flex-col overflow-hidden">
-          <Outlet />
-        </main>
-
-        {/* Floats over the content it scrolls above rather than sitting in a
-            strip below it — pages leave room with `pb-tab-bar` (PageShell). */}
-        <PhoneTabBar />
+        <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
+        <AiConsentPrompt />
+        <ExtensionBanner />
       </div>
-
-      <ShareProfileDialog open={shareOpen} onOpenChange={setShareOpen} />
-      <AiConsentPrompt />
-      <ExtensionBanner />
-    </div>
+    </TourProvider>
   )
 }

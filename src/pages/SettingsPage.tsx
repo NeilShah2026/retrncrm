@@ -49,6 +49,7 @@ import { useFeatureGate } from '@/hooks/useFeatureGate'
 import { useEntitlement } from '@/hooks/useEntitlement'
 import { deleteAccount } from '@/lib/deleteAccount'
 import { hasAiConsent, setAiConsent } from '@/lib/ai/consent'
+import { useTour } from '@/components/tour/TourProvider'
 import { isNative } from '@/lib/platform'
 import { ReminderSettingsRow } from '@/components/reminders/ReminderSettingsRow'
 import { LEGAL } from '@/pages/legal/legalInfo'
@@ -85,6 +86,7 @@ export function SettingsPage() {
   const { openOnboarding, openImportContacts, openUpgrade } = useUI()
   const gate = useFeatureGate()
   const { user, signOut } = useAuth()
+  const { start: startTour } = useTour()
   const { edu, label: planLabel, isPro } = useEntitlement()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
@@ -675,14 +677,14 @@ export function SettingsPage() {
             <PanelHeader>Help</PanelHeader>
             <PanelSection className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm">
-                <p className="font-medium">Run through onboarding</p>
+                <p className="font-medium">Take the tour</p>
                 <p className="text-muted-foreground">
-                  See the welcome flow again.
+                  A quick walk through where everything is in Retrn.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={openOnboarding} className="shrink-0">
+              <Button variant="outline" size="sm" onClick={startTour} className="shrink-0">
                 <CircleHelp />
-                Run it
+                Start tour
               </Button>
             </PanelSection>
           </Panel>

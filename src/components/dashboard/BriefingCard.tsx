@@ -158,7 +158,7 @@ export function NextUp({
   const pending = (!ready || loading) && !briefing
 
   return (
-    <Panel className={cn('flex flex-col', className)}>
+    <Panel className={cn('flex flex-col', className)} data-tour="next-up">
       <PanelHeader
         action={
           <Button

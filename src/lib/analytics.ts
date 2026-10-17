@@ -210,6 +210,10 @@ export type AnalyticsEvent =
   | 'subscription_active'
   | 'school_email_verified'
   | 'ai_consent_changed'
+  /** The first-run tooltip walkthrough. */
+  | 'tour_started'
+  | 'tour_completed'
+  | 'tour_skipped'
   /** Importing contacts from a spreadsheet. */
   | 'import_template_downloaded'
   | 'sheet_import_started'

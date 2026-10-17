@@ -299,7 +299,11 @@ export function ContactsPage() {
                 Suggest tags
               </Button>
             )}
-            <Button variant="outline" onClick={() => navigate(ROUTES.importSheet)}>
+            <Button
+              variant="outline"
+              onClick={() => navigate(ROUTES.importSheet)}
+              data-tour="contacts-import"
+            >
               <FileSpreadsheet />
               Import from Excel
             </Button>
