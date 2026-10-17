@@ -49,17 +49,27 @@ export function useOnboardingFlow() {
   const mustName = nameRequired(user)
   const ready = (!mustName || name.trim().length > 0) && !saving
 
-  const submit = React.useCallback(async () => {
-    const trimmed = nameRef.current.trim()
-    if (trimmed) {
+  /**
+   * Save the name and go. `interlude` runs between the two — the laptop plays
+   * its "nice to meet you" hand-off there, so the save happens under the
+   * animation rather than before it.
+   */
+  const submit = React.useCallback(
+    async (interlude?: () => Promise<void>) => {
+      const trimmed = nameRef.current.trim()
+      const save = trimmed
+        ? updateName(trimmed).then(({ error }) => {
+            // Not a reason to hold anyone here: `finish` writes it again.
+            if (error) console.warn('[onboarding] name save failed; retrying at finish', error)
+          })
+        : Promise.resolve()
       setSaving(true)
-      const { error } = await updateName(trimmed)
+      await Promise.all([save, interlude?.()])
       setSaving(false)
-      // Not a reason to hold anyone here: `finish` writes it again.
-      if (error) console.warn('[onboarding] name save failed; retrying at finish', error)
-    }
-    finish(true)
-  }, [finish, updateName])
+      finish(true)
+    },
+    [finish, updateName],
+  )
 
   return { name, setName, mustName, ready, saving, submit, skip: () => finish(false) }
 }
